@@ -1,449 +1,129 @@
-# Lok
+# loker
 
-Declarative multi-LLM orchestration. Define workflows in TOML, run them against
-multiple backends, get synthesized results.
+LLM orchestration engine. Routes prompts across multiple model families,
+aggregates their responses, and verifies outputs before they ship.
 
-## What It Is
+> **Status: pre-v0 (M0 - fork preparation).** loker is a hard fork of
+> [`ducks/lok`](https://github.com/ducks/lok). The lok command surface still
+> works under the new `loker` binary. The new primitives described below
+> (Strategy, Aggregator, VerifyHook, TensorZero backend) land in milestones
+> M1-M9. See [`loker-design.md`](https://github.com/maxkulish/investigations/blob/main/sakana-fugu/loker-design.md)
+> for the full design.
 
-- **Multi-backend queries**: Ask the same question to Claude, Codex, Gemini, and
-  Ollama in parallel, then synthesize or vote on the results
-- **Declarative workflows**: TOML files that define multi-step LLM pipelines with
-  dependencies, retries, and error handling
-- **Backend abstraction**: Swap `backend = "claude"` for `backend = "ollama"`
-  without changing your workflow logic
+## Why loker exists
 
-## What It's Not
+Two gaps in the current Rust LLM-orchestration ecosystem:
 
-- **Not an agent**: Lok doesn't make decisions or write code. It runs queries and
-  returns results. Use it *with* an agent (Claude Code, Cursor, etc.) that acts
-  on the output.
-- **Not a wrapper for one LLM**: If you only use Claude, you don't need lok. The
-  value is in multi-backend orchestration and consensus.
+1. **No production cross-family aggregation.** Sending the same prompt to
+   Anthropic, Google, OpenAI, and Zhipu in parallel and merging their answers
+   reduces correlated failures - but no Rust crate ships this as a primitive.
+2. **No escalating-retry primitive.** The pattern "try cheap model -> verify ->
+   retry on stronger model if it fails" is widely used informally but absent
+   from existing Rust orchestrators (`rig`, `genai`, `graniet/llm`, `swarms-rs`).
 
-## Quick Start
+loker exists to put both behind a stable, declarative TOML interface.
+
+## The three primitives
+
+These are the public surface loker is built around. None ship yet (M2-M4).
+
+### Strategy - how to call backends
+
+```rust
+enum Strategy {
+    SingleModel,        // one backend, one call
+    ParallelFanOut,     // N backends in parallel, partial-failure tolerant
+    EscalatingRetry,    // cheap -> medium -> strong, stop on first verify-pass
+}
+```
+
+### Aggregator - how to merge results
+
+```rust
+enum Aggregator {
+    Concat,             // dump all responses (debug, audit trails)
+    LLMJudge,           // use an LLM (different family) to merge
+    AnyFail,            // any non-pass aborts the phase
+    Vote,               // N-of-M agreement with cross-family enforcement
+}
+```
+
+### VerifyHook - how to gate retries
+
+```rust
+enum VerifyHook {
+    RunCommand,         // exit code 0 = pass
+    LLMVerifier,        // ask a model "does this answer the question?"
+    TestRunner,         // parse `cargo test` JSON output
+}
+```
+
+## Architecture
+
+```
+trigger          ─►  engine            ─►  transport          ─►  providers
+(CLI / hook)         (loker)               (TensorZero +          (Anthropic /
+                                            existing CLIs)         OpenAI / Google /
+                                                                   Ollama / ...)
+```
+
+loker is provider-agnostic. It speaks to:
+- **Subprocess backends** (`claude`, `codex`, `gemini`, `ollama`) - inherited from lok
+- **HTTP backend** via [TensorZero](https://www.tensorzero.com/) gateway
+  with ClickHouse-backed observability - new in M1
+
+## What works today (inherited from lok)
 
 ```bash
-cargo install lokomotiv      # Package is "lokomotiv", binary is "lok"
-
-lok doctor                   # Check what backends are available
-lok ask "Explain this code"  # Query all available backends
-lok hunt .                   # Find bugs in current directory
+cargo install --path .                 # build from source while M0 lands
+loker doctor                           # check which backend CLIs are installed
+loker ask "Find N+1 queries"           # query all backends
+loker hunt .                           # multi-prompt bug hunt
+loker audit .                          # security audit
+loker diff main..HEAD                  # multi-backend code review
 ```
 
-Example `lok doctor` output when backends are configured:
-
-```
-Checking backends...
-
-  ✓ codex - ready
-  ✓ gemini - ready
-  ✓ claude - ready
-
-✓ 3 backend(s) ready.
-```
-
-## Prerequisites
-
-Lok wraps existing LLM CLI tools. Install the ones you want to use:
-
-| Backend | Install | Notes |
-|---------|---------|-------|
-| Codex | `npm install -g @openai/codex` | Fast code analysis |
-| Gemini | `npm install -g @google/gemini-cli` | Deep security audits |
-| Claude | [claude.ai/download](https://claude.ai/download) | Claude Code CLI |
-| Ollama | [ollama.ai](https://ollama.ai) | Local models, no API keys |
-
-For issue/PR workflows, you also need:
-
-| Tool | Install | Used by |
-|------|---------|---------|
-| gh | [cli.github.com](https://cli.github.com) | `lok run fix`, `lok run review-pr` |
-
-Run `lok doctor` to see which backends are detected. Core commands (`lok ask`,
-`lok hunt`, `lok audit`) work without `gh`.
-
-## Commands
-
-### Analysis
-
-```bash
-lok ask "Find N+1 queries"              # Query all backends
-lok ask -b codex "Find dead code"       # Specific backend
-lok hunt .                              # Bug hunt (multiple prompts)
-lok hunt --issues                       # Bug hunt + create GitHub issues
-lok audit .                             # Security audit
-lok explain                             # Explain codebase structure
-```
-
-### Code Review
-
-```bash
-lok diff                                # Review staged changes
-lok diff main..HEAD                     # Review branch vs main
-lok run review-pr 123                   # Multi-backend PR review + comment
-```
-
-### Issue Management
-
-```bash
-lok run fix 123                         # Analyze issue, propose fix, comment
-lok ci 123                              # Analyze CI failures
-```
-
-### Multi-Agent Modes
-
-```bash
-lok debate "Should we use async here?"  # Backends argue and refine
-lok spawn "Build a REST API"            # Break into parallel subtasks
-lok conduct "Find and fix perf issues"  # Fully autonomous
-```
-
-### Workflows
-
-```bash
-lok run workflow-name                   # Run a workflow
-lok workflow list                       # List available workflows
-```
-
-### Utilities
-
-```bash
-lok doctor                              # Check installation
-lok backends                            # List configured backends
-lok suggest "task"                      # Suggest best backend for task
-lok init                                # Create config file
-```
-
-## Workflows
-
-Workflows are TOML files that define multi-step LLM pipelines. Steps can depend
-on previous steps and run in parallel when possible.
-
-```toml
-# .lok/workflows/example.toml
-name = "example"
-
-[[steps]]
-name = "scan"
-backend = "codex"
-prompt = "Find obvious issues in this codebase"
-
-[[steps]]
-name = "deep-dive"
-backend = "gemini"
-depends_on = ["scan"]
-prompt = "Investigate these findings: {{ steps.scan.output }}"
-
-[[steps]]
-name = "comment"
-depends_on = ["deep-dive"]
-shell = "gh issue comment 123 --body '{{ steps.deep-dive.output }}'"
-```
-
-### Workflow Resolution
-
-Lok searches for workflows in this order (first match wins):
-
-1. **Project**: `.lok/workflows/{name}.toml`
-2. **User**: `~/.config/lok/workflows/{name}.toml`
-3. **Embedded**: Built into the lok binary
-
-This means you can override any built-in workflow by creating your own version
-at the project or user level.
-
-### Built-in Workflows
-
-Lok ships with these workflows embedded in the binary:
-
-| Workflow | Description |
-|----------|-------------|
-| `diff` | Review git changes with multiple backends |
-| `explain` | Explain codebase structure and architecture |
-| `audit` | Security audit with multiple backends |
-| `hunt` | Bug hunt with multiple backends |
-
-Run `lok workflow list` to see all available workflows. Built-in workflows show
-as "(built-in)", which you can override by creating your own version:
-
-```bash
-lok workflow list              # Shows: diff (built-in)
-# Create override:
-mkdir -p .lok/workflows
-lok run diff > /dev/null       # See what it does, then customize:
-cat > .lok/workflows/diff.toml << 'EOF'
-name = "diff"
-description = "My custom diff review"
-# ... your custom steps
-EOF
-lok workflow list              # Now shows: diff (local)
-```
-
-### Consensus and Error Handling
-
-For multi-backend steps, you can require consensus and handle partial failures.
-
-**Workflow-level defaults** apply to all steps (steps can override):
-
-```toml
-name = "my-workflow"
-continue_on_error = true    # All steps continue on failure by default
-timeout = 300000            # All steps get 5 minute timeout by default
-
-[[steps]]
-name = "fast_step"
-backend = "codex"
-timeout = 60000             # Override: this step gets 1 minute
-prompt = "Quick analysis..."
-
-[[steps]]
-name = "critical_step"
-backend = "claude"
-continue_on_error = false   # Override: this step must succeed
-prompt = "Important work..."
-```
-
-**Step-level consensus** for multi-backend synthesis:
-
-```toml
-[[steps]]
-name = "propose_claude"
-backend = "claude"
-prompt = "Propose a fix..."
-
-[[steps]]
-name = "propose_codex"
-backend = "codex"
-prompt = "Propose a fix..."
-
-[[steps]]
-name = "debate"
-backend = "claude"
-depends_on = ["propose_claude", "propose_codex", "propose_gemini"]
-min_deps_success = 2        # Need at least 2/3 backends to succeed
-prompt = "Synthesize the proposals: {{ steps.propose_claude.output }}..."
-```
-
-When `min_deps_success` is set:
-- Step runs if at least N dependencies succeeded
-- Failed dependencies with `continue_on_error` pass their error output to the prompt
-- Logs "consensus reached (2/3 succeeded)" when threshold is met
-
-This prevents wasted tokens when one backend times out or hits rate limits.
-
-### Hard vs Soft Failures
-
-Steps fail in two ways:
-
-- **Hard failure**: Step fails and workflow stops. This is the default behavior.
-- **Soft failure**: Step fails but workflow continues. Enabled with `continue_on_error = true`.
-
-When a soft failure occurs, the error message is passed to dependent steps instead
-of the normal output. This lets downstream steps handle the failure gracefully:
-
-```toml
-[[steps]]
-name = "risky_step"
-backend = "gemini"
-continue_on_error = true   # Soft failure - workflow continues
-prompt = "..."
-
-[[steps]]
-name = "handler"
-depends_on = ["risky_step"]
-prompt = """
-{% if "error" in steps.risky_step.output %}
-Handle the error: {{ steps.risky_step.output }}
-{% else %}
-Process result: {{ steps.risky_step.output }}
-{% endif %}
-"""
-```
-
-### Retries
-
-Steps can retry on transient failures with exponential backoff:
-
-```toml
-[[steps]]
-name = "flaky_backend"
-backend = "gemini"
-retries = 3              # Retry up to 3 times (default: 0)
-retry_delay = 2000       # Start with 2 second delay (default: 1000ms)
-prompt = "..."
-```
-
-The delay doubles after each retry: 2s, 4s, 8s. Retries help with rate limits
-and temporary network issues. After all retries are exhausted, the step fails
-normally (hard or soft depending on `continue_on_error`).
-
-### Agentic Features
-
-Workflows can apply code edits and verify them:
-
-```toml
-[[steps]]
-name = "fix"
-backend = "claude"
-apply_edits = true
-verify = "cargo build"
-prompt = """
-Fix this issue. Output JSON:
-{"edits": [{"file": "src/main.rs", "old": "...", "new": "..."}]}
-"""
-```
-
-**How `apply_edits` works:**
-
-1. Parses JSON from LLM output looking for `{"edits": [...]}`
-2. For each edit, finds `old` text in `file` and replaces with `new`
-3. If `verify` is set, runs the command after edits
-4. If verification fails, the step fails (edits remain applied)
-
-**Risks and failure modes:**
-
-- **File not found**: Edit fails if the target file doesn't exist
-- **Text not found**: Edit fails if `old` text isn't in the file
-- **Ambiguous match**: Edit fails if `old` text appears multiple times
-- **Partial application**: If edit 3 of 5 fails, edits 1-2 remain applied
-
-**Automatic rollback with git-agent:**
-
-If [git-agent](https://github.com/ducks/git-agent) is installed and initialized,
-lok automatically creates a checkpoint before applying edits. If edits fail or
-verification fails, lok rolls back to the checkpoint.
-
-```bash
-# Install git-agent
-cargo install --git https://github.com/ducks/git-agent
-
-# Initialize in your project
-git-agent init
-git-agent begin "Working on feature X"
-
-# Now lok will auto-checkpoint before apply_edits
-lok run my-workflow  # Creates checkpoint, applies edits, rolls back on failure
-```
-
-When git-agent is active, you'll see:
-```
-  → Applying edits...
-    ✓ git-agent checkpoint created
-    ✓ Applied 3 edit(s)
-  verify: cargo build
-    ✗ Verification failed: ...
-    ↩ Rolled back via git-agent
-```
-
-Without git-agent, lok still works but won't auto-rollback.
-
-**Recommendations:**
-
-- Use git-agent for automatic rollback on failures
-- Start with `verify` commands to catch bad edits early
-- Review LLM output before running with `--apply` in production
-- Keep `old` text specific enough to match exactly once
-
-### Structured Output
-
-Workflows can produce JSON output for programmatic consumption. Use the
-`output_format` field to control how LLM responses are parsed:
-
-```toml
-[[steps]]
-name = "analyze"
-backend = "codex"
-output_format = "json"    # Parse output as JSON
-prompt = "Return findings as JSON array..."
-```
-
-Output format options:
-- `text` (default): Raw text output
-- `json`: Parse as JSON object
-- `json_array`: Parse as JSON array
-- `jsonl`: Parse as newline-delimited JSON
-
-Downstream steps can access parsed fields:
-
-```toml
-[[steps]]
-name = "report"
-depends_on = ["analyze"]
-prompt = "Summarize: {{ steps.analyze.output.findings }}"
-```
-
-## Configuration
-
-Works without config. For customization, create `lok.toml` or
-`~/.config/lok/lok.toml`:
-
-```toml
-[defaults]
-parallel = true
-timeout = 300
-# Wrap shell commands for isolated environments (NixOS, Docker)
-# command_wrapper = "nix-shell --run '{cmd}'"
-# command_wrapper = "docker exec dev sh -c '{cmd}'"
-
-[backends.codex]
-enabled = true
-command = "codex"
-args = ["exec", "--json", "-s", "read-only"]
-
-[backends.ollama]
-enabled = true
-command = "http://localhost:11434"
-model = "qwen2.5-coder:7b"
-
-[cache]
-enabled = true
-ttl_hours = 24
-```
-
-### Command Wrapper (NixOS/Docker)
-
-If you use isolated environments, shell commands in workflows may fail due to
-missing dependencies. Use `command_wrapper` to wrap all shell commands:
-
-```toml
-[defaults]
-# For NixOS with nix-shell
-command_wrapper = "nix-shell --run '{cmd}'"
-
-# For Docker
-command_wrapper = "docker exec dev sh -c '{cmd}'"
-
-# For direnv
-command_wrapper = "direnv exec . {cmd}"
-```
-
-The `{cmd}` placeholder is replaced with the actual command.
-
-## Backend Strengths
-
-| Backend | Best For | Speed |
-|---------|----------|-------|
-| Codex | Code patterns, N+1, dead code | Fast |
-| Gemini | Security audits, deep analysis | Slow (thorough) |
-| Claude | Orchestration, reasoning | Medium |
-| Ollama | Local/private, no rate limits | Varies |
-
-## Real World Results
-
-Lok found 25 bugs in its own codebase, then found a real bug in Discourse
-(35k stars) that became a merged PR.
-
-```bash
-lok hunt ~/dev/discourse --issues -y    # Found hardlink limit bug
-```
-
-## Why "Lok"?
-
-Swedish/German: Short for "lokomotiv" (locomotive). The conductor sends trained
-models down the tracks.
-
-Sanskrit/Hindi: "lok" means "world" or "people", as in "Lok Sabha" (People's
-Assembly). Multiple agents working as a collective.
+Workflows are TOML files under `.lok/workflows/` (config filename will move to
+`loker.toml` / `.loker/workflows/` in a later milestone with a deprecation
+window for both names).
+
+## Roadmap
+
+| M | Milestone | Test contract |
+|---|-----------|---------------|
+| M0 | Fork prep: rename, `genai = "0.6"` dep, attribution | `cargo test` green |
+| M1 | TensorZero backend via `genai` crate | wiremock-based unit tests + opt-in integration |
+| M2 | Strategy primitives (`SingleModel`, `ParallelFanOut`, `EscalatingRetry`) | unit tests with `MockBackend` |
+| M3 | Aggregator vocabulary (`Concat`, `LLMJudge`, `AnyFail`, `Vote`) + family-overlap guard | property tests + family-conflict tests |
+| M4 | Verify hooks (`RunCommand`, `LLMVerifier`, `TestRunner`) | per-hook unit tests against fixtures |
+| M5 | Phase runner + `trace.jsonl` (OpenTelemetry GenAI semconv) | resumability test, schema test |
+| M6 | `design-doc-tdd` reference workflow | end-to-end against local TensorZero |
+| M7 | TensorZero deployment recipe (gateway + ClickHouse + UI, Tier 2) | smoke script with health/query/observe |
+| M8 | CLI polish: `explain`, `resume`, `trace` pretty-printer | snapshot tests |
+| M9 | Documentation, migration guide from lok | doc-tests on README samples |
+| M10/M11 | HITL hook + browser UI - separate doc (`loker-hitl-design.md`) | depends on M4/M5 |
+
+## Design documents
+
+The actual decision-making lives in design docs, not this README:
+
+- **[`loker-design.md`](https://github.com/maxkulish/investigations/blob/main/sakana-fugu/loker-design.md)** - the engine: primitives, TOML grammar, milestones, related work, references
+- **`loker-hitl-design.md`** - human-in-the-loop hook and the localhost UI
+- **`workflow-design.md`** - broader system context across trigger / engine / transport / providers
+
+## Lineage
+
+loker is a hard fork of [`ducks/lok`](https://github.com/ducks/lok), MIT
+licensed, started in early 2026. Every commit before M0 in this repository's
+history was authored by ducks. The fork preserves lok's command surface while
+adding the orchestration primitives needed for cross-family aggregation and
+escalating retry.
+
+If you want lok's original direction (single-shot multi-backend queries, code
+review, audit) without the orchestration-primitive layer, use upstream lok
+directly.
 
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE). Copyright is held jointly: original work by
+ducks, derivative work by Max Kulish.
