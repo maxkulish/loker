@@ -1,0 +1,42 @@
+{
+  "anthropic_success": {
+    "elapsed_ms": 172,
+    "error": {
+      "message": "All variants failed with errors: haiku_v1: All model providers failed to infer with errors: anthropic: Error 401 Unauthorized from anthropic client: {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaR19qc4S368RUM7dSx6z\"}"
+    },
+    "expect_success": true,
+    "has_episode_id": false,
+    "http_status": 502,
+    "model_in_response": null,
+    "object": null,
+    "usage_keys": []
+  },
+  "openai_success": {
+    "elapsed_ms": 1578,
+    "error": null,
+    "expect_success": true,
+    "has_episode_id": true,
+    "http_status": 200,
+    "model_in_response": "tensorzero::function_name::loker_d1_openai::variant_name::mini_v1",
+    "object": "chat.completion",
+    "usage_keys": [
+      "completion_tokens",
+      "prompt_tokens",
+      "prompt_tokens_details",
+      "tensorzero_cost",
+      "total_tokens"
+    ]
+  },
+  "unknown_function": {
+    "elapsed_ms": 1,
+    "error": {
+      "message": "Unknown function: loker_d1_does_not_exist"
+    },
+    "expect_success": false,
+    "has_episode_id": false,
+    "http_status": 404,
+    "model_in_response": null,
+    "object": null,
+    "usage_keys": []
+  }
+}

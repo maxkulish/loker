@@ -1,0 +1,41 @@
+# tensorzero.toml for the CLO-243 round-trip spike.
+#
+# Two single-variant `chat` functions, each routed to a single provider.
+# Function names are deliberately of the form `loker_d1_<provider>` so the
+# spike can observe whether the response `model` field echoes the function
+# name, the variant name, or the underlying provider model.
+
+[gateway]
+bind_address = "0.0.0.0:3000"
+observability.enabled = true
+
+# Pre-declare the underlying provider models so the variant references stay
+# stable even if we swap the upstream model_name later.
+
+[models.loker_anthropic_haiku]
+routing = ["anthropic"]
+
+[models.loker_anthropic_haiku.providers.anthropic]
+type = "anthropic"
+model_name = "claude-haiku-4-5"
+
+[models.loker_openai_mini]
+routing = ["openai"]
+
+[models.loker_openai_mini.providers.openai]
+type = "openai"
+model_name = "gpt-4o-mini"
+
+[functions.loker_d1_anthropic]
+type = "chat"
+
+[functions.loker_d1_anthropic.variants.haiku_v1]
+type = "chat_completion"
+model = "loker_anthropic_haiku"
+
+[functions.loker_d1_openai]
+type = "chat"
+
+[functions.loker_d1_openai.variants.mini_v1]
+type = "chat_completion"
+model = "loker_openai_mini"

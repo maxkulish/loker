@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "Pong.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1777143564,
+  "episode_id": "019dc602-c1ae-7e03-b9c6-029a9b932188",
+  "id": "019dc602-c1ae-7e03-b9c6-0288ab8790fa",
+  "model": "tensorzero::function_name::loker_d1_openai::variant_name::mini_v1",
+  "object": "chat.completion",
+  "service_tier": null,
+  "system_fingerprint": "",
+  "usage": {
+    "completion_tokens": 3,
+    "prompt_tokens": 15,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "tensorzero_cost": null,
+    "total_tokens": 18
+  }
+}

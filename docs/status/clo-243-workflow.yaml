@@ -1,0 +1,97 @@
+task_id: CLO-243
+task_title: "Run TensorZero round-trip spike (D1)"
+task_url: "https://linear.app/cloud-ai/issue/CLO-243/run-tensorzero-round-trip-spike-d1"
+task_type: operational
+classification_reason: |
+  Spike / investigation task. Linear description is a procedural runbook
+  (bring up gateway, drive single_model call, capture shapes, document
+  verdict). Deliverables are docs + fixtures, not a feature implementation,
+  so design/plan phases would be redundant. Operational workflow is
+  execute -> document -> PR -> complete.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: High
+  branch_suggested: kmamemo/clo-243-run-tensorzero-round-trip-spike-d1
+  branch_actual: feat/clo-243-tensorzero
+  blocks: [CLO-247]
+  blocked_by: []
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-25T18:50:08Z"
+  updated_at: "2026-04-25T20:10:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Operational task"
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Operational task"
+  plan:
+    status: skipped
+    skip_reason: "Operational task"
+  execute:
+    status: complete
+    artifacts_expected:
+      - "docs/spikes/2026-04-25-tensorzero-roundtrip.md"
+      - "tests/fixtures/tensorzero/*"
+    artifacts_produced:
+      - "tensorzero/docker-compose.yml"
+      - "tensorzero/config/tensorzero.toml"
+      - "tensorzero/.env.example"
+      - "examples/tensorzero_spike.rs"
+      - "tests/fixtures/tensorzero/anthropic_success_request.json"
+      - "tests/fixtures/tensorzero/anthropic_success_response.json"
+      - "tests/fixtures/tensorzero/openai_success_request.json"
+      - "tests/fixtures/tensorzero/openai_success_response.json"
+      - "tests/fixtures/tensorzero/unknown_function_request.json"
+      - "tests/fixtures/tensorzero/unknown_function_response.json"
+      - "tests/fixtures/tensorzero/summary.json"
+  document:
+    status: complete
+    artifacts_produced:
+      - "docs/spikes/2026-04-25-tensorzero-roundtrip.md"
+    decisions_recorded:
+      - "family_of() derives from loker-side function name (function-name suffix convention loker_<purpose>_<family>); gateway response carries no provider hint. Resolves design-doc §11 Q4."
+      - "Token mapping: prompt_tokens/completion_tokens cover M1; cached_tokens + tensorzero_cost deferred to M5/M6 cost-summary work."
+      - "Defect surfaced for CLO-247: src/backend/tensorzero.rs::map_status maps 5xx -> Network unconditionally, but TensorZero wraps upstream auth failures as 502, so a permanent auth error becomes retryable. Fix via body-message inspection."
+      - "Path mismatch surfaced for CLO-247: src/backend/tensorzero.rs test config builds endpoint as /v1/, real gateway path is /openai/v1/."
+  pr:
+    status: pending
+    required: true
+    required_reason: "Spike output (verdict doc + fixtures) ships in repo and unblocks CLO-247 / Phase 1 (T-005+)"
+  complete:
+    status: pending
+
+acceptance_criteria:
+  - "Verdict written to docs/spikes/2026-04-25-tensorzero-roundtrip.md covering: header set, model-name mapping, family-id source, token shape, retryable error classes, open follow-ups"
+  - "Sample request/response payloads checked in as fixtures under tests/fixtures/tensorzero/ (sanitised - no secrets)"
+  - "Decision recorded for family_of source of truth (PRD §8 open question)"
+
+project_sync:
+  start_skipped: true
+  start_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo yet; /project:sync has no targets to update. Linear is the source of truth for this task."
+
+history:
+  - timestamp: "2026-04-25T18:50:08Z"
+    action: workflow_started
+    phase: init
+    details: "Created workflow state for CLO-243. Classified as operational (spike). Branch feat/clo-243-tensorzero already checked out."
+  - timestamp: "2026-04-25T18:50:08Z"
+    action: project_sync_start
+    phase: init
+    details: "Skipped: no aggregation files (PROJECT.md/ROADMAP.md/DEPENDENCIES.md) in repo. Linear remains source of truth."
+  - timestamp: "2026-04-25T20:00:00Z"
+    action: phase_completed
+    phase: execute
+    details: "Tier 2 stack (gateway + ClickHouse + UI) brought up. Spike runner captured 3 scenarios live: openai_success (200), anthropic_success (502, wrapped upstream 401), unknown_function (404). Sanitised request/response fixtures written under tests/fixtures/tensorzero/. Stack torn down."
+  - timestamp: "2026-04-25T20:10:00Z"
+    action: phase_completed
+    phase: document
+    details: "Verdict written at docs/spikes/2026-04-25-tensorzero-roundtrip.md. Sections: HTTP shape, model-name mapping, family-id source decision, token shape, retryable error classes, open follow-ups, reproduce. Family_of decision and 502/auth + path-prefix follow-ups recorded for CLO-247."

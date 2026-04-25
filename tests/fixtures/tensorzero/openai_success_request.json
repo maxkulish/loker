@@ -1,0 +1,12 @@
+{
+  "_meta_authorization_header": "<REDACTED>",
+  "max_tokens": 32,
+  "messages": [
+    {
+      "content": "Reply with the single word: pong.",
+      "role": "user"
+    }
+  ],
+  "model": "tensorzero::function_name::loker_d1_openai",
+  "temperature": 0.0
+}
