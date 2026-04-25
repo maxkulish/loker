@@ -5,12 +5,16 @@ mod codex;
 mod gemini;
 mod ollama;
 mod retry;
+#[allow(dead_code)]
+mod tensorzero;
 
 #[cfg(feature = "bedrock")]
 #[allow(unused_imports)]
 pub use bedrock::BedrockBackend;
 pub use claude::ClaudeBackend;
 pub use retry::{RetryExecutor, RetryPolicy};
+#[allow(unused_imports)]
+pub use tensorzero::{TensorZeroBackend, TensorZeroConfig};
 
 use crate::config::{BackendConfig, Config};
 use anyhow::Result;

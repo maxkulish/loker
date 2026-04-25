@@ -1,4 +1,4 @@
-//! Integration tests for lok workflow engine
+//! Integration tests for loker workflow engine
 //!
 //! These tests use shell-only workflows to verify engine behavior
 //! without requiring LLM backends.
@@ -7,10 +7,18 @@ use std::process::Command;
 
 fn run_workflow(workflow_path: &str) -> (bool, String) {
     let output = Command::new("cargo")
-        .args(["run", "--quiet", "--bin", "lok", "--", "run", workflow_path])
+        .args([
+            "run",
+            "--quiet",
+            "--bin",
+            "loker",
+            "--",
+            "run",
+            workflow_path,
+        ])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
-        .expect("Failed to execute lok");
+        .expect("Failed to execute loker");
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();

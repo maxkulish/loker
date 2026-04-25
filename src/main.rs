@@ -24,8 +24,8 @@ use colored::Colorize;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
-#[command(name = "lok")]
-#[command(about = "Multi-LLM orchestration tool for code analysis")]
+#[command(name = "loker")]
+#[command(about = "LLM orchestration: cross-family aggregation, escalating retry, verify hooks")]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]
@@ -757,7 +757,7 @@ async fn main() -> Result<()> {
                     "{} {} backend(s) ready. Run {} to see them.",
                     "✓".green(),
                     available,
-                    "lok backends".cyan()
+                    "loker backends".cyan()
                 );
             } else {
                 println!(
@@ -1207,7 +1207,7 @@ async fn run_report(
     let agent_dir = dir.join(".agent");
     if !agent_dir.exists() {
         anyhow::bail!(
-            "No agent history found. Run 'lok init --agent' to initialize agent tracking."
+            "No agent history found. Run 'loker init --agent' to initialize agent tracking."
         );
     }
 
@@ -1319,7 +1319,7 @@ async fn run_report(
     }
 
     // Sort by timestamp (oldest first for chronological order in reports)
-    events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    events.sort_by_key(|a| a.timestamp);
 
     // Apply limit (from the end, so we get most recent)
     if let Some(n) = limit {
@@ -1561,15 +1561,15 @@ async fn run_diff(
         println!("Tips:");
         println!(
             "  {} - review staged changes (default)",
-            "lok diff".dimmed()
+            "loker diff".dimmed()
         );
         println!(
             "  {} - review all uncommitted changes",
-            "lok diff --unstaged".dimmed()
+            "loker diff --unstaged".dimmed()
         );
         println!(
             "  {} - review branch vs main",
-            "lok diff main..HEAD".dimmed()
+            "loker diff main..HEAD".dimmed()
         );
         return Ok(());
     }
