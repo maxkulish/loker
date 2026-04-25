@@ -74,7 +74,12 @@ phases:
       validator_dev_dep: "jsonschema 0.46 (dev-dependencies only; verified absent from cargo tree -e=normal)"
     make_check_status: pass
   pr:
-    status: pending
+    status: open
+    pr_number: 6
+    pr_url: "https://github.com/maxkulish/loker/pull/6"
+    commit_sha: b5f2ef6
+    pushed_at: "2026-04-25T22:18:00Z"
+    opened_at: "2026-04-25T22:18:00Z"
   complete:
     status: pending
 
@@ -112,3 +117,15 @@ history:
     action: implementation_complete
     phase: implement
     details: "All 10 sub-tasks done. 8 schemas + 36 paired fixtures (16 positive + 14 negative + 6 trace + extras) under docs/schemas/ and tests/fixtures/schemas/. Validator at tests/schema_validation.rs scans every schema, requires paired positive/+negative/ dirs, validates each fixture, and detects orphan fixture dirs. jsonschema 0.46 confirmed dev-only (cargo tree -e=normal | rg jsonschema empty). make check green: 473 unit + 6 integration + 1 schema validation tests, 0 clippy warnings."
+  - timestamp: "2026-04-25T22:17:00Z"
+    action: commit_created
+    phase: pr
+    details: "git commit b5f2ef6 - 'feat(CLO-244): JSON schemas for run artefacts (D2)'. 49 files changed, 2041 insertions. Stages Cargo.toml/Cargo.lock (jsonschema dev-dep), docs/schemas/, docs/specs/, docs/status/clo-244-workflow.yaml, tests/fixtures/schemas/, tests/schema_validation.rs."
+  - timestamp: "2026-04-25T22:18:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Pushed feat/clo-244-json to origin (github.com:maxkulish/loker.git). New branch, upstream tracking set."
+  - timestamp: "2026-04-25T22:18:00Z"
+    action: pr_created
+    phase: pr
+    details: "Opened PR #6 https://github.com/maxkulish/loker/pull/6. Title 'feat(CLO-244): JSON schemas for run artefacts (D2)'. Body covers schemas, fixtures, validator, dev-dep verification, and unblocks list (T-024/T-029/T-048/T-050)."
