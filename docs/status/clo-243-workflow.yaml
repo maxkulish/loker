@@ -110,3 +110,7 @@ history:
     action: pr_created
     phase: pr
     details: "PR #3 opened: https://github.com/maxkulish/loker/pull/3"
+  - timestamp: "2026-04-25T20:35:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 9 Copilot inline comments in commit 05ec44b. Renamed anthropic_success -> anthropic_auth_failure across runner code, fixture filenames, summary.json key+flag, spike doc evidence list, and workflow YAML artifacts/history. Pinned tensorzero/gateway and tensorzero/ui to :lts. Tightened .env.example wording (OPENAI required for startup, ANTHROPIC has compose placeholder default). Fixed 'four scenarios' -> 'three scenarios' doc comment. make check green. Pushed to origin and replied to all 9 comments."
