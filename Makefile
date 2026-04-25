@@ -109,12 +109,12 @@ release:
 	@git tag -a v$(VERSION) -m "Release v$(VERSION)"
 	@git branch -d release/v$(VERSION)
 	@cargo build --release
-	@cp target/release/lok /usr/local/bin/lok
+	@cp target/release/loker /usr/local/bin/loker
 	@git push origin main
 	@git push origin v$(VERSION)
 	@echo ""
 	@echo "Released v$(VERSION)"
 	@echo "  - Tagged v$(VERSION)"
 	@echo "  - Pushed to origin"
-	@echo "  - Installed to /usr/local/bin/lok"
-	@lok --version
+	@echo "  - Installed to /usr/local/bin/loker"
+	@loker --version
