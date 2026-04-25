@@ -39,8 +39,8 @@ impl RetryPolicy {
         let delay = self.base_delay * exp;
 
         // Add jitter (±10%) to prevent thundering herd
-        let mut rng = rand::thread_rng();
-        let jitter = rng.gen_range(0.9..1.1);
+        let mut rng = rand::rng();
+        let jitter = rng.random_range(0.9..1.1);
         let delay_with_jitter = Duration::from_secs_f64(delay.as_secs_f64() * jitter);
 
         delay_with_jitter.min(self.max_delay)
