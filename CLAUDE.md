@@ -8,6 +8,10 @@ Active milestone: **M1 - TensorZero backend**.
 - `docs/plans/2026-04-25-m1-tensorzero-backend.md` - current task contract
 - `/Users/mk/Work/investigations/sakana-fugu/loker-design.md` - canonical design
 
+## Guides
+
+- `docs/guides/linear-mcp.md` - Linear MCP usage (project `CLO`, tool reference)
+
 ## Pre-merge gate
 
 ```bash
