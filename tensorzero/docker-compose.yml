@@ -1,0 +1,70 @@
+# Local Tier-2 TensorZero stack for the CLO-243 round-trip spike.
+# Gateway + ClickHouse + UI. Not for production.
+#
+# Usage:
+#   cd tensorzero && cp .env.example .env  # then fill in API keys
+#   docker compose up -d
+#   curl http://localhost:3000/health
+#   open http://localhost:4000
+
+services:
+  clickhouse:
+    image: clickhouse:lts
+    ports:
+      - "8123:8123"
+    environment:
+      CLICKHOUSE_USER: chuser
+      CLICKHOUSE_PASSWORD: chpassword
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: wget --spider --tries 1 http://chuser:chpassword@clickhouse:8123/ping
+      start_period: 30s
+      start_interval: 1s
+      timeout: 1s
+
+  gateway:
+    image: tensorzero/gateway:lts
+    volumes:
+      - ./config:/app/config:ro
+    command: --config-file /app/config/tensorzero.toml
+    environment:
+      TENSORZERO_CLICKHOUSE_URL: http://chuser:chpassword@clickhouse:8123/tensorzero
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Environment variable OPENAI_API_KEY must be set.}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-placeholder-not-set}
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+        ]
+      start_period: 10s
+      start_interval: 1s
+      timeout: 1s
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  ui:
+    image: tensorzero/ui:lts
+    environment:
+      TENSORZERO_GATEWAY_URL: http://gateway:3000
+      TENSORZERO_CLICKHOUSE_URL: http://chuser:chpassword@clickhouse:8123/tensorzero
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "4000:4000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  clickhouse-data:
