@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "loker.strategy": "escalating",
+  "loker.phase": "implement",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "attempts": [
+    {
+      "backend": "openai",
+      "model": "gpt-5-mini",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 800, "output_tokens": 400 },
+      "output_path": "implement/attempts/1.md",
+      "verify": { "status": "pass", "hook": null }
+    }
+  ],
+  "final_status": "succeeded"
+}

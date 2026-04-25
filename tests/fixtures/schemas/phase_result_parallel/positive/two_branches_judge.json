@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "loker.strategy": "parallel",
+  "loker.phase": "design",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "branches": [
+    {
+      "backend": "anthropic",
+      "family": "anthropic",
+      "model": "claude-opus-4-7",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 1843, "output_tokens": 712 },
+      "output_path": "design/branches/anthropic.md"
+    },
+    {
+      "backend": "openai",
+      "family": "openai",
+      "model": "gpt-5",
+      "finish_reasons": ["length"],
+      "usage": { "input_tokens": 1843, "output_tokens": 4096 },
+      "output_path": "design/branches/openai.md"
+    }
+  ],
+  "aggregator": "llm_judge",
+  "aggregate_output_path": "design/design.md",
+  "verify": { "status": "pass", "hook": "make check" }
+}

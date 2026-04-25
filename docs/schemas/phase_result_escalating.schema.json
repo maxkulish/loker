@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/phase_result_escalating.schema.json",
+  "title": "Phase Result - EscalatingRetry",
+  "description": "Result file emitted by a phase running under the EscalatingRetry strategy. The phase tries attempts in escalating tiers (cheap -> medium -> strong) until verify passes or the ladder is exhausted. Attempts are recorded in execution order; final_status records why the ladder stopped.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "loker.strategy",
+    "loker.phase",
+    "loker.run_id",
+    "attempts",
+    "final_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "loker.strategy": { "type": "string", "const": "escalating" },
+    "loker.phase": { "type": "string", "minLength": 1 },
+    "loker.run_id": { "type": "string", "format": "uuid" },
+    "attempts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "final_status": {
+      "type": "string",
+      "enum": ["succeeded", "exhausted", "aborted"]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "attempt": {
+      "type": "object",
+      "required": [
+        "tier",
+        "backend",
+        "model",
+        "finish_reasons",
+        "usage",
+        "output_path",
+        "verify"
+      ],
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["cheap", "medium", "strong"]
+        },
+        "backend": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "finish_reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["stop", "length", "tool_calls", "content_filter", "error"]
+          }
+        },
+        "usage": {
+          "type": "object",
+          "required": ["input_tokens", "output_tokens"],
+          "properties": {
+            "input_tokens": { "type": "integer", "minimum": 0 },
+            "output_tokens": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "output_path": { "type": "string", "minLength": 1 },
+        "verify": { "$ref": "#/$defs/verify" }
+      },
+      "additionalProperties": false
+    },
+    "verify": {
+      "type": "object",
+      "required": ["status", "hook"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pass", "fail", "skipped"] },
+        "hook": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

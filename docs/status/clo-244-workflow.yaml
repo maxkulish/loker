@@ -1,0 +1,114 @@
+task_id: CLO-244
+task_title: "Author JSON schemas for run artefacts (D2)"
+task_url: "https://linear.app/cloud-ai/issue/CLO-244/author-json-schemas-for-run-artefacts-d2"
+task_type: specification
+classification_reason: |
+  Well-scoped delivery task with clear acceptance criteria: author JSON
+  Schemas under docs/schemas/, sample fixtures under tests/fixtures/schemas/,
+  and a CI validator wired into make check. Format is constrained
+  (Draft-2020-12, OTel GenAI conventions + loker.* fields), file locations
+  are dictated, and the change touches a single concern (schemas +
+  validator). No cross-module architectural decisions are needed, so a
+  full design doc would be redundant. Specification workflow (write spec
+  -> implement -> PR) is the right fit. Tagged [parallel-ok] in PRD §11
+  D2; sibling of CLO-243.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-244-author-json-schemas-for-run-artefacts-d2
+  branch_actual: feat/clo-244-json
+  blocks:
+    - "T-024 (manifest writer)"
+    - "T-029 (trace.jsonl writer)"
+    - "T-048/T-050 (HITL artefacts)"
+  blocked_by: []
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-25T20:45:00Z"
+  updated_at: "2026-04-25T22:15:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task"
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task - using /spec instead"
+  spec:
+    status: complete
+    spec_file: docs/specs/2026-04-25-clo-244-json-schemas.md
+    approved: true
+    approved_in_auto_mode: true
+    review_completed: false
+    review_skipped: true
+    review_skip_reason: ".lok/workflows/spec-review.toml not present in this repo - AI review infrastructure not yet bootstrapped. Spec proceeds without AI review per task:phases:spec NO_REVIEWS_AVAILABLE branch."
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_applied: false
+    applied_suggestions: []
+    flagged_suggestions: []
+  implement:
+    status: complete
+    started_at: "2026-04-25T21:37:00Z"
+    completed_at: "2026-04-25T22:15:00Z"
+    artefacts:
+      schemas:
+        - docs/schemas/trace_event.schema.json
+        - docs/schemas/manifest.schema.json
+        - docs/schemas/summary.schema.json
+        - docs/schemas/pending.schema.json
+        - docs/schemas/response.schema.json
+        - docs/schemas/phase_result_single.schema.json
+        - docs/schemas/phase_result_parallel.schema.json
+        - docs/schemas/phase_result_escalating.schema.json
+      fixtures_dir: tests/fixtures/schemas/
+      fixtures_count: 36
+      validator: tests/schema_validation.rs
+      validator_dev_dep: "jsonschema 0.46 (dev-dependencies only; verified absent from cargo tree -e=normal)"
+    make_check_status: pass
+  pr:
+    status: pending
+  complete:
+    status: pending
+
+acceptance_criteria:
+  - "Draft-2020-12 JSON Schemas committed under docs/schemas/ with stable file names: trace.jsonl events, manifest.json, per-phase result files, HITL pending/responses, summary.json"
+  - "At least one positive + one negative fixture per schema under tests/fixtures/schemas/"
+  - "Validator wired into make check so schema drift fails the merge gate"
+
+project_sync:
+  start_skipped: true
+  start_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo yet; /project:sync has no targets to update. Linear is the source of truth for this task."
+
+history:
+  - timestamp: "2026-04-25T20:45:00Z"
+    action: workflow_started
+    phase: init
+    details: "Created workflow state for CLO-244. Classified as specification (well-scoped, clear AC, no architectural decisions). Branch feat/clo-244-json already checked out and clean."
+  - timestamp: "2026-04-25T20:45:00Z"
+    action: project_sync_start
+    phase: init
+    details: "Skipped: no aggregation files (PROJECT.md/ROADMAP.md/DEPENDENCIES.md) in repo. Linear remains source of truth."
+  - timestamp: "2026-04-25T21:35:00Z"
+    action: spec_drafted
+    phase: spec
+    details: "Authored 5-section spec at docs/specs/2026-04-25-clo-244-json-schemas.md. Scope M (~20 files: 8 schemas + 16+ fixtures + 1 validator test). Decomposition: 10 sub-tasks (1 harness + 8 per-schema authoring + 1 cleanup). Validator integrates via cargo test (already invoked by make check). jsonschema added as [dev-dependencies] only - no production runtime dep."
+  - timestamp: "2026-04-25T21:36:00Z"
+    action: spec_review_skipped
+    phase: spec
+    details: ".lok/workflows/spec-review.toml does not exist in this repo - AI review infrastructure not bootstrapped. Per task:phases:spec NO_REVIEWS_AVAILABLE branch, proceeding to checkpoint without Gemini/Ollama reviews."
+  - timestamp: "2026-04-25T21:37:00Z"
+    action: spec_approved
+    phase: spec
+    details: "Spec auto-approved in auto-mode (user enabled continuous autonomous execution). Transitioning to IMPLEMENT phase. Spec decomposition (10 sub-tasks) replaces a separate plan phase."
+  - timestamp: "2026-04-25T22:15:00Z"
+    action: implementation_complete
+    phase: implement
+    details: "All 10 sub-tasks done. 8 schemas + 36 paired fixtures (16 positive + 14 negative + 6 trace + extras) under docs/schemas/ and tests/fixtures/schemas/. Validator at tests/schema_validation.rs scans every schema, requires paired positive/+negative/ dirs, validates each fixture, and detects orphan fixture dirs. jsonschema 0.46 confirmed dev-only (cargo tree -e=normal | rg jsonschema empty). make check green: 473 unit + 6 integration + 1 schema validation tests, 0 clippy warnings."

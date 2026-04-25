@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "phase": "review",
+  "claimed_by": "mk",
+  "decided_at": "2026-04-25T14:42:11Z",
+  "decision": "reject",
+  "global_comment": "Reasoning in Section 3 doesn't match what the verify hook actually checks.",
+  "inline_comments_path": "responses/review-comments.jsonl"
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/trace_event.schema.json",
+  "title": "Loker Trace Event",
+  "description": "One JSON-encoded record from runs/<id>/trace.jsonl. Mixes OpenTelemetry GenAI semantic conventions (gen_ai.*) with loker-specific fields (loker.*). Forward-compatible: unknown loker.* keys are allowed via patternProperties so writers can add new attributes without breaking the validator. The shape per event kind is enforced by oneOf keyed on loker.event.",
+  "type": "object",
+  "required": ["loker.run_id", "loker.event", "loker.phase", "timestamp"],
+  "properties": {
+    "loker.run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable identifier for the run that produced this event."
+    },
+    "loker.event": {
+      "type": "string",
+      "enum": [
+        "phase_started",
+        "phase_finished",
+        "llm_call",
+        "verify_invoked",
+        "verify_result",
+        "hitl_pending",
+        "hitl_resolved",
+        "error"
+      ]
+    },
+    "loker.phase": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Phase name (e.g., design, plan, implement, verify)."
+    },
+    "loker.strategy": {
+      "type": "string",
+      "enum": ["single", "parallel", "escalating"]
+    },
+    "loker.attempt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "gen_ai.system": {
+      "type": "string",
+      "description": "Provider family (e.g., anthropic, openai, google, zhipu)."
+    },
+    "gen_ai.request.model": { "type": "string" },
+    "gen_ai.usage.input_tokens": { "type": "integer", "minimum": 0 },
+    "gen_ai.usage.output_tokens": { "type": "integer", "minimum": 0 },
+    "gen_ai.response.finish_reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verify.hook": { "type": ["string", "null"] },
+    "verify.status": { "type": "string", "enum": ["pass", "fail", "skipped"] },
+    "error.kind": { "type": "string" },
+    "error.message": { "type": "string" }
+  },
+  "patternProperties": {
+    "^loker\\.[a-z][a-z0-9_]*$": {}
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "title": "phase_started",
+      "properties": { "loker.event": { "const": "phase_started" } },
+      "required": ["loker.event"]
+    },
+    {
+      "title": "phase_finished",
+      "properties": { "loker.event": { "const": "phase_finished" } },
+      "required": ["loker.event"]
+    },
+    {
+      "title": "llm_call",
+      "properties": {
+        "loker.event": { "const": "llm_call" }
+      },
+      "required": [
+        "loker.event",
+        "gen_ai.system",
+        "gen_ai.request.model",
+        "gen_ai.usage.input_tokens",
+        "gen_ai.usage.output_tokens",
+        "gen_ai.response.finish_reasons"
+      ]
+    },
+    {
+      "title": "verify_invoked",
+      "properties": { "loker.event": { "const": "verify_invoked" } },
+      "required": ["loker.event", "verify.hook"]
+    },
+    {
+      "title": "verify_result",
+      "properties": { "loker.event": { "const": "verify_result" } },
+      "required": ["loker.event", "verify.status"]
+    },
+    {
+      "title": "hitl_pending",
+      "properties": { "loker.event": { "const": "hitl_pending" } },
+      "required": ["loker.event"]
+    },
+    {
+      "title": "hitl_resolved",
+      "properties": { "loker.event": { "const": "hitl_resolved" } },
+      "required": ["loker.event"]
+    },
+    {
+      "title": "error",
+      "properties": { "loker.event": { "const": "error" } },
+      "required": ["loker.event", "error.kind", "error.message"]
+    }
+  ]
+}

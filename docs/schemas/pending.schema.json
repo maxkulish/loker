@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/pending.schema.json",
+  "title": "Loker HITL Pending Request",
+  "description": "Engine-written request for human input at runs/<id>/pending/<phase>.json (HITL design §3.3). Severity drives the timeout ladder (low/medium/high), with high never auto-failing - timeout_at is null in that case. The artefact + context blocks give the UI everything it needs to render the decision page; decision_options narrows the legal verdicts the responder may pick.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "workflow",
+    "phase",
+    "severity",
+    "opened_at",
+    "timeout_at",
+    "artefact",
+    "context",
+    "decision_options"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "workflow": { "type": "string", "minLength": 1 },
+    "phase": { "type": "string", "minLength": 1 },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "opened_at": { "type": "string", "format": "date-time" },
+    "timeout_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Null when severity=high (no auto-fail). Otherwise an absolute deadline."
+    },
+    "artefact": {
+      "type": "object",
+      "required": ["path", "kind", "preview_lines"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "preview_lines": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "required": ["preceded_by", "next_phase", "prompt_summary"],
+      "properties": {
+        "preceded_by": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "next_phase": { "type": ["string", "null"], "minLength": 1 },
+        "prompt_summary": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "decision_options": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["approve", "reject", "comment_only"]
+      }
+    }
+  },
+  "additionalProperties": false
+}
