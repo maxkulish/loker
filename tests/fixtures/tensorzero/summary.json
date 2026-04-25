@@ -1,10 +1,10 @@
 {
-  "anthropic_success": {
+  "anthropic_auth_failure": {
     "elapsed_ms": 172,
     "error": {
       "message": "All variants failed with errors: haiku_v1: All model providers failed to infer with errors: anthropic: Error 401 Unauthorized from anthropic client: {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaR19qc4S368RUM7dSx6z\"}"
     },
-    "expect_success": true,
+    "expect_success": false,
     "has_episode_id": false,
     "http_status": 502,
     "model_in_response": null,

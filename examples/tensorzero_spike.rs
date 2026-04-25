@@ -11,7 +11,7 @@
 //!   TENSORZERO_GATEWAY_URL   default http://localhost:3000
 //!   LOKER_TZ_FIXTURE_DIR     default tests/fixtures/tensorzero
 //!
-//! The runner exercises four scenarios and writes one request + one
+//! The runner exercises three scenarios and writes one request + one
 //! response file per scenario, sanitised of any auth header value.
 
 use serde_json::{json, Value};
@@ -32,10 +32,10 @@ struct Scenario {
 
 const SCENARIOS: &[Scenario] = &[
     Scenario {
-        slug: "anthropic_success",
+        slug: "anthropic_auth_failure",
         function: "loker_d1_anthropic",
         user_message: "Reply with the single word: pong.",
-        expect_success: true,
+        expect_success: false,
     },
     Scenario {
         slug: "openai_success",

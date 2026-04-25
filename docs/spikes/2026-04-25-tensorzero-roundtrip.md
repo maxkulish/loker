@@ -5,7 +5,7 @@
 - Branch: `feat/clo-243-tensorzero`
 - Stack: gateway `tensorzero/gateway:lts` + ClickHouse `clickhouse:lts` + UI `tensorzero/ui:lts`, all from `tensorzero/docker-compose.yml`
 - Driver: `examples/tensorzero_spike.rs` (HTTP `reqwest` against `POST /openai/v1/chat/completions`)
-- Raw evidence: `tests/fixtures/tensorzero/{anthropic_success,openai_success,unknown_function}_{request,response}.json` plus `summary.json`
+- Raw evidence: `tests/fixtures/tensorzero/{anthropic_auth_failure,openai_success,unknown_function}_{request,response}.json` plus `summary.json`
 
 ## Verdict
 
@@ -115,7 +115,7 @@ The gateway's habit of returning **502 for upstream provider errors regardless o
 
 - For 5xx, inspect the body. If the message contains an upstream auth signature (`"401"`, `"Unauthorized"`, `"invalid x-api-key"`, `"authentication_error"`), return `BackendError::Auth`. Otherwise keep the `Network` mapping.
 - Same body-inspection trick for `"rate_limit"` / `"429"` → `RateLimit`.
-- Add wiremock cases for the two captured fixtures (`anthropic_success_response.json` and `unknown_function_response.json`) to lock the mapping in.
+- Add wiremock cases for the two captured fixtures (`anthropic_auth_failure_response.json` and `unknown_function_response.json`) to lock the mapping in.
 
 This defect was discoverable only via the live round-trip — wiremock unit tests today fabricate clean 401/429/500 statuses that the gateway never actually emits.
 
@@ -124,7 +124,7 @@ This defect was discoverable only via the live round-trip — wiremock unit test
 1. **Path prefix mismatch (CLO-247):** `src/backend/tensorzero.rs` test config builds the endpoint as `format!("{}/v1/", server.uri())`. The real gateway path is `/openai/v1/`. Today both work because the unit tests mock whatever path is asked, but a production smoke test against the gateway will 404. Update both the runtime config helper and `examples/workflows/*` defaults.
 2. **502 body-inspection error mapping (CLO-247):** see §5.
 3. **Streaming behaviour (defer to M2 / CLO-?):** spike used non-streaming. `chat_completion` variants accept `stream: true` and return SSE; need a second spike before strategy work that wants partial output.
-4. **Real Anthropic capture (defer):** `anthropic_success_response.json` is the wrapped-401 path because the local env had no key. The success-path fixture for Anthropic should be captured the next time someone runs the stack with a valid key. Schema is expected to mirror OpenAI (TensorZero normalises it on the way out), but worth verifying.
+4. **Real Anthropic capture (defer):** `anthropic_auth_failure_response.json` is the wrapped-401 path because the local env had no key. A success-path fixture for Anthropic (`anthropic_success_response.json`) should be captured the next time someone runs the stack with a valid key. Schema is expected to mirror OpenAI (TensorZero normalises it on the way out), but worth verifying.
 5. **429 / timeout fixtures (defer):** induce by saturating an upstream provider in a load test; out of scope for D1.
 6. **Health endpoint surface (informational):** `/health` reports `{gateway, clickhouse, postgres, valkey, valkey_cache}` even when postgres/valkey are not externally configured — the gateway runs them embedded. Worth noting in the deployment-recipe doc but not blocking.
 7. **`max_tokens: 32` in `examples/tensorzero_spike.rs`** is intentionally small for the spike. Real callers will use TensorZero variant defaults (no `max_tokens` in body).

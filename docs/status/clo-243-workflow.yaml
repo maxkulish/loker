@@ -46,8 +46,8 @@ phases:
       - "tensorzero/config/tensorzero.toml"
       - "tensorzero/.env.example"
       - "examples/tensorzero_spike.rs"
-      - "tests/fixtures/tensorzero/anthropic_success_request.json"
-      - "tests/fixtures/tensorzero/anthropic_success_response.json"
+      - "tests/fixtures/tensorzero/anthropic_auth_failure_request.json"
+      - "tests/fixtures/tensorzero/anthropic_auth_failure_response.json"
       - "tests/fixtures/tensorzero/openai_success_request.json"
       - "tests/fixtures/tensorzero/openai_success_response.json"
       - "tests/fixtures/tensorzero/unknown_function_request.json"
@@ -63,9 +63,12 @@ phases:
       - "Defect surfaced for CLO-247: src/backend/tensorzero.rs::map_status maps 5xx -> Network unconditionally, but TensorZero wraps upstream auth failures as 502, so a permanent auth error becomes retryable. Fix via body-message inspection."
       - "Path mismatch surfaced for CLO-247: src/backend/tensorzero.rs test config builds endpoint as /v1/, real gateway path is /openai/v1/."
   pr:
-    status: pending
+    status: complete
     required: true
     required_reason: "Spike output (verdict doc + fixtures) ships in repo and unblocks CLO-247 / Phase 1 (T-005+)"
+    pr_url: "https://github.com/maxkulish/loker/pull/3"
+    pr_number: 3
+    commit_sha: "6ec56c9"
   complete:
     status: pending
 
@@ -90,8 +93,20 @@ history:
   - timestamp: "2026-04-25T20:00:00Z"
     action: phase_completed
     phase: execute
-    details: "Tier 2 stack (gateway + ClickHouse + UI) brought up. Spike runner captured 3 scenarios live: openai_success (200), anthropic_success (502, wrapped upstream 401), unknown_function (404). Sanitised request/response fixtures written under tests/fixtures/tensorzero/. Stack torn down."
+    details: "Tier 2 stack (gateway + ClickHouse + UI) brought up. Spike runner captured 3 scenarios live: openai_success (200), anthropic_auth_failure (502, wrapped upstream 401), unknown_function (404). Sanitised request/response fixtures written under tests/fixtures/tensorzero/. Stack torn down."
   - timestamp: "2026-04-25T20:10:00Z"
     action: phase_completed
     phase: document
     details: "Verdict written at docs/spikes/2026-04-25-tensorzero-roundtrip.md. Sections: HTTP shape, model-name mapping, family-id source decision, token shape, retryable error classes, open follow-ups, reproduce. Family_of decision and 502/auth + path-prefix follow-ups recorded for CLO-247."
+  - timestamp: "2026-04-25T20:20:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit 6ec56c9: spike(CLO-243): capture TensorZero round-trip shapes (D1). 14 files, 640 insertions. make check green (fmt + clippy -D warnings + 473 unit + 6 integration)."
+  - timestamp: "2026-04-25T20:21:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Pushed feat/clo-243-tensorzero to origin with upstream tracking."
+  - timestamp: "2026-04-25T20:22:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #3 opened: https://github.com/maxkulish/loker/pull/3"
