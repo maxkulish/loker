@@ -1,0 +1,88 @@
+task_id: CLO-245
+task_title: "Define atomic run-state write protocol (D3)"
+task_url: "https://linear.app/cloud-ai/issue/CLO-245/define-atomic-run-state-write-protocol-d3"
+task_type: operational
+classification_reason: |
+  D3 decision/documentation task (T-003 from implementation roadmap).
+  Deliverable is a single doc (`docs/run-state.md`) capturing the chosen
+  write protocol, rationale, reader/writer rules, and fault-injection
+  plan. No code shipped. Same shape as CLO-243 (D1 spike) which used
+  operational: execute = research + compare protocols, document = write
+  the doc, pr = commit and merge. Skipping design/plan because there is
+  no implementation to design first - the doc IS the deliverable.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-245-define-atomic-run-state-write-protocol-d3
+  branch_actual: feat/clo-245-atomic
+  blocks: [T-024, T-025, T-031]
+  blocked_by: []
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-25T20:45:00Z"
+  updated_at: "2026-04-25T21:05:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Operational task"
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Operational task"
+  plan:
+    status: skipped
+    skip_reason: "Operational task"
+  execute:
+    status: complete
+    artifacts_expected:
+      - "docs/run-state.md"
+    artifacts_produced:
+      - "docs/run-state.md"
+  document:
+    status: complete
+    artifacts_produced:
+      - "docs/run-state.md"
+    decisions_recorded:
+      - "Canonical artefacts live at runs/<id>/<phase>/<artefact> and are committed via tmp+rename+fsync (NamedTempFile::persist + parent-dir sync_all in Rust). Failed attempts archived to attempts/<phase>/<n>/. Symlink/pointer alternative rejected due to portability + reader-path complexity."
+      - "Per-phase commit order: started -> artefact -> manifest -> completed. phase.completed is the single source of truth - its absence forces rerun even if artefact + manifest appear complete."
+      - "Manifest is full-rewrite-via-tmp-rename, not text-append. Avoids partial-line corruption. Cheap because manifests are small."
+      - "Heartbeat with 5min default TTL distinguishes alive-writer from dead-writer; advisory .lock in T-031 reinforces parallel-writer detection."
+      - "14-row kill matrix specified for T-031 crash-injection tests. Row 9 (kill between manifest and phase.completed) requires T-024 to implement orphan-entry sweep on resume."
+  pr:
+    status: in_progress
+    required: true
+    required_reason: "Doc unblocks T-024 (manifest writer), T-025 (phase status markers), T-031 (resumability). Decision must live in repo for downstream PRs to reference."
+  complete:
+    status: pending
+
+acceptance_criteria:
+  - "docs/run-state.md committed with: (1) comparison + trade-offs of `.tmp + rename + status marker` vs. attempt-directory, (2) chosen protocol with temp filename pattern, fsync rules, marker semantics (phase.started/completed/failed), (3) reader/writer rules, (4) fault-injection plan covering kill at every observable transition with expected reader behaviour"
+  - "Decision recorded once - downstream tasks (T-024, T-025, T-031) can reference this doc"
+
+project_sync:
+  start_skipped: true
+  start_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo. Linear is the source of truth (same as CLO-243)."
+
+history:
+  - timestamp: "2026-04-25T20:45:00Z"
+    action: workflow_started
+    phase: init
+    details: "Created workflow state for CLO-245. Classified as operational (D3 decision/documentation task, deliverable is docs/run-state.md). Branch feat/clo-245-atomic already checked out and clean."
+  - timestamp: "2026-04-25T20:45:00Z"
+    action: project_sync_start
+    phase: init
+    details: "Skipped: no aggregation files in repo. Linear remains source of truth."
+  - timestamp: "2026-04-25T21:00:00Z"
+    action: phase_completed
+    phase: execute
+    details: "Compared tmp+rename+marker (A) vs attempt-directory canonical with symlink (B). Picked A: stable reader path, append-only manifest with stable paths, no symlink portability tax (Windows unprivileged users), simpler file-watch for M5+ SSE. PRD already mandates write-temp+rename for markers (FR-21) and attempts/<phase>/<n>/ for failed retries (FR-23e), so A is consistent with both."
+  - timestamp: "2026-04-25T21:05:00Z"
+    action: phase_completed
+    phase: document
+    details: "Wrote docs/run-state.md (full doc). Sections: why, layout recap, decision + comparison table, atomic-commit primitive, marker schemas, per-phase commit order, manifest rewrite policy, failed-attempt archive, heartbeat, resume walk, stale-tmp sweep, 14-row fault-injection kill matrix mapping to T-031 tests, open items deferred to T-024/T-025/T-031, non-goals."
