@@ -1,0 +1,105 @@
+task_id: CLO-246
+task_title: "Write UI threat model for `loker ui` (D4)"
+task_url: "https://linear.app/cloud-ai/issue/CLO-246/write-ui-threat-model-for-loker-ui-d4"
+task_type: operational
+classification_reason: |
+  Discovery / written-artefact task (PRD §11 D4). Single deliverable is a
+  threat-model doc at docs/security/2026-04-25-ui-threat-model.md plus a
+  PRD §5 cross-reference. No code lands; no architecture decisions to
+  wrestle. Same shape as CLO-243 (research -> doc -> PR), so operational
+  workflow (execute -> document -> PR -> complete) fits cleanly.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-246-write-ui-threat-model-for-loker-ui-d4
+  branch_actual: feat/clo-246-ui
+  blocks: ["T-050 (per-phase advisory lock)", "T-055 (M11 threat-model test suite)"]
+  blocked_by: []
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-25T21:00:00Z"
+  updated_at: "2026-04-25T21:30:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Operational task"
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Operational task"
+  plan:
+    status: skipped
+    skip_reason: "Operational task"
+  execute:
+    status: complete
+    artifacts_expected:
+      - "docs/security/2026-04-25-ui-threat-model.md"
+      - "docs/prd/2026-04-25-loker.md (cross-link from §5 Security NFR table)"
+    artifacts_produced:
+      - "docs/security/2026-04-25-ui-threat-model.md"
+      - "docs/prd/2026-04-25-loker.md (rows 197-198 cross-linked to threat model)"
+  document:
+    status: complete
+    decisions_recorded:
+      - "PRD §11 D4 verdict: origin checks + localhost-only bind are sufficient. Per-session URL tokens NOT shipped (4 reasons in §4 of threat model: tokens don't cover residual adversaries (same-user / extensions); tokens leak via Referer; tokens worsen UX without raising the bar against the realistic attacker; OAuth allowlist in Phase 2 supersedes any token scheme)."
+      - "M11 threat-model test suite (T-055) enumerated as 21 named tests under tests/ui/threat_model.rs covering CSRF, X-Frame-Options, CORP, MIME sniffing, traversal, symlink, lock takeover, cookie attrs, CSP, Referrer-Policy, bind, method allowlist, redirect."
+      - "Phase 2 deferrals: OAuth allowlist, per-user identity, non-loopback bind, mTLS, signed cookies, CSP report-only -> enforce, HSTS."
+  pr:
+    status: pending
+    required: true
+    required_reason: "Threat-model doc unblocks T-050 (advisory lock) and T-055 (M11 threat-model test suite); ships in repo."
+  complete:
+    status: pending
+
+acceptance_criteria:
+  - "docs/security/2026-04-25-ui-threat-model.md committed with attacker model, mitigations, and the M11 test list"
+  - "PRD §5 Security NFR table cross-references this doc once landed"
+
+threat_inputs:
+  prd_section_5_rows:
+    - "row 197 (UI auth phase 1 = localhost-only bind)"
+    - "row 198 (path traversal, no symlink follow, X-Frame-Options DENY, SameSite=Strict, origin check on POST)"
+  prd_section_8_risk:
+    - "row 284 (Localhost UI threat surface): cross-tab, browser-extension, symlink, path-traversal, stale-lock"
+  prd_section_11_d4:
+    - "Question covers cross-origin POST, extension snooping, symlink escape, traversal, stale-lock takeover"
+    - "Decision required: per-session URL token vs origin+localhost-bind"
+  hitl_design_refs:
+    - "§4.3 Routes (GET artefact, POST responses, SSE)"
+    - "§4.4 advisory lock + heartbeat (FR-26)"
+    - "§5 auth phasing (Phase 1 = none, Phase 2 = OAuth allowlist deferred)"
+  fr_refs:
+    - "FR-26 advisory lock with 60s heartbeat"
+    - "FR-28 localhost-bound, no auth in v0"
+
+project_sync:
+  start_skipped: true
+  start_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo. Linear remains source of truth."
+
+history:
+  - timestamp: "2026-04-25T21:00:00Z"
+    action: workflow_started
+    phase: init
+    details: "Created workflow state for CLO-246. Classified operational (written-artefact discovery task per PRD §11 D4). Branch feat/clo-246-ui already checked out; no prior work on it."
+  - timestamp: "2026-04-25T21:00:00Z"
+    action: project_sync_start
+    phase: init
+    details: "Skipped: no aggregation files (PROJECT.md/ROADMAP.md/DEPENDENCIES.md) in repo. Linear remains source of truth."
+  - timestamp: "2026-04-25T21:20:00Z"
+    action: phase_completed
+    phase: execute
+    details: "Drafted docs/security/2026-04-25-ui-threat-model.md: §1 scope/trust-boundary table, §2 attacker model A1-A7, §3 threats T1-T8 with mitigations, §4 D4 verdict (origin+bind > URL tokens), §5 21-test M11 list (T-CSRF/T-XFRAME/T-CORP/T-MIME/T-TRAVERSAL/T-SYMLINK/T-LOCK/T-COOKIE/T-CSP/T-REFERRER/T-BIND/T-METHOD/T-REDIRECT), §6 Phase 2 deferrals, §7 open questions, §8 references. Cross-linked from PRD §5 rows 197-198."
+  - timestamp: "2026-04-25T21:25:00Z"
+    action: phase_completed
+    phase: document
+    details: "Decisions recorded inline in threat model §4 (D4 verdict) and §5 (M11 test list). Acceptance criteria 1+2 satisfied: doc committed and PRD §5 NFR rows reference the doc."
+  - timestamp: "2026-04-25T21:30:00Z"
+    action: pre_merge_gate_passed
+    phase: pr
+    details: "make check green: cargo fmt --check + cargo clippy -D warnings + cargo test (473 unit + 6 integration)."
