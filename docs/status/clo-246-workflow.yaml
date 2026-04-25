@@ -51,9 +51,12 @@ phases:
       - "M11 threat-model test suite (T-055) enumerated as 21 named tests under tests/ui/threat_model.rs covering CSRF, X-Frame-Options, CORP, MIME sniffing, traversal, symlink, lock takeover, cookie attrs, CSP, Referrer-Policy, bind, method allowlist, redirect."
       - "Phase 2 deferrals: OAuth allowlist, per-user identity, non-loopback bind, mTLS, signed cookies, CSP report-only -> enforce, HSTS."
   pr:
-    status: pending
+    status: in_progress
     required: true
     required_reason: "Threat-model doc unblocks T-050 (advisory lock) and T-055 (M11 threat-model test suite); ships in repo."
+    pr_url: "https://github.com/maxkulish/loker/pull/5"
+    pr_number: 5
+    commit_sha: "7a36c8a"
   complete:
     status: pending
 
@@ -103,3 +106,15 @@ history:
     action: pre_merge_gate_passed
     phase: pr
     details: "make check green: cargo fmt --check + cargo clippy -D warnings + cargo test (473 unit + 6 integration)."
+  - timestamp: "2026-04-25T21:32:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit 7a36c8a: docs(CLO-246): UI threat model for loker ui (D4). 3 files, 330 insertions, 2 deletions."
+  - timestamp: "2026-04-25T21:33:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Pushed feat/clo-246-ui to origin with upstream tracking."
+  - timestamp: "2026-04-25T21:34:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #5 opened: https://github.com/maxkulish/loker/pull/5"
