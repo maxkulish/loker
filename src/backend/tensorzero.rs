@@ -1,10 +1,23 @@
 //! TensorZero backend - HTTP gateway via the `genai` crate (M1).
 //!
 //! Routes chat calls through a TensorZero gateway that exposes an
-//! OpenAI-compatible Chat Completions API. We pin all calls to the
-//! configured endpoint and auth via a `ServiceTargetResolver`, using
-//! `AdapterKind::OpenAI` so genai builds the standard
-//! `POST {endpoint}/chat/completions` request.
+//! OpenAI-compatible Chat Completions surface at
+//! `POST {gateway}/openai/v1/chat/completions`. Authenticates via
+//! `Authorization: Bearer <token>`; `Content-Type: application/json`. The
+//! `model` field on the wire carries the configured TensorZero function name
+//! (e.g. `tensorzero::function_name::loker_d1_openai`).
+//!
+//! 5xx responses from the gateway frequently wrap upstream errors (a 401 from
+//! Anthropic, a 429 from OpenAI, ...). We body-inspect 502s to classify them
+//! as `BackendError::Auth` / `RateLimit` / `Network` rather than collapsing
+//! all 5xx into `Network`, which would trigger pointless retries on
+//! credential failures.
+//!
+//! Path prefix, header shape, error-mapping verdict, and the function-name
+//! family-suffix convention come from the D1 round-trip spike.
+//!
+//! **Source of truth**: `docs/spikes/2026-04-25-tensorzero-roundtrip.md`
+//! (CLO-243).
 
 use super::{Backend, BackendError, QueryOutput, TokenUsage};
 use async_trait::async_trait;
@@ -30,18 +43,14 @@ pub struct TensorZeroBackend {
 
 impl TensorZeroBackend {
     pub fn new(cfg: TensorZeroConfig) -> Result<Self, BackendError> {
-        let endpoint_url = if cfg.endpoint.ends_with('/') {
-            cfg.endpoint.clone()
-        } else {
-            format!("{}/", cfg.endpoint)
-        };
-        let endpoint = Endpoint::from_owned(endpoint_url);
+        let endpoint = Endpoint::from_owned(normalize_endpoint(&cfg.endpoint));
         let auth = AuthData::from_single(cfg.api_key.clone().unwrap_or_default());
 
         let resolver = ServiceTargetResolver::from_resolver_fn(
             move |service_target: ServiceTarget| -> Result<ServiceTarget, genai::resolver::Error> {
                 let ServiceTarget { model, .. } = service_target;
-                let model = ModelIden::new(AdapterKind::OpenAI, model.model_name);
+                let wire_model = canonicalize_wire_model(model.model_name.as_str());
+                let model = ModelIden::new(AdapterKind::OpenAI, wire_model);
                 Ok(ServiceTarget {
                     endpoint: endpoint.clone(),
                     auth: auth.clone(),
@@ -171,15 +180,118 @@ fn map_webc_error(err: genai::webc::Error, elapsed: Duration) -> BackendError {
     }
 }
 
+/// Normalize a configured endpoint URL to the canonical TensorZero
+/// OpenAI-compat base, `…/openai/v1/`.
+///
+/// Per D1 spike (`docs/spikes/2026-04-25-tensorzero-roundtrip.md`) the gateway
+/// exposes the OpenAI surface at `/openai/v1/chat/completions`, and `genai`
+/// appends `chat/completions` to whatever `Endpoint` it is given. We therefore
+/// guarantee the configured endpoint ends in exactly `/openai/v1/`.
+fn normalize_endpoint(raw: &str) -> String {
+    let trimmed = raw.trim_end_matches('/');
+    if trimmed.ends_with("/openai/v1") {
+        format!("{trimmed}/")
+    } else {
+        format!("{trimmed}/openai/v1/")
+    }
+}
+
+/// Canonicalize the value sent on the wire as the OpenAI-compat `model` field.
+///
+/// Per the D1 spike (`docs/spikes/2026-04-25-tensorzero-roundtrip.md` §2 and
+/// `tests/fixtures/tensorzero/openai_success_request.json`) the gateway expects
+/// the literal value `tensorzero::function_name::<fn>` in the request body.
+///
+/// `genai` 0.6.0-beta.17 always splits a `ModelName` on the first `::` and
+/// emits only the suffix as the wire `model` field (see
+/// `adapter_shared::ChatRequest::to_request_payload` and
+/// `ModelName::split_as_namespace_and_name`). To make the wire body match the
+/// D1 fixture we therefore prepend a sacrificial `loker::` namespace: genai
+/// strips it during payload assembly, leaving exactly the canonical
+/// `tensorzero::function_name::<fn>` on the wire.
+///
+/// Accepted input forms (canonicalize before prepending the sacrificial
+/// namespace):
+/// - `tensorzero::function_name::<fn>`  -> already canonical, kept verbatim
+/// - `tensorzero::model_name::<m>`      -> kept verbatim (model_name routing)
+/// - `function_name::<fn>` / `model_name::<m>` -> wrapped with `tensorzero::`
+/// - bare `<fn>`                         -> wrapped as
+///   `tensorzero::function_name::<fn>`
+///
+/// Config canonicalization (rejecting unknown family suffixes, etc.) is not in
+/// this task's scope (CLO-250 / CLO-251).
+fn canonicalize_wire_model(model: &str) -> String {
+    let canonical = if model.starts_with("tensorzero::") {
+        model.to_string()
+    } else if model.starts_with("function_name::") || model.starts_with("model_name::") {
+        format!("tensorzero::{model}")
+    } else if !model.contains("::") {
+        format!("tensorzero::function_name::{model}")
+    } else {
+        model.to_string()
+    };
+    format!("loker::{canonical}")
+}
+
+/// Inspect a 5xx response body and reclassify gateway-wrapped upstream
+/// failures. The TensorZero gateway forwards a 401 from Anthropic / OpenAI as
+/// a 502 carrying the upstream error JSON in the body; the same goes for
+/// upstream rate-limit (429) signals. Returns `None` to fall through to the
+/// default 5xx classification (`Network`).
+fn classify_5xx_body(status: u16, body: &str) -> Option<BackendError> {
+    let lower = body.to_lowercase();
+    let auth_match = lower.contains("authentication_error")
+        || lower.contains("unauthorized")
+        || lower.contains("invalid x-api-key")
+        || lower.contains("invalid api key")
+        || lower.contains(" 401 ")
+        || lower.contains("\"401\"");
+    if auth_match {
+        return Some(BackendError::Auth {
+            message: format!("TensorZero HTTP {status} (upstream auth failure): {body}"),
+        });
+    }
+    let rate_match = lower.contains("rate_limit")
+        || lower.contains("rate limit")
+        || lower.contains("too many requests")
+        || lower.contains(" 429 ")
+        || lower.contains("\"429\"");
+    if rate_match {
+        return Some(BackendError::RateLimit {
+            message: format!("TensorZero HTTP {status} (upstream rate limit): {body}"),
+            retry_after_ms: None,
+        });
+    }
+    None
+}
+
+/// Reclassify a 404 body that signals an "Unknown function:" config error
+/// (see `tests/fixtures/tensorzero/unknown_function_response.json`). Such
+/// failures will not become healthy on retry; they require config edits.
+fn classify_404_body(body: &str) -> Option<BackendError> {
+    if body.to_lowercase().contains("unknown function") {
+        return Some(BackendError::Config {
+            message: format!("TensorZero unknown function: {body}"),
+        });
+    }
+    None
+}
+
 fn map_status(status: u16, body: String) -> BackendError {
     let msg = format!("TensorZero HTTP {status}: {body}");
     match status {
         401 | 403 => BackendError::Auth { message: msg },
+        404 => classify_404_body(&body).unwrap_or(BackendError::ExecutionFailed {
+            message: msg,
+            exit_code: None,
+        }),
         429 => BackendError::RateLimit {
             message: msg,
             retry_after_ms: None,
         },
-        500..=599 => BackendError::Network { message: msg },
+        500..=599 => {
+            classify_5xx_body(status, &body).unwrap_or(BackendError::Network { message: msg })
+        }
         _ => BackendError::ExecutionFailed {
             message: msg,
             exit_code: None,
@@ -197,7 +309,7 @@ mod tests {
 
     fn config_for(server: &MockServer) -> TensorZeroConfig {
         TensorZeroConfig {
-            endpoint: format!("{}/v1/", server.uri()),
+            endpoint: server.uri(),
             model: "test-model".to_string(),
             api_key: Some("test-key".to_string()),
             timeout: Duration::from_secs(5),
@@ -223,7 +335,7 @@ mod tests {
     async fn returns_text_on_200_success() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
+            .and(path("/openai/v1/chat/completions"))
             .and(header("authorization", "Bearer test-key"))
             .respond_with(ResponseTemplate::new(200).set_body_json(openai_success_body()))
             .mount(&server)
@@ -243,7 +355,7 @@ mod tests {
     async fn maps_429_to_rate_limit_retryable() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
+            .and(path("/openai/v1/chat/completions"))
             .respond_with(ResponseTemplate::new(429).set_body_string("rate limited"))
             .mount(&server)
             .await;
@@ -264,7 +376,7 @@ mod tests {
     async fn maps_500_to_retryable_error() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
+            .and(path("/openai/v1/chat/completions"))
             .respond_with(ResponseTemplate::new(500).set_body_string("server error"))
             .mount(&server)
             .await;
@@ -285,7 +397,7 @@ mod tests {
     async fn maps_401_to_auth_not_retryable() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
+            .and(path("/openai/v1/chat/completions"))
             .respond_with(ResponseTemplate::new(401).set_body_string("unauthorized"))
             .mount(&server)
             .await;
@@ -306,7 +418,7 @@ mod tests {
     async fn maps_malformed_json_to_parse_error() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
+            .and(path("/openai/v1/chat/completions"))
             .respond_with(
                 ResponseTemplate::new(200)
                     .insert_header("content-type", "application/json")
@@ -331,7 +443,7 @@ mod tests {
     async fn maps_request_timeout_to_timeout_error() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
+            .and(path("/openai/v1/chat/completions"))
             .respond_with(
                 ResponseTemplate::new(200)
                     .set_body_json(openai_success_body())
@@ -357,7 +469,7 @@ mod tests {
     #[test]
     fn name_is_tensorzero() {
         let cfg = TensorZeroConfig {
-            endpoint: "http://localhost:3000/v1/".to_string(),
+            endpoint: "http://localhost:3000".to_string(),
             model: "test-model".to_string(),
             api_key: Some("k".to_string()),
             timeout: Duration::from_secs(1),
@@ -365,5 +477,225 @@ mod tests {
         let backend = TensorZeroBackend::new(cfg).unwrap();
         assert_eq!(backend.name(), "tensorzero");
         assert!(backend.is_available());
+    }
+
+    #[test]
+    fn normalize_endpoint_appends_when_missing() {
+        assert_eq!(
+            normalize_endpoint("http://localhost:3000"),
+            "http://localhost:3000/openai/v1/"
+        );
+        assert_eq!(
+            normalize_endpoint("http://localhost:3000/"),
+            "http://localhost:3000/openai/v1/"
+        );
+    }
+
+    #[test]
+    fn normalize_endpoint_does_not_double_suffix() {
+        assert_eq!(
+            normalize_endpoint("http://gateway/openai/v1"),
+            "http://gateway/openai/v1/"
+        );
+        assert_eq!(
+            normalize_endpoint("http://gateway/openai/v1/"),
+            "http://gateway/openai/v1/"
+        );
+    }
+
+    #[test]
+    fn classify_5xx_body_detects_anthropic_auth_fixture() {
+        let fixture =
+            include_str!("../../tests/fixtures/tensorzero/anthropic_auth_failure_response.json");
+        let classified = classify_5xx_body(502, fixture);
+        assert!(
+            matches!(classified, Some(BackendError::Auth { .. })),
+            "expected Auth from anthropic 502 auth fixture, got {classified:?}"
+        );
+    }
+
+    #[test]
+    fn classify_5xx_body_detects_rate_limit_signature() {
+        let body = r#"{"error":{"message":"All variants failed: rate_limit hit upstream"}}"#;
+        let classified = classify_5xx_body(502, body);
+        assert!(
+            matches!(classified, Some(BackendError::RateLimit { .. })),
+            "expected RateLimit, got {classified:?}"
+        );
+    }
+
+    #[test]
+    fn classify_5xx_body_returns_none_for_generic_5xx() {
+        assert!(classify_5xx_body(500, "internal server error").is_none());
+        assert!(classify_5xx_body(502, "").is_none());
+    }
+
+    #[test]
+    fn classify_404_body_detects_unknown_function_fixture() {
+        let fixture =
+            include_str!("../../tests/fixtures/tensorzero/unknown_function_response.json");
+        let classified = classify_404_body(fixture);
+        assert!(
+            matches!(classified, Some(BackendError::Config { .. })),
+            "expected Config from unknown_function fixture, got {classified:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn endpoint_normalizes_to_openai_v1_at_runtime() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(openai_success_body()))
+            .mount(&server)
+            .await;
+
+        let backend = TensorZeroBackend::new(config_for(&server)).expect("backend builds");
+        let out = backend
+            .query("hi", Path::new("."), None)
+            .await
+            .expect("base-URL endpoint should normalize to /openai/v1/");
+        assert_eq!(out.stdout, "hello from tensorzero");
+    }
+
+    #[tokio::test]
+    async fn sends_bearer_auth_json_content_and_function_name_model() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(openai_success_body()))
+            .mount(&server)
+            .await;
+
+        let mut cfg = config_for(&server);
+        cfg.model = "tensorzero::function_name::loker_d1_openai".to_string();
+        let backend = TensorZeroBackend::new(cfg).expect("backend builds");
+        backend
+            .query("hi", Path::new("."), None)
+            .await
+            .expect("200 path matches");
+
+        let recorded = server.received_requests().await.expect("requests captured");
+        assert_eq!(recorded.len(), 1, "expected exactly one request");
+        let req = &recorded[0];
+
+        let auth = req
+            .headers
+            .get("authorization")
+            .expect("Authorization header present")
+            .to_str()
+            .expect("Authorization is ascii");
+        assert!(
+            auth.starts_with("Bearer "),
+            "Authorization must be Bearer-shaped, got {auth:?}"
+        );
+        assert_eq!(auth, "Bearer test-key");
+
+        let content_type = req
+            .headers
+            .get("content-type")
+            .expect("Content-Type header present")
+            .to_str()
+            .expect("content-type is ascii");
+        assert!(
+            content_type.starts_with("application/json"),
+            "Content-Type must be application/json, got {content_type:?}"
+        );
+
+        let body: serde_json::Value =
+            serde_json::from_slice(&req.body).expect("request body is JSON");
+        assert_eq!(
+            body.get("model").and_then(|v| v.as_str()),
+            Some("tensorzero::function_name::loker_d1_openai"),
+            "model field must echo the configured function name verbatim; body was {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn maps_502_upstream_auth_to_auth_not_retryable() {
+        let server = MockServer::start().await;
+        let body =
+            include_str!("../../tests/fixtures/tensorzero/anthropic_auth_failure_response.json");
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(502).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let backend = TensorZeroBackend::new(config_for(&server)).unwrap();
+        let err = backend
+            .query("hi", Path::new("."), None)
+            .await
+            .expect_err("502 fails");
+        assert!(
+            matches!(err, BackendError::Auth { .. }),
+            "expected Auth (upstream auth wrapped in 502), got {err:?}"
+        );
+        assert!(!err.is_retryable());
+    }
+
+    #[tokio::test]
+    async fn maps_502_upstream_rate_limit_to_rate_limit_retryable() {
+        let server = MockServer::start().await;
+        let body = r#"{"error":{"message":"All variants failed: rate_limit exceeded upstream"}}"#;
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(502).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let backend = TensorZeroBackend::new(config_for(&server)).unwrap();
+        let err = backend
+            .query("hi", Path::new("."), None)
+            .await
+            .expect_err("502 fails");
+        assert!(
+            matches!(err, BackendError::RateLimit { .. }),
+            "expected RateLimit (upstream rate limit wrapped in 502), got {err:?}"
+        );
+        assert!(err.is_retryable());
+    }
+
+    #[tokio::test]
+    async fn maps_502_generic_to_network_retryable() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(502).set_body_string("bad gateway"))
+            .mount(&server)
+            .await;
+
+        let backend = TensorZeroBackend::new(config_for(&server)).unwrap();
+        let err = backend
+            .query("hi", Path::new("."), None)
+            .await
+            .expect_err("502 fails");
+        assert!(
+            matches!(err, BackendError::Network { .. }),
+            "expected Network for generic 502, got {err:?}"
+        );
+        assert!(err.is_retryable());
+    }
+
+    #[tokio::test]
+    async fn maps_404_unknown_function_to_config_not_retryable() {
+        let server = MockServer::start().await;
+        let body = include_str!("../../tests/fixtures/tensorzero/unknown_function_response.json");
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(404).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let backend = TensorZeroBackend::new(config_for(&server)).unwrap();
+        let err = backend
+            .query("hi", Path::new("."), None)
+            .await
+            .expect_err("404 fails");
+        assert!(
+            matches!(err, BackendError::Config { .. }),
+            "expected Config for unknown function 404, got {err:?}"
+        );
+        assert!(!err.is_retryable());
     }
 }

@@ -63,6 +63,25 @@ to `/usr/local/bin/lok`; the binary is `loker` (separate cleanup).
 - v0 verification is binary pass/fail. No logprobs or semantic-similarity
   scoring until a later milestone (design doc §10 non-goals).
 
+## Function-name family convention (TensorZero, M1)
+
+TensorZero functions exposed to loker MUST be named
+`loker_<purpose>_<family>`, where `<family>` is the substring after the
+final `_` and identifies the model family (`anthropic`, `openai`,
+`google`, `zhipu`, ...). The cross-family judge guard (FR-13) and
+`family_of(backend_id)` (CLO-251 / T-015) derive the family from this
+suffix; unknown suffixes MUST be rejected at config-load.
+
+Canonical examples (see `tensorzero/config/tensorzero.toml`):
+
+- `loker_d1_anthropic` -> family `anthropic`
+- `loker_d1_openai`    -> family `openai`
+
+The convention is set by the D1 round-trip spike. Source of truth:
+`docs/spikes/2026-04-25-tensorzero-roundtrip.md`. Path / header / error
+mapping for the gateway also live there; the live skeleton is
+`src/backend/tensorzero.rs`.
+
 ## Reference
 
 | Need | Read |
