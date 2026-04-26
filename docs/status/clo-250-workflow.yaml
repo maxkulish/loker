@@ -27,10 +27,10 @@ linear:
     - "CLO-247 (Reconcile tensorzero backend with D1 spike findings) - merged 2026-04-26 (PR #7, commit 048b6cd)"
 
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-26T00:00:00Z"
-  updated_at: "2026-04-26T18:30:00Z"
+  updated_at: "2026-04-26T17:44:17Z"
 
 phases:
   discovery:
@@ -67,14 +67,19 @@ phases:
       - "ST7: docs/handoff.md sample [tensorzero] block before Reference table"
       - "ST8: make check passes (520 tests, 0 warnings); rg 'env::var' src/backend/tensorzero.rs returns no matches (AC7 verified)"
   pr:
-    status: in_progress
+    status: complete
     pr_url: "https://github.com/maxkulish/loker/pull/10"
     pr_number: 10
     pr_branch: "feat/clo-250-config"
     pr_commit: "78415ec"
+    merge_commit: "cc83b7a"
+    merged_at: "2026-04-26T17:42:40Z"
     reviews_addressed: 4
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_files_skip_reason: "No PROJECT.md/ROADMAP.md/DEPENDENCIES.md in this repo (consistent with CLO-247/CLO-248/CLO-249)."
+    merged_at: "2026-04-26T17:42:40Z"
 
 history:
   - timestamp: "2026-04-26T00:00:00Z"
@@ -149,3 +154,16 @@ history:
       src/template/* convention). make check still clean (520 tests, 0
       warnings). Replies posted to all 4 comments with /gemini review
       trailer to trigger re-validation.
+  - timestamp: "2026-04-26T17:42:40Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #10 merged to main as squash commit cc83b7a (feat(CLO-250): add tensorzero config schema to src/config.rs)."
+  - timestamp: "2026-04-26T17:44:17Z"
+    action: workflow_complete
+    phase: complete
+    details: |
+      Linear CLO-250 set to Done. No PROJECT.md/ROADMAP.md/DEPENDENCIES.md
+      aggregation files in this repo, so /project:sync --complete step
+      skipped (consistent with CLO-247/CLO-248/CLO-249). T-033 (TOML
+      workflow grammar) and T-039 (loker doctor reachability) are now
+      unblocked - both consume the TensorZeroConfig added here.
