@@ -16,8 +16,8 @@
   ],
   "properties": {
     "schema_version": {
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      "type": "integer",
+      "const": 1
     },
     "loker.strategy": { "type": "string", "const": "parallel" },
     "loker.phase": { "type": "string", "minLength": 1 },

@@ -4,16 +4,16 @@
   "title": "Loker Run Manifest",
   "description": "Append-only artefact registry persisted at runs/<id>/manifest.json (PRD FR-23b). Each entry is content-addressed by sha256 so the resume path can detect tampering or partial writes. Entries are added phase-by-phase; an empty entries array is legal between run start and the first phase artefact landing.",
   "type": "object",
-  "required": ["loker.run_id", "loker.schema_version", "entries"],
+  "required": ["loker.run_id", "schema_version", "entries"],
   "properties": {
     "loker.run_id": {
       "type": "string",
       "format": "uuid"
     },
-    "loker.schema_version": {
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "Semantic version of the manifest schema this file conforms to."
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version of the manifest envelope. Intentionally un-namespaced: the same key is used across all loker artefacts and across HITL files (whose canonical shape uses bare 'schema_version'). All other loker-specific keys keep the 'loker.' prefix."
     },
     "entries": {
       "type": "array",
@@ -46,13 +46,14 @@
           ]
         },
         "schema_version": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          "type": "integer",
+          "const": 1,
+          "description": "Schema version of the artefact this entry references."
         },
         "sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
-          "description": "Lowercase hex sha256 of the artefact bytes at the moment of the manifest write."
+          "description": "Lowercase hex sha256 of the artefact bytes at the moment of the manifest write. For directory kinds (e.g., 'changes/'), the producer hashes a deterministic manifest of the directory contents (sorted relative paths joined with their per-file sha256s, newline-separated) rather than a single file. Producers MUST document the exact serialization they used so verifiers can reproduce the digest."
         },
         "producer": {
           "type": "string",

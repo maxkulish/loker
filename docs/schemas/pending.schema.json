@@ -18,7 +18,11 @@
   ],
   "properties": {
     "schema_version": { "type": "integer", "const": 1 },
-    "run_id": { "type": "string", "minLength": 1 },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "HITL workflow slug (per HITL design §3.3, e.g. 'design-doc-tdd-2026-04-25-1437-a7c3'), not the loker.run_id UUID used by other artefacts. Kept un-namespaced and as an opaque string to preserve compatibility with the HITL spec."
+    },
     "workflow": { "type": "string", "minLength": 1 },
     "phase": { "type": "string", "minLength": 1 },
     "severity": {
@@ -29,7 +33,7 @@
     "timeout_at": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Null when severity=high (no auto-fail). Otherwise an absolute deadline."
+      "description": "Null when severity=high (no auto-fail). Otherwise an absolute deadline. The relationship is enforced by an if/then/else clause at the schema root."
     },
     "artefact": {
       "type": "object",
@@ -64,5 +68,15 @@
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "if": {
+    "properties": { "severity": { "const": "high" } },
+    "required": ["severity"]
+  },
+  "then": {
+    "properties": { "timeout_at": { "type": "null" } }
+  },
+  "else": {
+    "properties": { "timeout_at": { "type": "string", "format": "date-time" } }
+  }
 }

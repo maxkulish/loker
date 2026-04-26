@@ -6,7 +6,7 @@
   "type": "object",
   "required": [
     "loker.run_id",
-    "loker.schema_version",
+    "schema_version",
     "started_at",
     "finished_at",
     "duration_ms",
@@ -20,9 +20,10 @@
       "type": "string",
       "format": "uuid"
     },
-    "loker.schema_version": {
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version of the summary envelope. Un-namespaced for consistency with manifest.json and HITL artefacts."
     },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
