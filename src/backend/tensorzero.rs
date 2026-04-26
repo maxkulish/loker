@@ -115,6 +115,18 @@ impl Backend for TensorZeroBackend {
         // surfaces connectivity errors as `BackendError::Network`.
         true
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // genai `exec_chat` (non-streaming), no tool param wired today; the
+        // gateway forwards to capable models, but the call site is single-shot.
+        // `file_edit=true` because Claude/Sonnet-class models behind the
+        // gateway reliably emit JSON edit blocks.
+        super::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        }
+    }
 }
 
 fn token_usage_from_genai(usage: &Usage) -> Option<TokenUsage> {
@@ -386,6 +398,25 @@ mod tests {
             "expected Timeout, got {err:?}"
         );
         assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        let cfg = TensorZeroConfig {
+            endpoint: "http://localhost:3000".to_string(),
+            model: "test-model".to_string(),
+            api_key: Some("k".to_string()),
+            timeout: Duration::from_secs(1),
+        };
+        let backend = TensorZeroBackend::new(cfg).expect("config should construct");
+        assert_eq!(
+            backend.capabilities(),
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
     }
 
     #[test]

@@ -177,6 +177,17 @@ impl Backend for OllamaBackend {
         // Return true and let runtime connection fail if not running.
         true
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // POST /api/chat with `stream: false`. No tool surface wired. Local
+        // models (llama3.2 default) do not reliably emit JSON edit blocks, so
+        // file_edit is honestly false here.
+        super::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -229,5 +240,22 @@ mod tests {
         assert!(parsed.model.is_none());
         assert!(parsed.prompt_eval_count.is_none());
         assert!(parsed.eval_count.is_none());
+    }
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        let backend = OllamaBackend {
+            client: Client::new(),
+            base_url: "http://localhost:11434".to_string(),
+            model: "llama3.2".to_string(),
+        };
+        assert_eq!(
+            backend.capabilities(),
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: false,
+            }
+        );
     }
 }

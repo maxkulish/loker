@@ -132,4 +132,39 @@ impl super::Backend for CodexBackend {
     fn is_available(&self) -> bool {
         which::which(&self.command).is_ok()
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // `codex exec --json -s read-only` is a single-shot subprocess. The
+        // JSON event stream contains agent_message items but no tool_use turn,
+        // and the call is non-streaming from our side. Codex models reliably
+        // emit JSON edit blocks in their reply text.
+        super::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        use super::super::Backend;
+        let backend = CodexBackend {
+            command: "codex".to_string(),
+            args: vec![],
+            default_model: None,
+        };
+        assert_eq!(
+            backend.capabilities(),
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
+    }
 }

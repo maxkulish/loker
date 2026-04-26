@@ -68,6 +68,15 @@ pub enum WorkflowError {
         timeout: u64,
         min: u64,
     },
+
+    #[error("Workflow '{workflow}': step '{step}' demands capability '{capability}' ({reason}) but backend '{backend}' does not support it\n  hint: pick a backend whose capabilities() reports {capability}=true, or remove {reason} from the step")]
+    MissingCapability {
+        workflow: String,
+        step: String,
+        backend: String,
+        capability: &'static str,
+        reason: &'static str,
+    },
 }
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
@@ -114,6 +123,24 @@ pub struct Workflow {
     pub timeout: Option<u64>,
 }
 
+/// Capability demands implied by a step's feature flags.
+///
+/// Returns `(capability_name, reason)` pairs - one per feature that requires a
+/// non-default backend capability. `capability_name` matches a field on
+/// `BackendCapabilities` (e.g. `"file_edit"`); `reason` names the step feature
+/// that demanded it (e.g. `"apply_edits = true"`).
+///
+/// v0 demand rule: `step.apply_edits == true` requires `file_edit`. New
+/// capability demands (consensus strategies, verify hooks) plug in here as
+/// they land in T-013/T-024.
+pub fn required_capabilities(step: &Step) -> Vec<(&'static str, &'static str)> {
+    let mut demands = Vec::new();
+    if step.apply_edits {
+        demands.push(("file_edit", "apply_edits = true"));
+    }
+    demands
+}
+
 impl Workflow {
     /// Validate workflow configuration at load time
     pub fn validate(&self) -> Result<(), WorkflowError> {
@@ -139,6 +166,58 @@ impl Workflow {
                         timeout,
                         min: MIN_TIMEOUT_MS,
                     });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate the workflow including per-step backend capability demands.
+    ///
+    /// Runs the standard `validate()` checks first (dependencies, timeouts,
+    /// min_deps_success), then iterates each step's `required_capabilities`
+    /// and resolves each backend through `lookup`. Fails on the first
+    /// `MissingCapability` it encounters.
+    ///
+    /// Unknown backend names (`lookup` returns `None`) are treated as
+    /// `BackendCapabilities::none()` - i.e. all-false - so a step that demands
+    /// `file_edit` against an unknown backend is rejected with the unknown
+    /// name surfaced in the error rather than passing silently.
+    ///
+    /// `lookup` is a closure rather than a concrete type so production callers
+    /// can consult the live `BackendConfig` map / `create_backend` factory
+    /// while tests inject a `HashMap` literal without spinning up real
+    /// clients.
+    pub fn validate_with_capabilities<F>(&self, lookup: F) -> Result<(), WorkflowError>
+    where
+        F: Fn(&str) -> Option<crate::backend::BackendCapabilities>,
+    {
+        self.validate()?;
+
+        for step in &self.steps {
+            let demands = required_capabilities(step);
+            if demands.is_empty() {
+                continue;
+            }
+            for backend_name in step.get_backends() {
+                let caps =
+                    lookup(&backend_name).unwrap_or_else(crate::backend::BackendCapabilities::none);
+                for (capability, reason) in &demands {
+                    let satisfied = match *capability {
+                        "tool_use" => caps.tool_use,
+                        "streaming" => caps.streaming,
+                        "file_edit" => caps.file_edit,
+                        _ => false,
+                    };
+                    if !satisfied {
+                        return Err(WorkflowError::MissingCapability {
+                            workflow: self.name.clone(),
+                            step: step.name.clone(),
+                            backend: backend_name.clone(),
+                            capability,
+                            reason,
+                        });
+                    }
                 }
             }
         }
@@ -6492,5 +6571,191 @@ prompt = "p"
         let verify_cmd = "cargo test";
         let composed = format!("({}) || true && ({})", format_cmd, verify_cmd);
         assert_eq!(composed, "(cargo fmt) || true && (cargo test)");
+    }
+
+    // -----------------------------------------------------------------------
+    // BackendCapabilities validation (CLO-251)
+    // -----------------------------------------------------------------------
+
+    fn make_step(name: &str, backend: &str, apply_edits: bool) -> Step {
+        Step {
+            name: name.to_string(),
+            backend: backend.to_string(),
+            backends: vec![],
+            model: None,
+            prompt: "do work".to_string(),
+            depends_on: vec![],
+            when: None,
+            shell: None,
+            apply_edits,
+            verify: None,
+            fix_retries: 0,
+            retries: 0,
+            retry_delay: 1000,
+            for_each: None,
+            output_format: None,
+            continue_on_error: None,
+            min_deps_success: None,
+            timeout: None,
+            consensus: None,
+            validate: None,
+        }
+    }
+
+    fn caps_file_edit() -> crate::backend::BackendCapabilities {
+        crate::backend::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        }
+    }
+
+    fn capability_lookup() -> impl Fn(&str) -> Option<crate::backend::BackendCapabilities> {
+        |name: &str| match name {
+            "claude" | "codex" | "gemini" | "tensorzero" | "bedrock" => Some(caps_file_edit()),
+            "ollama" => Some(crate::backend::BackendCapabilities::none()),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn required_capabilities_returns_empty_for_plain_step() {
+        let step = make_step("plain", "claude", false);
+        assert!(required_capabilities(&step).is_empty());
+    }
+
+    #[test]
+    fn required_capabilities_returns_file_edit_for_apply_edits() {
+        let step = make_step("edit", "claude", true);
+        assert_eq!(
+            required_capabilities(&step),
+            vec![("file_edit", "apply_edits = true")]
+        );
+    }
+
+    #[test]
+    fn validate_rejects_apply_edits_on_ollama() {
+        let workflow = Workflow {
+            name: "wf".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![make_step("edit", "ollama", true)],
+            continue_on_error: false,
+            timeout: None,
+        };
+        let err = workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect_err("ollama lacks file_edit, must reject");
+        match err {
+            WorkflowError::MissingCapability {
+                capability,
+                reason,
+                backend,
+                step,
+                ..
+            } => {
+                assert_eq!(capability, "file_edit");
+                assert_eq!(reason, "apply_edits = true");
+                assert_eq!(backend, "ollama");
+                assert_eq!(step, "edit");
+            }
+            other => panic!("expected MissingCapability, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_apply_edits_on_claude() {
+        let workflow = Workflow {
+            name: "wf".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![make_step("edit", "claude", true)],
+            continue_on_error: false,
+            timeout: None,
+        };
+        workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect("claude has file_edit, must accept");
+    }
+
+    #[test]
+    fn validate_with_capabilities_handles_empty_steps() {
+        let workflow = Workflow {
+            name: "empty".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![],
+            continue_on_error: false,
+            timeout: None,
+        };
+        workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect("empty step list must validate");
+    }
+
+    #[test]
+    fn validate_skips_shell_only_steps() {
+        let mut step = make_step("setup", "", false);
+        step.shell = Some("echo hi".to_string());
+        let workflow = Workflow {
+            name: "wf".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![step],
+            continue_on_error: false,
+            timeout: None,
+        };
+        workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect("shell-only steps demand no capabilities");
+    }
+
+    #[test]
+    fn validate_rejects_apply_edits_on_first_failing_backend_in_multi() {
+        let mut step = make_step("edit", "", true);
+        step.backends = vec!["claude".to_string(), "ollama".to_string()];
+        let workflow = Workflow {
+            name: "wf".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![step],
+            continue_on_error: false,
+            timeout: None,
+        };
+        let err = workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect_err("ollama in the list must trip validation");
+        match err {
+            WorkflowError::MissingCapability { backend, .. } => {
+                assert_eq!(backend, "ollama");
+            }
+            other => panic!("expected MissingCapability, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn validate_treats_unknown_backend_as_none() {
+        let workflow = Workflow {
+            name: "wf".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![make_step("edit", "deepseek", true)],
+            continue_on_error: false,
+            timeout: None,
+        };
+        let err = workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect_err("unknown backend resolves to none(), must reject");
+        match err {
+            WorkflowError::MissingCapability {
+                backend,
+                capability,
+                ..
+            } => {
+                assert_eq!(backend, "deepseek");
+                assert_eq!(capability, "file_edit");
+            }
+            other => panic!("expected MissingCapability, got {:?}", other),
+        }
     }
 }

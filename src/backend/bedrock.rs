@@ -210,6 +210,18 @@ impl super::Backend for BedrockBackend {
             ))
             .exists()
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // `query()` always invokes `invoke_with_messages_model` with `tools:
+        // None` (line 171). The InvokeModel API is non-streaming. Default
+        // model is a Claude Sonnet variant that reliably emits JSON edit
+        // blocks.
+        super::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -244,5 +256,30 @@ mod tests {
         let parsed: BedrockResponse = serde_json::from_str(json).expect("should parse");
         assert!(parsed.model.is_none());
         assert!(parsed.usage.is_none());
+    }
+
+    #[tokio::test]
+    async fn capabilities_match_current_wiring() {
+        use super::super::Backend;
+        let cfg = BackendConfig {
+            enabled: true,
+            command: None,
+            args: vec![],
+            skip_lines: 0,
+            api_key_env: None,
+            model: None,
+            timeout: None,
+            max_retries: None,
+            retry_delay_ms: None,
+        };
+        let backend = BedrockBackend::new(&cfg).await.expect("backend builds");
+        assert_eq!(
+            backend.capabilities(),
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
     }
 }
