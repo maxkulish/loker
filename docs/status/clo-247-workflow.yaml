@@ -69,7 +69,11 @@ phases:
       integration: 6
       schema: 1
   pr:
-    status: pending
+    status: in_progress
+    pr_url: "https://github.com/maxkulish/loker/pull/7"
+    pr_number: 7
+    branch: "feat/clo-247-reconcile"
+    commit_sha: "24103b8"
   complete:
     status: pending
 
@@ -124,3 +128,15 @@ history:
     action: phase_completed
     phase: implement
     details: "Transitioning to pr phase."
+  - timestamp: "2026-04-26T10:08:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit 24103b8 on feat/clo-247-reconcile. 5 files changed, 607 insertions(+), 20 deletions(-)."
+  - timestamp: "2026-04-26T10:08:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Branch feat/clo-247-reconcile pushed to origin."
+  - timestamp: "2026-04-26T10:09:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #7 opened: https://github.com/maxkulish/loker/pull/7"
