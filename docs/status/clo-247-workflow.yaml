@@ -73,7 +73,8 @@ phases:
     pr_url: "https://github.com/maxkulish/loker/pull/7"
     pr_number: 7
     branch: "feat/clo-247-reconcile"
-    commit_sha: "24103b8"
+    commit_sha: "3b9f0ca"
+    reviews_addressed: 3
   complete:
     status: pending
 
@@ -140,3 +141,7 @@ history:
     action: pr_created
     phase: pr
     details: "PR #7 opened: https://github.com/maxkulish/loker/pull/7"
+  - timestamp: "2026-04-26T14:02:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 3 PR review comments in commit 3b9f0ca. (1) gemini-code-assist: replaced literal substring 401/429 checks with boundary-aware contains_status_code helper (rejects 4011, code=14010, H401X). (2) Copilot: restricted body inspection to 502 only — generic 5xx now maps directly to BackendError::Network. (3) Copilot: added unit tests canonicalize_wire_model_strips_to_canonical_on_wire and contains_status_code_handles_punctuation_boundaries. make check green: 487 unit + 6 integration + 1 schema. Replies posted on all 3 comments (gemini reply includes /gemini review trailer)."
