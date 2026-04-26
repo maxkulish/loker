@@ -30,7 +30,7 @@ workflow:
   current_phase: pr
   status: in_progress
   created_at: "2026-04-26T00:00:00Z"
-  updated_at: "2026-04-26T18:00:00Z"
+  updated_at: "2026-04-26T18:30:00Z"
 
 phases:
   discovery:
@@ -67,7 +67,12 @@ phases:
       - "ST7: docs/handoff.md sample [tensorzero] block before Reference table"
       - "ST8: make check passes (520 tests, 0 warnings); rg 'env::var' src/backend/tensorzero.rs returns no matches (AC7 verified)"
   pr:
-    status: pending
+    status: in_progress
+    pr_url: "https://github.com/maxkulish/loker/pull/10"
+    pr_number: 10
+    pr_branch: "feat/clo-250-config"
+    pr_commit: "78415ec"
+    reviews_addressed: 4
   complete:
     status: pending
 
@@ -118,3 +123,29 @@ history:
       All 11 acceptance criteria satisfied. #[allow(dead_code)] added on to_backend_opts
       (consistent with established codebase pattern in backend/, role/, workflow/, etc -
       method is library-public and tested but not yet wired into bin; T-033 will consume it).
+  - timestamp: "2026-04-26T18:00:00Z"
+    action: commit_created
+    phase: implement
+    details: "3f7ddf5 feat(CLO-250): add tensorzero config schema to src/config.rs (7 files, +649/-13)"
+  - timestamp: "2026-04-26T18:00:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Pushed feat/clo-250-config to origin (new branch tracking origin/feat/clo-250-config)."
+  - timestamp: "2026-04-26T18:00:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #10 opened: https://github.com/maxkulish/loker/pull/10"
+  - timestamp: "2026-04-26T18:30:00Z"
+    action: review_addressed
+    phase: pr
+    details: |
+      Addressed 4 inline review comments (gemini-code-assist + Copilot) in
+      commit 78415ec. Renamed RetryPolicy -> RetryPolicyConfig (avoids clash
+      with backend::retry::RetryPolicy), switched max_retries u32 -> usize
+      and reused existing default_retries() / default_retry_delay_ms()
+      helpers (dropped duplicates), added default_model non-empty check in
+      validate(), and dropped the `unsafe` wrappers around env::set_var /
+      remove_var in the env-var test (safe on MSRV 1.80; matches
+      src/template/* convention). make check still clean (520 tests, 0
+      warnings). Replies posted to all 4 comments with /gemini review
+      trailer to trigger re-validation.
