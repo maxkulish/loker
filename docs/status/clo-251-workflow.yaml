@@ -28,10 +28,10 @@ linear:
     - "CLO-247 (T-005 reconcile tensorzero with D1 spike) - merged 2026-04-26 (PR #7, commit 048b6cd)"
 
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: in_progress
   created_at: "2026-04-26T18:00:00Z"
-  updated_at: "2026-04-26T18:30:00Z"
+  updated_at: "2026-04-26T20:30:00Z"
 
 phases:
   discovery:
@@ -57,10 +57,19 @@ phases:
     applied_suggestions: []
     flagged_suggestions: []
   implement:
-    status: in_progress
-    sub_tasks_completed: []
+    status: complete
+    sub_tasks_completed:
+      - "ST1: BackendCapabilities struct + Backend::capabilities() trait method"
+      - "ST2: Honest per-backend capabilities() overrides + pinning tests (tensorzero, claude, codex, gemini, ollama, bedrock)"
+      - "ST3: WorkflowError::MissingCapability + required_capabilities helper + Workflow::validate_with_capabilities"
+      - "ST4: 8 unit tests (claude pass / ollama fail / multi-backend / unknown / empty / shell-only / required_capabilities) + production loader wiring via capabilities_for_name in run_workflow and validate_workflow"
+    pre_merge_check: "make check exits 0 (fmt + clippy + 516 lib tests + 14 integration tests green)"
   pr:
-    status: pending
+    status: complete
+    pr_url: "https://github.com/maxkulish/loker/pull/11"
+    pr_number: 11
+    branch: feat/clo-251-backend
+    commit_sha: fc232a0
   complete:
     status: pending
 
@@ -81,3 +90,19 @@ history:
     action: phase_completed
     phase: spec
     details: "Spec phase complete. Transitioning to implement phase. ST1 first: define BackendCapabilities + extend Backend trait."
+  - timestamp: "2026-04-26T20:00:00Z"
+    action: implementation_complete
+    phase: implement
+    details: "ST1-ST4 complete. BackendCapabilities trait + struct, per-backend honest overrides with pinning tests, WorkflowError::MissingCapability + validate_with_capabilities, production loader wiring via static capabilities_for_name lookup in src/main.rs run_workflow and validate_workflow. make check exits 0 (516 lib tests + 14 integration tests green)."
+  - timestamp: "2026-04-26T20:15:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit fc232a0: feat(CLO-251): add BackendCapabilities + workflow validation (FR-4). 11 files, 886 insertions."
+  - timestamp: "2026-04-26T20:20:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Pushed feat/clo-251-backend to origin."
+  - timestamp: "2026-04-26T20:30:00Z"
+    action: pr_created
+    phase: pr
+    details: "Opened PR #11: https://github.com/maxkulish/loker/pull/11. Awaiting review/merge."
