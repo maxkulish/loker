@@ -1,0 +1,104 @@
+task_id: CLO-248
+task_title: "Add wiremock unit-test contract for tensorzero backend"
+task_url: "https://linear.app/cloud-ai/issue/CLO-248/add-wiremock-unit-test-contract-for-tensorzero-backend"
+task_type: specification
+classification_reason: |
+  Single-module test scaffolding with a fully enumerated case list (6 wiremock
+  cases: 200, 429, 500, malformed JSON, timeout, auth). All architecture
+  decisions are pre-decided: error variants live in T-007 (CLO-249 surface
+  already shipped via PR #7), retry policy lives in T-008, and the M1 plan
+  (docs/plans/2026-04-25-m1-tensorzero-backend.md §"Test contract") spells
+  out the exact wiremock-as-dev-dep approach. No design Q&A required — the
+  /spec workflow fits, mirroring CLO-247.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: High
+  branch_suggested: kmamemo/clo-248-add-wiremock-unit-test-contract-for-tensorzero-backend
+  branch_actual: feat/clo-248-wiremock
+  blocks:
+    - "CLO-257 (Implement Strategy::SingleModel)"
+    - "CLO-252 (Add opt-in tensorzero integration test gated by LOKER_TZ_INTEGRATION)"
+  blocked_by:
+    - "CLO-247 (Reconcile tensorzero backend with D1 spike findings) — merged 2026-04-26 via PR #7 (commit 048b6cd)"
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-26T00:00:00Z"
+  updated_at: "2026-04-26T01:05:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task — M1 plan already enumerates the 6 required wiremock cases and the test contract."
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task — using /spec instead of full design doc. Architecture decisions live in docs/plans/2026-04-25-m1-tensorzero-backend.md."
+  spec:
+    status: complete
+    spec_file: "specs/2026-04-26-clo-248-wiremock-test-contract.md"
+    approved: true
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_completed: false
+    review_skipped_reason: "AI spec-review workflow file (.lok/workflows/spec-review.toml) not present in this branch. Per spec.md phase degradation: noted as 'No AI reviews available' and proceeding to user checkpoint with draft spec."
+    review_applied: false
+    applied_suggestions: []
+    flagged_suggestions: []
+  implement:
+    status: complete
+    files_created:
+      - "tests/tensorzero_backend.rs (7 #[tokio::test] cases — 200, 429, 500, 401, 403, malformed JSON, timeout)"
+      - "src/lib.rs (5-module re-export so external integration tests can `use loker::backend::*`)"
+    verification:
+      wiremock_tests: "7 passed; 0 failed (cargo test --test tensorzero_backend -q)"
+      pre_merge_gate: "fmt + clippy + test all green (make check) — 487 unit + 6 integration + 1 schema + 7 wiremock"
+  pr:
+    status: pending
+    pr_url: null
+    pr_number: null
+  complete:
+    status: pending
+
+context:
+  pre_existing_state:
+    - "wiremock = \"0.6\" already declared in Cargo.toml [dev-dependencies] (line 63) — no Cargo edit required for the dep itself."
+    - "tests/tensorzero_backend.rs does NOT yet exist — needs to be created."
+    - "Branch feat/clo-248-wiremock already checked out."
+    - "Working tree clean as of workflow init."
+  reference_artefacts:
+    - "docs/plans/2026-04-25-m1-tensorzero-backend.md (T-006 contract)"
+    - "docs/spikes/2026-04-25-tensorzero-roundtrip.md (D1 fixtures, error mapping)"
+    - "specs/2026-04-26-clo-247-reconcile-tensorzero.md (CLO-247 spec — sibling pattern)"
+    - "tests/fixtures/tensorzero/ (200 success body shape from D1)"
+
+history:
+  - timestamp: "2026-04-26T00:00:00Z"
+    action: workflow_started
+    phase: entry
+    details: "Workflow YAML created. Task classified as specification (auto: explicit case enumeration, no architecture decisions, sibling to CLO-247). Project aggregation files (PROJECT.md/DEPENDENCIES.md) not present in this repo — /project:sync skipped."
+  - timestamp: "2026-04-26T00:25:00Z"
+    action: spec_drafted
+    phase: spec
+    details: "Drafted specs/2026-04-26-clo-248-wiremock-test-contract.md (5 sections, S scope, 10 ACs, 3 sub-tasks). Key design choice: external tests/tensorzero_backend.rs pins the public-API contract; existing inline mod tests in src/backend/tensorzero.rs stay in place for private-helper coverage. Spec corrected to match actual API: out.stdout (not text), query(prompt, &Path, Option<&str>), endpoint = server.uri() (backend appends /openai/v1)."
+  - timestamp: "2026-04-26T00:28:00Z"
+    action: spec_review_failed
+    phase: spec
+    details: ".lok/workflows/spec-review.toml does not exist in this branch — no AI spec-review pipeline configured. Proceeding to user checkpoint with draft spec per spec.md degradation path."
+  - timestamp: "2026-04-26T00:35:00Z"
+    action: spec_approved
+    phase: spec
+    details: "User approved unreviewed draft spec. Transitioning to implement phase. Spec decomposition (3 sub-tasks) is the implementation plan — no separate /plan phase per specification-task workflow."
+  - timestamp: "2026-04-26T00:55:00Z"
+    action: implementation_complete
+    phase: implement
+    details: "Created tests/tensorzero_backend.rs with 7 #[tokio::test] cases covering all M1 wire-contract scenarios (200, 429, 500, 401, 403, malformed JSON, timeout). Side effect: added minimal src/lib.rs re-exporting the 5 crate modules so external test files can `use loker::backend::*` — loker was binary-only before this commit. main.rs unchanged. Also unblocks CLO-252 (integration test) and CLO-257 (Strategy::SingleModel) which face the same import problem."
+  - timestamp: "2026-04-26T01:05:00Z"
+    action: phase_completed
+    phase: implement
+    details: "Verified: cargo test --test tensorzero_backend -q -> 7 passed. make check -> 487 unit + 6 integration + 1 schema + 7 wiremock all green, fmt + clippy clean. Transitioning to pr phase."
