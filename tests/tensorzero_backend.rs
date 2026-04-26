@@ -64,6 +64,7 @@ async fn rate_limit_429_is_retryable() {
     Mock::given(method("POST"))
         .and(path("/openai/v1/chat/completions"))
         .respond_with(ResponseTemplate::new(429).set_body_string("rate limited"))
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -86,6 +87,7 @@ async fn server_error_500_is_retryable() {
     Mock::given(method("POST"))
         .and(path("/openai/v1/chat/completions"))
         .respond_with(ResponseTemplate::new(500).set_body_string("internal error"))
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -95,11 +97,12 @@ async fn server_error_500_is_retryable() {
         .await
         .expect_err("500 fails");
 
+    // Per spec §3 (Constraints) + AC4: pin retryability, not the variant — 5xx
+    // bucket selection is a T-008 retry-policy implementation detail.
     assert!(
-        matches!(err, BackendError::Network { .. }),
-        "expected Network for generic 5xx, got {err:?}"
+        err.is_retryable(),
+        "expected generic 5xx to be retryable, got {err:?}"
     );
-    assert!(err.is_retryable());
 }
 
 #[tokio::test]
@@ -108,6 +111,7 @@ async fn auth_failure_401_is_not_retryable() {
     Mock::given(method("POST"))
         .and(path("/openai/v1/chat/completions"))
         .respond_with(ResponseTemplate::new(401).set_body_string("unauthorized"))
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -130,6 +134,7 @@ async fn auth_failure_403_is_not_retryable() {
     Mock::given(method("POST"))
         .and(path("/openai/v1/chat/completions"))
         .respond_with(ResponseTemplate::new(403).set_body_string("forbidden"))
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -156,6 +161,7 @@ async fn malformed_json_returns_parse_error() {
                 .insert_header("content-type", "application/json")
                 .set_body_string("{not valid json"),
         )
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -182,6 +188,7 @@ async fn request_timeout_returns_timeout_error() {
                 .set_body_json(openai_success_body("too late"))
                 .set_delay(Duration::from_millis(800)),
         )
+        .expect(1)
         .mount(&server)
         .await;
 
