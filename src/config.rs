@@ -14,6 +14,8 @@ pub struct Config {
     #[serde(default)]
     pub cache: crate::cache::CacheConfig,
     #[serde(default)]
+    pub tensorzero: Option<TensorZeroConfig>,
+    #[serde(default)]
     pub backends: HashMap<String, BackendConfig>,
     #[serde(default)]
     pub tasks: HashMap<String, TaskConfig>,
@@ -120,6 +122,89 @@ pub struct BackendConfig {
 
 fn default_enabled() -> bool {
     true
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct RetryPolicy {
+    #[serde(default = "default_retry_max")]
+    pub max_retries: u32,
+    #[serde(default = "default_retry_delay_ms_u64")]
+    pub delay_ms: u64,
+}
+
+fn default_retry_max() -> u32 {
+    0
+}
+
+fn default_retry_delay_ms_u64() -> u64 {
+    1000
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: default_retry_max(),
+            delay_ms: default_retry_delay_ms_u64(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct TensorZeroConfig {
+    pub endpoint: String,
+    pub default_model: String,
+    #[serde(default)]
+    pub api_key_env: Option<String>,
+    #[serde(default = "default_tz_timeout_secs")]
+    pub timeout_secs: u64,
+    #[serde(default)]
+    pub retry_policy: RetryPolicy,
+}
+
+fn default_tz_timeout_secs() -> u64 {
+    60
+}
+
+impl TensorZeroConfig {
+    #[allow(dead_code)]
+    pub fn to_backend_opts(&self) -> Result<crate::backend::TensorZeroBackendOpts> {
+        let api_key = match self.api_key_env.as_deref() {
+            Some(var) if !var.is_empty() => Some(
+                std::env::var(var)
+                    .with_context(|| format!("Missing environment variable: {}", var))?,
+            ),
+            _ => None,
+        };
+        Ok(crate::backend::TensorZeroBackendOpts {
+            endpoint: self.endpoint.clone(),
+            model: self.default_model.clone(),
+            api_key,
+            timeout: std::time::Duration::from_secs(self.timeout_secs),
+        })
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.endpoint.is_empty() {
+            anyhow::bail!("tensorzero.endpoint: must not be empty");
+        }
+        let url = reqwest::Url::parse(&self.endpoint).with_context(|| {
+            format!("tensorzero.endpoint: not a valid URL: '{}'", self.endpoint)
+        })?;
+        let scheme = url.scheme();
+        if scheme != "http" && scheme != "https" {
+            anyhow::bail!(
+                "tensorzero.endpoint: scheme must be http or https, got '{}' in '{}'",
+                scheme,
+                self.endpoint
+            );
+        }
+        if self.timeout_secs == 0 {
+            anyhow::bail!("tensorzero.timeout_secs: must be greater than zero");
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -258,6 +343,7 @@ impl Default for Config {
             defaults: Defaults::default(),
             conductor: ConductorConfig::default(),
             cache: crate::cache::CacheConfig::default(),
+            tensorzero: None,
             backends,
             tasks,
             roles: HashMap::new(),
@@ -318,9 +404,13 @@ pub fn load_config_from_paths(
     // Explicit path: merge with defaults (not hollow)
     if let Some(p) = explicit_path {
         merge_toml_file(&mut base, p)?;
-        return base
+        let cfg: Config = base
             .try_into::<Config>()
-            .with_context(|| format!("Error parsing {}", p.display()));
+            .with_context(|| format!("Error parsing {}", p.display()))?;
+        if let Some(tz) = cfg.tensorzero.as_ref() {
+            tz.validate()?;
+        }
+        return Ok(cfg);
     }
 
     // Layer 2: user config (~/.config/lok/lok.toml)
@@ -334,8 +424,13 @@ pub fn load_config_from_paths(
     merge_toml_file(&mut base, &project_config_path)?;
 
     // Deserialize merged TOML into Config (deny_unknown_fields applied here)
-    base.try_into::<Config>()
-        .context("Failed to deserialize merged config")
+    let cfg: Config = base
+        .try_into::<Config>()
+        .context("Failed to deserialize merged config")?;
+    if let Some(tz) = cfg.tensorzero.as_ref() {
+        tz.validate()?;
+    }
+    Ok(cfg)
 }
 
 pub fn load_config(path: Option<&Path>) -> Result<Config> {
@@ -822,5 +917,119 @@ timeout = 999
             "Error should mention file: {}",
             err
         );
+    }
+
+    #[test]
+    fn test_tensorzero_config_serialization_roundtrip() {
+        let mut original = Config::default();
+        original.tensorzero = Some(TensorZeroConfig {
+            endpoint: "https://gateway.local:3000".to_string(),
+            default_model: "tensorzero::function_name::loker_d1_openai".to_string(),
+            api_key_env: Some("TENSORZERO_API_KEY".to_string()),
+            timeout_secs: 90,
+            retry_policy: RetryPolicy {
+                max_retries: 3,
+                delay_ms: 500,
+            },
+        });
+
+        let serialized = toml::to_string_pretty(&original).unwrap();
+        let deserialized: Config = toml::from_str(&serialized).unwrap();
+
+        let original_tz = original.tensorzero.as_ref().unwrap();
+        let round_tz = deserialized.tensorzero.as_ref().unwrap();
+        assert_eq!(original_tz.endpoint, round_tz.endpoint);
+        assert_eq!(original_tz.default_model, round_tz.default_model);
+        assert_eq!(original_tz.api_key_env, round_tz.api_key_env);
+        assert_eq!(original_tz.timeout_secs, round_tz.timeout_secs);
+        assert_eq!(
+            original_tz.retry_policy.max_retries,
+            round_tz.retry_policy.max_retries
+        );
+        assert_eq!(
+            original_tz.retry_policy.delay_ms,
+            round_tz.retry_policy.delay_ms
+        );
+    }
+
+    #[test]
+    fn test_tensorzero_missing_endpoint_fails() {
+        let toml_str = r#"
+[tensorzero]
+default_model = "loker_d1_openai"
+"#;
+        let result = toml::from_str::<Config>(toml_str);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("endpoint"),
+            "Error should mention endpoint: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_tensorzero_invalid_url_fails() {
+        let toml_str = r#"
+[tensorzero]
+endpoint = "not a url"
+default_model = "loker_d1_openai"
+"#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        let result = cfg.tensorzero.as_ref().unwrap().validate();
+        assert!(result.is_err());
+        let err = format!("{:#}", result.unwrap_err());
+        assert!(
+            err.contains("endpoint"),
+            "Error should mention endpoint: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_tensorzero_zero_timeout_fails() {
+        let toml_str = r#"
+[tensorzero]
+endpoint = "https://gateway.local"
+default_model = "loker_d1_openai"
+timeout_secs = 0
+"#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        let result = cfg.tensorzero.as_ref().unwrap().validate();
+        assert!(result.is_err());
+        let err = format!("{:#}", result.unwrap_err());
+        assert!(
+            err.contains("timeout"),
+            "Error should mention timeout: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_tensorzero_to_backend_opts_resolves_env() {
+        let var_name = "LOK_TEST_TENSORZERO_KEY_CLO250";
+        // SAFETY: tests in this module run serially via cargo's default behaviour
+        // for the same process; the var name is unique to this test.
+        unsafe {
+            std::env::set_var(var_name, "secret-token-xyz");
+        }
+
+        let cfg = TensorZeroConfig {
+            endpoint: "https://gateway.local".to_string(),
+            default_model: "loker_d1_openai".to_string(),
+            api_key_env: Some(var_name.to_string()),
+            timeout_secs: 60,
+            retry_policy: RetryPolicy::default(),
+        };
+
+        let opts = cfg.to_backend_opts().expect("env var is set");
+        assert_eq!(opts.endpoint, "https://gateway.local");
+        assert_eq!(opts.model, "loker_d1_openai");
+        assert_eq!(opts.api_key.as_deref(), Some("secret-token-xyz"));
+        assert_eq!(opts.timeout, std::time::Duration::from_secs(60));
+
+        unsafe {
+            std::env::remove_var(var_name);
+        }
     }
 }

@@ -30,7 +30,7 @@ use std::path::Path;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
-pub struct TensorZeroConfig {
+pub struct TensorZeroBackendOpts {
     pub endpoint: String,
     pub model: String,
     pub api_key: Option<String>,
@@ -43,7 +43,7 @@ pub struct TensorZeroBackend {
 }
 
 impl TensorZeroBackend {
-    pub fn new(cfg: TensorZeroConfig) -> Result<Self, BackendError> {
+    pub fn new(cfg: TensorZeroBackendOpts) -> Result<Self, BackendError> {
         let endpoint = Endpoint::from_owned(normalize_endpoint(&cfg.endpoint));
         let auth = AuthData::from_single(cfg.api_key.clone().unwrap_or_default());
 
@@ -229,8 +229,8 @@ mod tests {
         }
     }
 
-    fn config_for(server: &MockServer) -> TensorZeroConfig {
-        TensorZeroConfig {
+    fn config_for(server: &MockServer) -> TensorZeroBackendOpts {
+        TensorZeroBackendOpts {
             endpoint: server.uri(),
             model: "test-model".to_string(),
             api_key: Some("test-key".to_string()),
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn name_is_tensorzero() {
-        let cfg = TensorZeroConfig {
+        let cfg = TensorZeroBackendOpts {
             endpoint: "http://localhost:3000".to_string(),
             model: "test-model".to_string(),
             api_key: Some("k".to_string()),

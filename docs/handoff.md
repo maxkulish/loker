@@ -82,6 +82,25 @@ The convention is set by the D1 round-trip spike. Source of truth:
 mapping for the gateway also live there; the live skeleton is
 `src/backend/tensorzero.rs`.
 
+### TensorZero backend (lok.toml)
+
+Declared as a top-level `[tensorzero]` table. The config layer validates
+required fields, URL shape, and timeout at parse time, then resolves
+`api_key_env` via `std::env::var` when constructing the runtime opts -
+the backend module itself stays env-free.
+
+```toml
+[tensorzero]
+endpoint = "https://gateway.local:3000"
+default_model = "loker_d1_openai"
+api_key_env = "TENSORZERO_API_KEY"
+timeout_secs = 60
+
+[tensorzero.retry_policy]
+max_retries = 0
+delay_ms = 1000
+```
+
 ## Reference
 
 | Need | Read |

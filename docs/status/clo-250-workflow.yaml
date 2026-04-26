@@ -1,0 +1,120 @@
+task_id: CLO-250
+task_title: "Add tensorzero config schema to src/config.rs"
+task_url: "https://linear.app/cloud-ai/issue/CLO-250/add-tensorzero-config-schema-to-srcconfigrs"
+task_type: specification
+classification_reason: |
+  Single-module change in `src/config.rs`. The repo already has a
+  `BackendConfig` struct (src/config.rs:103) used for codex/gemini/claude/
+  ollama with `command`, `model`, `timeout`, `max_retries`, `retry_delay_ms`,
+  `api_key_env`. Adding a TensorZero config slot reuses or extends this
+  established pattern - no architecture decisions, pattern to study not
+  invent. Acceptance criteria are mechanically testable (round-trip serde,
+  parse-error tests for missing endpoint / invalid URL / zero timeout).
+  Mirrors CLO-249's specification path: short scope, clear contract,
+  /spec workflow fits.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-250-add-tensorzero-config-schema-to-srcconfigrs
+  branch_actual: feat/clo-250-config
+  blocks:
+    - "T-033 (TOML workflow grammar - backend resolver consumes the config)"
+    - "T-039 (`loker doctor` reaches into the config to check reachability)"
+  blocked_by:
+    - "CLO-247 (Reconcile tensorzero backend with D1 spike findings) - merged 2026-04-26 (PR #7, commit 048b6cd)"
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-26T00:00:00Z"
+  updated_at: "2026-04-26T18:00:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task - existing BackendConfig in src/config.rs:103 sets the pattern; CLO-247/CLO-248/CLO-249 already reconciled the TensorZero surface area. No discovery needed."
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task - using /spec instead of full design doc. No architecture decisions; mirror existing per-backend config pattern."
+  spec:
+    status: complete
+    spec_file: "specs/2026-04-26-clo-250-add-tensorzero-config-schema.md"
+    approved: true
+    auto_approved: true
+    auto_approval_reason: "Auto mode active; spec is mechanical schema addition (3 files, 6 sub-tasks), no architecture decisions, all acceptance criteria mechanically testable. User may course-correct at any point."
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_completed: false
+    review_applied: false
+    review_skip_reason: "No .lok/workflows/spec-review.toml present in this repo; AI review tooling unavailable (consistent with CLO-247/CLO-249). Proceeding to user checkpoint with draft spec unchanged."
+    applied_suggestions: []
+    flagged_suggestions: []
+  implement:
+    status: complete
+    sub_tasks_completed:
+      - "ST1: RetryPolicy + TensorZeroConfig structs (src/config.rs)"
+      - "ST2: Wire Option<TensorZeroConfig> into Config + default()"
+      - "ST3: validate() (URL via reqwest, scheme http/https, timeout > 0) + load-time call in both branches"
+      - "ST4: Rename runtime TensorZeroConfig -> TensorZeroBackendOpts (5 refs in src/backend/tensorzero.rs, 1 re-export, 3 refs in tests/tensorzero_backend.rs)"
+      - "ST5: to_backend_opts() conversion with env::var resolution (kept env-free in backend module)"
+      - "ST6: 5 unit tests (round-trip + 3 parse-error + env)"
+      - "ST7: docs/handoff.md sample [tensorzero] block before Reference table"
+      - "ST8: make check passes (520 tests, 0 warnings); rg 'env::var' src/backend/tensorzero.rs returns no matches (AC7 verified)"
+  pr:
+    status: pending
+  complete:
+    status: pending
+
+history:
+  - timestamp: "2026-04-26T00:00:00Z"
+    action: workflow_started
+    phase: spec
+    details: |
+      Created CLO-250 workflow as specification task. Blocker CLO-247
+      resolved (PR #7 merged). Branch feat/clo-250-config already checked
+      out. No PROJECT.md/DEPENDENCIES.md/ROADMAP.md in this repo, so
+      /project:sync --start step skipped (consistent with CLO-249).
+      Auto mode active.
+  - timestamp: "2026-04-26T17:00:00Z"
+    action: spec_drafted
+    phase: spec
+    details: |
+      Wrote 5-section spec at specs/2026-04-26-clo-250-add-tensorzero-config-schema.md.
+      Scope S, 7 sub-tasks (ST1: RetryPolicy + TensorZeroConfig structs; ST2: wire
+      Option<TensorZeroConfig> into Config; ST3: validate() + load-time call; ST4:
+      rename runtime TensorZeroConfig -> TensorZeroBackendOpts; ST5: to_backend_opts()
+      conversion with env::var resolution; ST6: round-trip + 3 parse-error + env tests;
+      ST7: docs/handoff sample). 11 acceptance criteria all mechanically verifiable
+      via cargo test / rg / make check. Naming clash resolved by renaming the runtime
+      struct (impact: 1 re-export + 1 test import).
+  - timestamp: "2026-04-26T17:00:00Z"
+    action: spec_review_skipped
+    phase: spec
+    details: "AI spec-review unavailable: .lok/workflows/spec-review.toml not present in this repo (consistent with CLO-247/CLO-249). Proceeding directly to user checkpoint with the draft spec unchanged."
+  - timestamp: "2026-04-26T17:00:00Z"
+    action: spec_approved
+    phase: spec
+    details: "Auto-mode approval. Spec scope S, mechanically testable, no architecture decisions. Mirrors CLO-249 auto-approval rationale."
+  - timestamp: "2026-04-26T18:00:00Z"
+    action: implementation_complete
+    phase: implement
+    details: |
+      All 8 sub-tasks done. src/config.rs gained RetryPolicy + TensorZeroConfig
+      (deny_unknown_fields), Option<TensorZeroConfig> wired into Config with default
+      None, validate() called in both load_config_from_paths branches, to_backend_opts()
+      method resolves api_key_env via std::env::var (kept out of the backend module).
+      Runtime TensorZeroConfig renamed to TensorZeroBackendOpts in src/backend/tensorzero.rs,
+      src/backend/mod.rs re-export, and tests/tensorzero_backend.rs imports.
+      docs/handoff.md gained a [tensorzero] sample block before the Reference table.
+      5 new unit tests in src/config.rs cover round-trip + missing endpoint + invalid URL +
+      zero timeout + env::var resolution. make check passes (520 tests, 0 warnings).
+      rg "env::var" src/backend/tensorzero.rs returns no matches (AC7 verified).
+      All 11 acceptance criteria satisfied. #[allow(dead_code)] added on to_backend_opts
+      (consistent with established codebase pattern in backend/, role/, workflow/, etc -
+      method is library-public and tested but not yet wired into bin; T-033 will consume it).
