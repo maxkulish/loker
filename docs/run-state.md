@@ -89,9 +89,11 @@ new contents, never torn":
 5. `fsync(parent_dir_fd)` - commit the directory entry update.
 
 In Rust, `tempfile::NamedTempFile::new_in(dir)` + `.persist(<final>)`
-implements (1)-(4) portably. Step 5 needs a manual
+implements (1), (2), and (4) portably. Step 3 requires calling
+`file.as_file().sync_all()?` before `persist()`, since `tempfile`
+does not implicitly fsync the file. Step 5 needs a manual
 `File::open(parent).sync_all()` because `tempfile` does not fsync the
-directory.
+directory either.
 
 The random suffix (64 bits is enough) prevents collisions when two
 processes - or a previously-crashed writer's leftover - attempt the
@@ -145,11 +147,16 @@ into `runs/<id>/markers/`.
 For each successful attempt of a phase, the writer MUST execute steps
 in this order and complete each step's fsync before starting the next:
 
-1. **Started**: write `markers/<phase>.started` (only on attempt 1; on
-   retry the original started marker is reused, only `attempt` count
-   in the body would change - but the body is not rewritten - the
-   reader uses `attempts_made` from `<phase>.failed` if present, else
-   the manifest entries to count attempts).
+1. **Started**: write `markers/<phase>.started` via the atomic-commit
+   primitive on **every attempt**, updating the body's `attempt`
+   field to the current attempt number. The marker is small;
+   rewriting it per attempt keeps it self-describing. The reader
+   trusts the started marker's `attempt` value as authoritative for
+   the in-flight attempt; on a fresh start of the same phase it
+   verifies that value against `attempts_made + 1` from any
+   `markers/<phase>.failed` and against the count of subdirectories
+   under `attempts/<phase>/` (a tiebreaker when markers disagree
+   after a partially-recovered crash).
 2. **Artefact**: write each artefact file via the atomic-commit
    primitive into `<phase>/<artefact>`.
 3. **Manifest**: rewrite `manifest.json` via the atomic-commit
@@ -158,10 +165,10 @@ in this order and complete each step's fsync before starting the next:
 4. **Completed**: write `markers/<phase>.completed` via the
    atomic-commit primitive.
 
-**Critical invariant**: `<phase>.completed` is the single source of
-truth for "phase done". Its presence implies (2) and (3) are durable.
-Its absence implies the phase MUST be rerun, even if (2) and (3)
-appear complete on disk.
+**Critical invariant**: `markers/<phase>.completed` is the single
+source of truth for "phase done". Its presence implies (2) and (3)
+are durable. Its absence implies the phase MUST be rerun, even if (2)
+and (3) appear complete on disk.
 
 ### Manifest rewrite
 
@@ -217,8 +224,14 @@ default favors no-spurious-rerun.
 For each phase declared in the workflow, in dependency order:
 
 1. **`markers/<phase>.completed` present**:
-   - Load each `artefact_paths` entry via the manifest.
-   - sha256-verify against the manifest entry.
+   - Read the marker's `manifest_entry_sha256`. This digest is the
+     authoritative lookup key for the completed phase.
+   - Load that manifest entry; treat it as the sole source of truth
+     for the phase's artefact set. The completed marker's
+     `artefact_paths` is a denormalised hint for human-readable
+     debugging only - the manifest entry is canonical.
+   - sha256-verify each on-disk artefact referenced by that manifest
+     entry against the digests recorded in the same entry.
    - On mismatch: log `ArtefactSchemaMismatch`, treat phase as failed,
      rerun. (The completion marker plus a tampered artefact means
      someone edited files between runs; we do not silently trust
@@ -241,8 +254,10 @@ For each phase declared in the workflow, in dependency order:
 
 On resume, before any phase work begins, sweep every
 `runs/<id>/**/*.tmp` whose mtime is older than `heartbeat_ttl_seconds`.
-Move into `attempts/_orphan_tmp/<isoformat>/` rather than deleting -
-crash-debugging value outweighs disk cost.
+Move into `attempts/_orphan_tmp/<YYYYMMDDTHHMMSSZ>/` (compact UTC
+timestamp, no `:` separator so the path is portable across
+filesystems including Windows) rather than deleting - crash-debugging
+value outweighs disk cost.
 
 ### Hash verification
 
@@ -264,25 +279,32 @@ reader behaviour.
 
 | # | Kill point | On-disk state after kill | Expected reader behaviour |
 |---|---|---|---|
-| 1 | Before `phase.started` write | No markers for phase | Treat as fresh; run from attempt 1 |
-| 2 | Mid-write of `phase.started` (between tmp write and rename) | `<phase>.started.<rand>.tmp` only | Sweep tmp on resume; treat as fresh |
-| 3 | After `phase.started` rename, before any artefact tmp opened | `<phase>.started`; heartbeat fresh | If heartbeat stale: rerun from attempt 1 (no archive needed). If fresh: refuse parallel writer |
-| 4 | Mid-write of artefact (tmp present, not fsynced) | `<phase>.started`; `<phase>/<artefact>.<rand>.tmp` | Heartbeat stale -> archive tmp, rerun from attempt 2 |
+| 1 | Before `markers/<phase>.started` write | No `markers/<phase>.*` files for phase | Treat as fresh; run from attempt 1 |
+| 2 | Mid-write of `markers/<phase>.started` (between tmp write and rename) | `markers/<phase>.started.<rand>.tmp` only | Sweep tmp on resume; treat as fresh |
+| 3 | After `markers/<phase>.started` rename, before any artefact tmp opened | `markers/<phase>.started`; heartbeat fresh | If heartbeat stale: rerun from attempt 1 (no archive needed). If fresh: refuse parallel writer |
+| 4 | Mid-write of artefact (tmp present, not fsynced) | `markers/<phase>.started`; `<phase>/<artefact>.<rand>.tmp` | Heartbeat stale -> archive tmp, rerun from attempt 2 |
 | 5 | After artefact fsync, before rename | Same as (4) | Same as (4) |
 | 6 | After artefact rename, before parent-dir fsync | `<phase>/<artefact>` may exist in page cache; not durably visible after power loss | After power loss: equivalent to (4). After process kill (no power loss): equivalent to (7) |
-| 7 | After artefact rename + parent fsync, before manifest rewrite | `<phase>/<artefact>` durable; manifest does not reference it | Resume: `<phase>.completed` absent -> archive artefact to attempts, rerun. The orphan artefact has no manifest entry, so it is invisible to downstream phases either way |
+| 7 | After artefact rename + parent fsync, before manifest rewrite | `<phase>/<artefact>` durable; manifest does not reference it | Resume: `markers/<phase>.completed` absent -> archive artefact to attempts, rerun. The orphan artefact has no manifest entry, so it is invisible to downstream phases either way |
 | 8 | Mid-manifest rewrite (`manifest.json.tmp` present) | Old `manifest.json` intact; new tmp present | Sweep tmp; manifest is the old one; rerun phase |
-| 9 | After manifest rename, before `phase.completed` rewrite | Manifest references new artefact; no completion marker | Rerun phase. The manifest entry is a leak (orphan entry referencing artefact at canonical path). On rerun success, manifest gets rewritten with the new attempt's entry, leaking the prior orphan. **Mitigation**: on resume, drop manifest entries for which no `<phase>.completed` marker references their sha256. T-024 must implement this sweep |
-| 10 | Mid-write of `phase.completed` | `phase.completed.<rand>.tmp` present | Sweep tmp; rerun phase per (9) |
-| 11 | After `phase.completed` rename, before parent-dir fsync | Marker may not survive power loss | Power loss: equivalent to (9). Process kill: equivalent to (12) |
-| 12 | After `phase.completed` durable | Phase done | Skip phase; load via manifest with hash verify |
-| 13 | After `phase.failed` durable | No partial state in `<phase>/` (archived) | Rerun from attempt `attempts_made + 1` |
-| 14 | Two writers race on the same run (concurrent `loker run`) | Both see no completion marker; both write `<phase>.started.<rand>.tmp` | Whichever rename wins becomes `<phase>.started`; loser's started.tmp is sweep debris. Reader-side: heartbeat-fresh check makes second writer abort before doing artefact work. **Reinforced** by an advisory file lock on `runs/<id>/.lock` taken by the writer at start (out of scope for this doc; T-031 owns) |
+| 9 | After manifest rename, before `markers/<phase>.completed` rewrite | Manifest references new artefact; no `markers/<phase>.completed` marker | Rerun phase. The manifest entry is a leak (orphan entry referencing artefact at canonical path). On rerun success, manifest gets rewritten with the new attempt's entry, leaking the prior orphan. **Mitigation**: on resume, drop manifest entries for which no `markers/<phase>.completed` marker references their sha256. T-024 must implement this sweep |
+| 10 | Mid-write of `markers/<phase>.completed` | `markers/<phase>.completed.<rand>.tmp` present | Sweep tmp; rerun phase per (9) |
+| 11 | After `markers/<phase>.completed` rename, before parent-dir fsync | `markers/<phase>.completed` may not survive power loss | Power loss: equivalent to (9). Process kill: equivalent to (12) |
+| 12 | After `markers/<phase>.completed` durable | `markers/<phase>.completed` durable | Skip phase; load via manifest with hash verify |
+| 13 | After `markers/<phase>.failed` durable | `markers/<phase>.failed` durable; no partial state in `<phase>/` (archived) | Rerun from attempt `attempts_made + 1` |
+| 14 | Two writers race on the same run (concurrent `loker run`) | Both see no `markers/<phase>.completed`; both write `markers/<phase>.started.<rand>.tmp` | Whichever rename wins becomes `markers/<phase>.started`; loser's started.tmp is sweep debris. Reader-side: heartbeat-fresh check makes second writer abort before doing artefact work. **Reinforced** by an advisory file lock on `runs/<id>/.lock` taken by the writer at start (out of scope for this doc; T-031 owns) |
 
 Each row maps to one test in `tests/run_state_crash.rs` (to be created
-under T-031). Crash injection uses `std::process::abort` from a test
-hook installed at the named transition - no real signal delivery
-needed.
+under T-031) for **process-crash semantics**. Crash injection in
+those tests uses `std::process::abort` from a test hook installed at
+the named transition - no real signal delivery needed. Rows that
+discuss **power-loss semantics** (rows 6 and 11) are not fully
+validated by `abort` alone: in particular, row 11's "before parent-dir
+fsync" durability outcome ("marker may not survive power loss")
+requires a separate power-loss / storage-fault harness if we want to
+verify that behavior empirically. The `run_state_crash.rs` test for
+row 11 should assert only the process-kill outcome called out in the
+matrix.
 
 ## Open items deferred to downstream tasks
 
