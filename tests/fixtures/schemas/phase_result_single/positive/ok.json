@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "loker.strategy": "single",
+  "loker.phase": "design",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "attempts": [
+    {
+      "backend": "anthropic",
+      "model": "claude-opus-4-7",
+      "finish_reasons": ["stop"],
+      "usage": {
+        "input_tokens": 1843,
+        "output_tokens": 712
+      },
+      "output_path": "design/design.md",
+      "verify": {
+        "status": "pass",
+        "hook": "make check"
+      }
+    }
+  ]
+}

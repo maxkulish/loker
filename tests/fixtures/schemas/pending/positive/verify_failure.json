@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "design-doc-tdd-2026-04-25-1437-a7c3",
+  "workflow": "design-doc-tdd",
+  "phase": "verify",
+  "severity": "medium",
+  "opened_at": "2026-04-25T14:55:00Z",
+  "timeout_at": "2026-04-25T15:25:00Z",
+  "artefact": {
+    "path": "runs/design-doc-tdd-2026-04-25-1437-a7c3/verify.json",
+    "kind": "json",
+    "preview_lines": 80
+  },
+  "context": {
+    "preceded_by": ["design", "implement"],
+    "next_phase": null,
+    "prompt_summary": "make check failed on clippy warnings; reviewer requested human triage."
+  },
+  "decision_options": ["approve", "reject", "comment_only"]
+}

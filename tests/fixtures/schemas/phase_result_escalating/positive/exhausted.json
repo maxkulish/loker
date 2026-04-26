@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "loker.strategy": "escalating",
+  "loker.phase": "implement",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "attempts": [
+    {
+      "tier": "cheap",
+      "backend": "openai",
+      "model": "gpt-5-mini",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 800, "output_tokens": 400 },
+      "output_path": "implement/attempts/1-cheap.md",
+      "verify": { "status": "fail", "hook": "make check" }
+    },
+    {
+      "tier": "medium",
+      "backend": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 1200, "output_tokens": 700 },
+      "output_path": "implement/attempts/2-medium.md",
+      "verify": { "status": "fail", "hook": "make check" }
+    },
+    {
+      "tier": "strong",
+      "backend": "anthropic",
+      "model": "claude-opus-4-7",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 1500, "output_tokens": 1100 },
+      "output_path": "implement/attempts/3-strong.md",
+      "verify": { "status": "fail", "hook": "make check" }
+    }
+  ],
+  "final_status": "exhausted"
+}

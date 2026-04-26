@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/response.schema.json",
+  "title": "Loker HITL Response",
+  "description": "UI-written human verdict at runs/<id>/responses/<phase>.json (HITL design §3.4). First-write-wins via claimed_by. inline_comments_path optionally points at a JSONL file with per-line/per-block annotations; when set, the engine renders comments into the verify result downstream.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "phase",
+    "claimed_by",
+    "decided_at",
+    "decision",
+    "global_comment",
+    "inline_comments_path"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "phase": { "type": "string", "minLength": 1 },
+    "claimed_by": { "type": "string", "minLength": 1 },
+    "decided_at": { "type": "string", "format": "date-time" },
+    "decision": {
+      "type": "string",
+      "enum": ["approve", "reject"]
+    },
+    "global_comment": {
+      "type": ["string", "null"]
+    },
+    "inline_comments_path": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "Relative path under runs/<id>/. Null when no inline comments exist."
+    }
+  },
+  "additionalProperties": false
+}

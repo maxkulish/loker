@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "loker.strategy": "parallel",
+  "loker.phase": "review",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "branches": [],
+  "aggregator": "concat",
+  "aggregate_output_path": "review/review.md",
+  "verify": { "status": "skipped", "hook": null }
+}

@@ -1,0 +1,12 @@
+{
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "schema_version": 1,
+  "entries": [
+    {
+      "name": "design/design.md",
+      "kind": "design.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "producer": "single"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "schema_version": 1,
+  "started_at": "2026-04-25T20:45:00Z",
+  "finished_at": "2026-04-25T20:55:30Z",
+  "duration_ms": -1,
+  "status": "success",
+  "totals": {
+    "input_tokens": 0,
+    "output_tokens": 0
+  },
+  "backends": [],
+  "phases": []
+}

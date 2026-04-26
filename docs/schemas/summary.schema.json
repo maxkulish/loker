@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/summary.schema.json",
+  "title": "Loker Run Summary",
+  "description": "Optional aggregate report emitted at runs/<id>/summary.json when the run completes (PRD FR-23, FR-23a). Reports tokens per backend, totals, and the budget comparison that powers the warning when cost_budget_usd is configured. Cost fields are optional in v0 because the data source is still an open question - tokens-only is sufficient.",
+  "type": "object",
+  "required": [
+    "loker.run_id",
+    "schema_version",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "status",
+    "totals",
+    "backends",
+    "phases"
+  ],
+  "properties": {
+    "loker.run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version of the summary envelope. Un-namespaced for consistency with manifest.json and HITL artefacts."
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed", "partial", "aborted"]
+    },
+    "totals": { "$ref": "#/$defs/usage" },
+    "backends": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/backend_usage" }
+    },
+    "phases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/phase_summary" }
+    },
+    "cost_budget_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Project-configured budget (FR-23a). Absent means no warning is computed."
+    },
+    "budget_warning": {
+      "type": "boolean",
+      "description": "True when totals.cost_usd exceeds cost_budget_usd. False or absent otherwise."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "usage": {
+      "type": "object",
+      "required": ["input_tokens", "output_tokens"],
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "cost_usd": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "backend_usage": {
+      "type": "object",
+      "required": ["name", "model", "input_tokens", "output_tokens"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "cost_usd": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "phase_summary": {
+      "type": "object",
+      "required": ["phase", "status", "attempts", "duration_ms"],
+      "properties": {
+        "phase": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["success", "failed", "skipped"]
+        },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "strategy": {
+          "type": "string",
+          "enum": ["single", "parallel", "escalating"]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "loker.strategy": "single",
+  "loker.phase": "implement",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "attempts": [
+    {
+      "backend": "anthropic",
+      "model": "claude-opus-4-7",
+      "finish_reasons": ["stop"],
+      "usage": {
+        "input_tokens": 4218,
+        "output_tokens": 1903
+      },
+      "output_path": "implement/changes/",
+      "verify": {
+        "status": "fail",
+        "hook": "make check"
+      }
+    }
+  ]
+}

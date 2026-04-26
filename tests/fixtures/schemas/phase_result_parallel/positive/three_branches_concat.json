@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "loker.strategy": "parallel",
+  "loker.phase": "review",
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "branches": [
+    {
+      "backend": "anthropic",
+      "family": "anthropic",
+      "model": "claude-opus-4-7",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 1024, "output_tokens": 512 },
+      "output_path": "review/branches/anthropic.md"
+    },
+    {
+      "backend": "openai",
+      "family": "openai",
+      "model": "gpt-5",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 1100, "output_tokens": 480 },
+      "output_path": "review/branches/openai.md"
+    },
+    {
+      "backend": "google",
+      "family": "google",
+      "model": "gemini-2.5-pro",
+      "finish_reasons": ["stop"],
+      "usage": { "input_tokens": 990, "output_tokens": 540 },
+      "output_path": "review/branches/google.md"
+    }
+  ],
+  "aggregator": "concat",
+  "aggregate_output_path": "review/review.md",
+  "verify": { "status": "pass", "hook": null }
+}

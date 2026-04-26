@@ -1,0 +1,9 @@
+{
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "loker.event": "verify_result",
+  "loker.phase": "implement",
+  "loker.attempt": 1,
+  "timestamp": "2026-04-25T20:46:11Z",
+  "verify.hook": "make check",
+  "verify.status": "pass"
+}

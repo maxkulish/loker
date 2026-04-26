@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "design-doc-tdd-2026-04-25-1437-a7c3",
+  "workflow": "design-doc-tdd",
+  "phase": "review",
+  "severity": "low",
+  "opened_at": "2026-04-25T14:37:48Z",
+  "timeout_at": null,
+  "artefact": {
+    "path": "runs/design-doc-tdd-2026-04-25-1437-a7c3/review.md",
+    "kind": "markdown",
+    "preview_lines": 200
+  },
+  "context": {
+    "preceded_by": ["design"],
+    "next_phase": "implement",
+    "prompt_summary": "low-severity sanity check that should set a deadline."
+  },
+  "decision_options": ["approve", "comment_only"]
+}
