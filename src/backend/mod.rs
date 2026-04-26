@@ -82,13 +82,12 @@ impl BackendError {
     /// Centralised mappings (e.g. `From<genai::Error>`) cannot observe the call-site
     /// duration, so they emit `Timeout { elapsed_ms: 0 }` and let the caller chain
     /// `.with_elapsed(start.elapsed())` to attach the measured value.
-    #[allow(dead_code)]
     pub fn with_elapsed(mut self, elapsed: Duration) -> Self {
         if let BackendError::Timeout {
             ref mut elapsed_ms, ..
         } = self
         {
-            *elapsed_ms = elapsed.as_millis() as u64;
+            *elapsed_ms = elapsed.as_millis().try_into().unwrap_or(u64::MAX);
         }
         self
     }

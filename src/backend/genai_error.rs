@@ -165,7 +165,7 @@ fn contains_status_code(haystack: &str, code: &str) -> bool {
         if before_ok && after_ok {
             return true;
         }
-        start = i + 1;
+        start = after;
     }
     false
 }
