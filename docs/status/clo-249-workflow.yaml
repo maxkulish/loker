@@ -25,10 +25,10 @@ linear:
     - "CLO-247 (Reconcile tensorzero backend with D1 spike findings) - merged 2026-04-26 (PR #7, commit 048b6cd)"
 
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-26T00:00:00Z"
-  updated_at: "2026-04-26T16:00:00Z"
+  updated_at: "2026-04-26T17:35:00Z"
 
 phases:
   discovery:
@@ -62,9 +62,24 @@ phases:
       - "ST4: verified spec §5 evaluation matrix coverage (13 + 3 + 11 = 27 tests)"
       - "ST5: make check (fmt + clippy + 501 unit + 6 integration + 1 schema test) — all green"
   pr:
-    status: pending
+    status: complete
+    pr_url: "https://github.com/maxkulish/loker/pull/8"
+    pr_number: 8
+    branch: "feat/clo-249-genai"
+    commit_sha: "0398b94"
+    merge_commit: "06604c9"
+    reviews_addressed: 5
+    review_fix_commit: "5cecd2e"
+    replies_posted: "5/5"
+    declined_suggestions:
+      - "copilot 3143689334 (mod.rs:633): keep Debug-string comparison in test; expanding to explicit match arms adds ~75 lines without strengthening the assertion"
+      - "gemini 3143692655 (genai_error.rs:197): keep unwrap_or; clippy::unnecessary_lazy_evaluations under -D warnings flags closure for non-allocating struct ctor"
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_skip_reason: "No PROJECT.md/ROADMAP.md/DEPENDENCIES.md in this repo; canonical roadmap docs/plans/001-implementation-roadmap.md updated separately in commit 827d16c marking T-007 shipped."
+    merged_at: "2026-04-26T15:29:59Z"
+    linear_status: "Done"
 
 history:
   - timestamp: "2026-04-26T00:00:00Z"
@@ -87,3 +102,36 @@ history:
     action: implementation_complete
     phase: implement
     details: "ST1-ST5 done. Files: src/backend/mod.rs (+77 lines: with_elapsed builder + 3 tests + mod genai_error), src/backend/genai_error.rs (new, helpers + 13 unit tests + mapping doc tables), src/backend/tensorzero.rs (-208 lines: deleted duplicated helpers, rewired call site to BackendError::from(e).with_elapsed). make check: 501 unit + 6 integration + 1 schema test all pass."
+  - timestamp: "2026-04-26T16:05:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit 0398b94 on feat/clo-249-genai. 5 files changed, 776 insertions(+), 208 deletions(-)."
+  - timestamp: "2026-04-26T16:05:30Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Branch feat/clo-249-genai pushed to origin (new branch, tracks origin/feat/clo-249-genai)."
+  - timestamp: "2026-04-26T16:06:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #8 opened: https://github.com/maxkulish/loker/pull/8"
+  - timestamp: "2026-04-26T16:25:00Z"
+    action: review_addressed
+    phase: pr
+    details: |
+      Addressed 5 inline comments from copilot-pull-request-reviewer + gemini-code-assist.
+      Fix commit 5cecd2e on feat/clo-249-genai (2 files, +2/-3): src/backend/mod.rs
+      (saturating try_into for elapsed_ms cast, removed #[allow(dead_code)] from
+      with_elapsed) + src/backend/genai_error.rs (advance start by needle.len() for
+      UTF-8-safe contains_status_code progression). 2 suggestions declined with
+      rationale (Debug-string test brevity; clippy::unnecessary_lazy_evaluations
+      conflict under -D warnings). make check green (501 unit + 6 integration + 1
+      schema). All 5 inline replies posted with /gemini review trailer; CI checks
+      pass (clippy 20s, format 15s, test 1m50s).
+  - timestamp: "2026-04-26T15:29:59Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #8 squash-merged to main as commit 06604c9 by maxkulish."
+  - timestamp: "2026-04-26T17:35:00Z"
+    action: workflow_complete
+    phase: complete
+    details: "Task CLO-249 fully completed. Roadmap T-007 marked shipped via commit 827d16c. Linear status -> Done. CLO-258 (T-013 EscalatingRetry walker) now has its retryability flag dependency satisfied."
