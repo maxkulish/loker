@@ -56,12 +56,12 @@ with the spike findings; the rest hardens it to the FR-2 / FR-3 contract.
 Depends on Phase 1 (`Backend` trait + at least one impl). Parallel with
 Phase 3 and 4. Internal order is sequential.
 
-| ID | Task | After | Blocks | PRD |
-|----|------|-------|--------|-----|
-| T-011 | `Strategy::SingleModel`: one backend, one prompt, one response. Mock-backend unit test. | T-006 | T-029 | FR-5 |
-| T-012 | `Strategy::ParallelFanOut` with `min_responses` floor. Surplus failures tolerated. | T-011 | T-029 | FR-6 |
-| T-013 | `Strategy::EscalatingRetry` walker. Stops at first verify pass; exhausts list with structured error. | T-007, T-020 | T-014, T-029 | FR-7 |
-| T-014 | `pass_failure_context` flag on `EscalatingRetry`. Off in v0 default; on in design-doc-tdd. | T-013 | T-035 | FR-8 |
+| ID | Linear | Task | After | Blocks | PRD |
+|----|--------|------|-------|--------|-----|
+| T-011 | CLO-257 | `Strategy::SingleModel`: one backend, one prompt, one response. Mock-backend unit test. | T-006 | T-029 | FR-5 |
+| T-012 | CLO-259 | `Strategy::ParallelFanOut` with `min_responses` floor. Surplus failures tolerated. | T-011 | T-029 | FR-6 |
+| T-013 | CLO-258 | `Strategy::EscalatingRetry` walker. Stops at first verify pass; exhausts list with structured error. | T-007, T-020 | T-014, T-029 | FR-7 |
+| T-014 | CLO-260 | `pass_failure_context` flag on `EscalatingRetry`. Off in v0 default; on in design-doc-tdd. | T-013 | T-035 | FR-8 |
 
 ## Phase 3 - Aggregator vocabulary (M3)
 
