@@ -9,8 +9,9 @@
 //!
 //! 5xx responses from the gateway frequently wrap upstream errors (a 401 from
 //! Anthropic, a 429 from OpenAI, ...). We body-inspect 502s to classify them
-//! as `BackendError::Auth` / `RateLimit` / `Network` rather than collapsing
-//! all 5xx into `Network`, which would trigger pointless retries on
+//! as `BackendError::Auth` / `BackendError::RateLimit` /
+//! `BackendError::Network` rather than collapsing all 5xx into
+//! `BackendError::Network`, which would trigger pointless retries on
 //! credential failures.
 //!
 //! Path prefix, header shape, error-mapping verdict, and the function-name
@@ -265,11 +266,12 @@ fn classify_5xx_body(status: u16, body: &str) -> Option<BackendError> {
 
 /// Boundary-aware HTTP status-code substring check.
 ///
-/// Matches `code` when surrounded by non-digit boundaries (start/end of
-/// string or any non-ASCII-digit character). This catches forms like
-/// `" 401 "`, `"\"401\""`, `"401:"`, `"(429)"`, and `{"status":429}` in
-/// minified JSON, while avoiding false positives such as `"4011"` or
-/// `"H429X"` where the digits are part of a longer identifier.
+/// Matches `code` when surrounded by non-ASCII-alphanumeric boundaries
+/// (start/end of string or any non-ASCII-alphanumeric character). This
+/// catches forms like `" 401 "`, `"\"401\""`, `"401:"`, `"(429)"`, and
+/// `{"status":429}` in minified JSON, while avoiding false positives such
+/// as `"4011"` or `"H429X"` where the digits are part of a longer
+/// alphanumeric identifier.
 fn contains_status_code(haystack: &str, code: &str) -> bool {
     let bytes = haystack.as_bytes();
     let needle = code.as_bytes();
