@@ -37,7 +37,7 @@ No comment may be left without a response - whether the fix was applied, decline
 | Question answered | "[explanation]. [reference to design doc if relevant]" |
 | Deferred | "Tracked as follow-up in [task/issue]. [reason for deferral]" |
 
-For `gemini-code-assist` comments, every reply MUST end with `/gemini review` on its own line to trigger re-validation.
+Every inline review-comment reply MUST end with `/gemini review` on its own line. Gemini re-reviews on demand regardless of who posted the original comment, so the trailer triggers re-validation universally (gemini-code-assist, copilot-pull-request-reviewer, or human reviewers).
 
 ---
 
@@ -272,20 +272,21 @@ gh api repos/{owner}/{repo}/pulls/[number]/comments/[comment_id]/replies \
 1. Every comment gets a reply - no exceptions
 2. Reference the commit SHA that contains the fix
 3. If declining a suggestion, explain why (reference design docs, ADRs, or project constraints)
-4. For `gemini-code-assist` comments: every reply MUST end with `/gemini review` on its own line
-5. For `copilot-pull-request-reviewer` comments: reply with fix details (no special trigger needed)
-6. Track reply count - the final summary must show `Replies Posted: N/N`
+4. Every inline reply MUST end with `/gemini review` on its own line - regardless of reviewer (gemini-code-assist, copilot-pull-request-reviewer, or human). Gemini can re-review any thread, so the trailer is appended universally.
+5. Track reply count - the final summary must show `Replies Posted: N/N`
 
 **Reply templates by reviewer type**:
 
+All inline reply templates end with `/gemini review` on its own line.
+
 | Reviewer | Decision | Reply Template |
 |----------|----------|----------------|
-| Human | Bug fix | "Fixed in abc1234. Good catch!" |
-| Human | Declined | "Intentionally kept as-is: [rationale]. Happy to discuss." |
+| Human | Bug fix | "Fixed in abc1234. Good catch!\n\n/gemini review" |
+| Human | Declined | "Intentionally kept as-is: [rationale]. Happy to discuss.\n\n/gemini review" |
 | `gemini-code-assist` | Fixed | "Fixed in abc1234. [details]\n\n/gemini review" |
 | `gemini-code-assist` | Declined | "Kept as-is: [reason]\n\n/gemini review" |
-| `copilot-pull-request-reviewer` | Fixed | "Fixed in abc1234. [details]" |
-| `copilot-pull-request-reviewer` | Declined | "Intentionally kept as-is: [rationale]" |
+| `copilot-pull-request-reviewer` | Fixed | "Fixed in abc1234. [details]\n\n/gemini review" |
+| `copilot-pull-request-reviewer` | Declined | "Intentionally kept as-is: [rationale]\n\n/gemini review" |
 
 **Batch replies** (for multiple comments):
 
@@ -304,7 +305,7 @@ for item in "${COMMENTS[@]}"; do
 done
 ```
 
-For `gemini-code-assist` comments, append `/gemini review` to each reply body.
+Every inline reply body MUST end with `/gemini review` on its own line, regardless of original commenter.
 
 ### Step 10: Update Workflow State (if exists)
 
@@ -801,17 +802,17 @@ gh api repos/{owner}/{repo}/pulls/[number]/comments --paginate \
 | Aspect | gemini-code-assist | copilot-pull-request-reviewer |
 |--------|-------------------|-------------------------------|
 | Severity levels | Yes (`**Severity**: high/medium/low`) | No - treat all as medium |
-| Re-validation trigger | `/gemini review` in reply | None needed - auto re-reviews on push |
+| Re-validation trigger | `/gemini review` in reply | `/gemini review` in reply (Gemini re-reviews any thread); Copilot also auto re-reviews on push |
 | Suggestion format | Markdown with severity header | Markdown, often with code blocks |
-| Reply format | Must include `/gemini review` | Standard reply, no special suffix |
+| Reply format | Must include `/gemini review` | Must include `/gemini review` (universal rule for inline replies) |
 
 ### Handling copilot Feedback
 
 1. **Fetch comments** filtered by `copilot-pull-request-reviewer`
 2. **Treat all as medium priority** (no severity parsing needed)
 3. **Address issues** the same way as other review comments
-4. **Reply to each comment** with fix details (no `/gemini review` needed)
-5. Copilot automatically re-reviews when new commits are pushed
+4. **Reply to each comment** with fix details and the `/gemini review` trailer on its own line (universal rule - Gemini can re-validate any inline thread regardless of original commenter)
+5. Copilot automatically re-reviews when new commits are pushed; Gemini re-validates on the `/gemini review` trigger
 
 ---
 

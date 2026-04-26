@@ -1,0 +1,151 @@
+task_id: CLO-247
+task_title: "Reconcile tensorzero backend with D1 spike findings"
+task_url: "https://linear.app/cloud-ai/issue/CLO-247/reconcile-tensorzero-backend-with-d1-spike-findings"
+task_type: specification
+classification_reason: |
+  Single-module reconciliation against an already-decided baseline (D1 spike,
+  CLO-243). All architecture decisions are recorded in
+  docs/spikes/2026-04-25-tensorzero-roundtrip.md (path prefix, header shape,
+  function-name routing, family-suffix convention, 502 body-inspection error
+  mapping). Concrete fixtures live under tests/fixtures/tensorzero/. Acceptance
+  criteria are testable (cargo build clean; headers/URL/model match D1
+  fixtures; D1 spike doc referenced from type docs). No design Q&A required —
+  the /spec workflow fits.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: High
+  branch_suggested: kmamemo/clo-247-reconcile-tensorzero-backend-with-d1-spike-findings
+  branch_actual: feat/clo-247-reconcile
+  blocks:
+    - "CLO-248 (Add wiremock unit-test contract for tensorzero backend)"
+    - "CLO-249 (Map genai errors to BackendError variants)"
+    - "CLO-250 (Add tensorzero config schema to src/config.rs)"
+    - "CLO-251 (Add BackendCapabilities struct, FR-4)"
+  blocked_by:
+    - "CLO-243 (Run TensorZero round-trip spike, D1) — merged 2026-04-26 (PR #2 squash 8e4e86f? verify)"
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-26T08:00:00Z"
+  updated_at: "2026-04-26T10:05:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task — D1 spike (CLO-243) already produced the discovery artefact (docs/spikes/2026-04-25-tensorzero-roundtrip.md)."
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task — using /spec instead of full design doc. Architecture decisions live in the D1 spike verdict."
+  spec:
+    status: complete
+    spec_file: "specs/2026-04-26-clo-247-reconcile-tensorzero.md"
+    approved: true
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_completed: false
+    review_applied: false
+    review_skip_reason: "No .lok/workflows/spec-review.toml present in this repo; AI review tooling unavailable. Proceeding to user checkpoint with draft spec unchanged."
+    applied_suggestions: []
+    flagged_suggestions: []
+  implement:
+    status: complete
+    sub_tasks_completed:
+      - "ST1: Path-prefix fix /v1/ -> /openai/v1/"
+      - "ST2: Reconcile error mapping (502 body inspection + 404 unknown function)"
+      - "ST3: Wiremock contract for headers + model field"
+      - "ST4: Cross-reference D1 spike in module doc"
+      - "ST5: Codify family-suffix convention"
+      - "ST6: make check passes"
+    make_check_status: green
+    test_counts:
+      unit: 485
+      integration: 6
+      schema: 1
+  pr:
+    status: in_progress
+    pr_url: "https://github.com/maxkulish/loker/pull/7"
+    pr_number: 7
+    branch: "feat/clo-247-reconcile"
+    commit_sha: "1940df4"
+    reviews_addressed: 5
+  complete:
+    status: pending
+
+acceptance_criteria:
+  - "cargo build clean; no panicking placeholders in src/backend/tensorzero.rs"
+  - "Headers, target URL, and model-name mapping match D1 fixtures under tests/fixtures/tensorzero/"
+  - "Comment / type docs in src/backend/tensorzero.rs reference docs/spikes/2026-04-25-tensorzero-roundtrip.md as source of truth"
+
+reconciliation_inputs:
+  spike_doc: "docs/spikes/2026-04-25-tensorzero-roundtrip.md"
+  fixtures_dir: "tests/fixtures/tensorzero/"
+  current_skeleton: "src/backend/tensorzero.rs"
+  d1_findings_to_apply:
+    - "Path prefix: /v1/ → /openai/v1/ (runtime config helper + examples/workflows/* defaults)"
+    - "502 body-inspection error mapping: auth-signature → BackendError::Auth; rate_limit/429 signature → BackendError::RateLimit; otherwise BackendError::Network"
+    - "family_of(backend_id) derives from function-name suffix; reject unknown suffixes at config-load (codify convention in docs/handoff.md + tensorzero.toml template comments)"
+    - "ServiceTargetResolver wiring matches the OpenAI-shaped chat-completions schema observed in the spike"
+    - "Auth header: Authorization: Bearer <anything> (gateway forwards upstream); Content-Type: application/json"
+    - "Wiremock fixtures: lock anthropic_auth_failure_response.json + unknown_function_response.json"
+    - "Comment / type docs cross-reference D1 spike doc"
+
+project_sync:
+  start_skipped: true
+  start_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo (verified 2026-04-26). Linear remains source of truth (same as CLO-246)."
+
+history:
+  - timestamp: "2026-04-26T08:00:00Z"
+    action: workflow_started
+    phase: init
+    details: "Created workflow state for CLO-247. Classified specification (single-module reconciliation; D1 spike CLO-243 already decided architecture; testable acceptance criteria; no design Q&A required). Branch feat/clo-247-reconcile already checked out and clean."
+  - timestamp: "2026-04-26T08:00:00Z"
+    action: project_sync_start
+    phase: init
+    details: "Skipped: aggregation files (PROJECT.md / ROADMAP.md / DEPENDENCIES.md) do not exist in repo. Linear remains source of truth."
+  - timestamp: "2026-04-26T09:15:00Z"
+    action: spec_drafted
+    phase: spec
+    details: "Wrote 5-section spec at specs/2026-04-26-clo-247-reconcile-tensorzero.md. Scope M, 5 sub-tasks. Acceptance criteria AC1-AC10 all mechanically testable (cargo test + grep + make check)."
+  - timestamp: "2026-04-26T09:15:00Z"
+    action: spec_review_skipped
+    phase: spec
+    details: "AI spec-review unavailable: .lok/workflows/spec-review.toml not present in this repo. Proceeding directly to user checkpoint with the draft spec unchanged."
+  - timestamp: "2026-04-26T09:20:00Z"
+    action: spec_approved
+    phase: spec
+    details: "User approved spec at checkpoint (option 1). Transitioning to implement phase. Spec decomposes into 5 sub-tasks executed in order 1->2->3->4->5."
+  - timestamp: "2026-04-26T10:05:00Z"
+    action: implementation_complete
+    phase: implement
+    details: "All 6 sub-tasks complete. Wire-format reconciliation: canonicalize_wire_model wraps the canonical tensorzero::function_name::<fn> in a sacrificial loker:: namespace prefix - genai's OpenAI adapter strips the first ::-namespace at payload assembly (split_as_namespace_and_name in genai 0.6.0-beta.17), leaving the canonical form on the wire as required by D1 fixture openai_success_request.json. Path prefix /openai/v1/, Bearer auth, content-type application/json, 502 body-inspection error mapping for upstream auth/rate-limit failures, family-suffix convention codified in tensorzero.toml + handoff.md. make check green: 485 unit + 6 integration + 1 schema tests pass; clippy clean."
+  - timestamp: "2026-04-26T10:05:00Z"
+    action: phase_completed
+    phase: implement
+    details: "Transitioning to pr phase."
+  - timestamp: "2026-04-26T10:08:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit 24103b8 on feat/clo-247-reconcile. 5 files changed, 607 insertions(+), 20 deletions(-)."
+  - timestamp: "2026-04-26T10:08:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Branch feat/clo-247-reconcile pushed to origin."
+  - timestamp: "2026-04-26T10:09:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #7 opened: https://github.com/maxkulish/loker/pull/7"
+  - timestamp: "2026-04-26T14:02:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 3 PR review comments in commit 3b9f0ca. (1) gemini-code-assist: replaced literal substring 401/429 checks with boundary-aware contains_status_code helper (rejects 4011, code=14010, H401X). (2) Copilot: restricted body inspection to 502 only — generic 5xx now maps directly to BackendError::Network. (3) Copilot: added unit tests canonicalize_wire_model_strips_to_canonical_on_wire and contains_status_code_handles_punctuation_boundaries. make check green: 487 unit + 6 integration + 1 schema. Replies posted on all 3 comments (gemini reply includes /gemini review trailer)."
+  - timestamp: "2026-04-26T14:25:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 2 additional Copilot doc-consistency comments in commit 1940df4. (1) Module doc 502 body-inspection paragraph now uses BackendError::Auth / BackendError::RateLimit / BackendError::Network consistently (was: BackendError::Auth / RateLimit / Network). (2) contains_status_code doc now describes non-ASCII-alphanumeric boundaries (matches is_ascii_alphanumeric implementation; was: non-digit / non-ASCII-digit). Doc-only; no behavior change. make check green: 487 unit + 6 integration + 1 schema. Replies posted on both comments with /gemini review trailer (now universal per updated /pr:review skill)."

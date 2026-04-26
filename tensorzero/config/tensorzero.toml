@@ -26,6 +26,15 @@ routing = ["openai"]
 type = "openai"
 model_name = "gpt-4o-mini"
 
+# Function-name family convention (D1 verdict, CLO-247):
+#   loker_<purpose>_<family>
+# `<family>` is the substring after the final `_` and identifies the model
+# family. loker's `family_of(backend_id)` (CLO-251 / FR-13) derives the
+# family from this suffix; unknown suffixes MUST be rejected at
+# config-load.  Canonical families: `anthropic`, `openai`, `google`,
+# `zhipu`. Source of truth: docs/spikes/2026-04-25-tensorzero-roundtrip.md
+# and docs/handoff.md.
+
 [functions.loker_d1_anthropic]
 type = "chat"
 
