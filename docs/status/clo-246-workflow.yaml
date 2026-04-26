@@ -20,10 +20,10 @@ linear:
   blocked_by: []
 
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-25T21:00:00Z"
-  updated_at: "2026-04-25T21:30:00Z"
+  updated_at: "2026-04-26T07:42:00Z"
 
 phases:
   discovery:
@@ -51,14 +51,22 @@ phases:
       - "M11 threat-model test suite (T-055) enumerated as 21 named tests under tests/ui/threat_model.rs covering CSRF, X-Frame-Options, CORP, MIME sniffing, traversal, symlink, lock takeover, cookie attrs, CSP, Referrer-Policy, bind, method allowlist, redirect."
       - "Phase 2 deferrals: OAuth allowlist, per-user identity, non-loopback bind, mTLS, signed cookies, CSP report-only -> enforce, HSTS."
   pr:
-    status: in_progress
+    status: complete
     required: true
     required_reason: "Threat-model doc unblocks T-050 (advisory lock) and T-055 (M11 threat-model test suite); ships in repo."
     pr_url: "https://github.com/maxkulish/loker/pull/5"
     pr_number: 5
-    commit_sha: "7a36c8a"
+    commit_sha: "f8c9834"
+    merged_at: "2026-04-26T07:40:43Z"
+    merge_commit: "33effa6"
+    reviews_addressed: 6
   complete:
-    status: pending
+    status: complete
+    merged_at: "2026-04-26T07:40:43Z"
+    merge_commit: "33effa6"
+    aggregation_files_updated: false
+    aggregation_files_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo. Linear is the source of truth."
+    linear_status: "Done"
 
 acceptance_criteria:
   - "docs/security/2026-04-25-ui-threat-model.md committed with attacker model, mitigations, and the M11 test list"
@@ -118,3 +126,33 @@ history:
     action: pr_created
     phase: pr
     details: "PR #5 opened: https://github.com/maxkulish/loker/pull/5"
+  - timestamp: "2026-04-26T07:00:00Z"
+    action: review_addressed
+    phase: pr
+    details: |
+      Addressed 6 PR review comments in commit f8c9834. Two real technical issues:
+      (1) CSRF content-type allowlist: T1 mitigation #3 + T-CSRF-4 now reject both
+      `text/plain` and `multipart/form-data` (gemini comments 3142470177 and 3142470184
+      flagged that multipart is also a CORS "simple" type that bypasses preflight).
+      (2) T3 component validation: rewritten to split-then-validate (percent-decode
+      first, split on `/`, validate each component for empty/`.`/`..`/NUL/`\\`); the
+      earlier "reject component containing /" was self-contradictory since `/` is the
+      separator (Copilot 3142471840). (3) T4 symlink walk ordering: inverted - step 1
+      now walks the *unresolved* path with `tokio::fs::symlink_metadata` BEFORE
+      canonicalisation, because canonicalize resolves links and the resolved path no
+      longer carries the symlink-ness of intermediate components (gemini 3142470182,
+      Copilot 3142471847). Step 2 canonicalises and prefix-checks, step 3 opens via
+      `tokio::fs::File::open` (non-blocking). Added rationale for why prefix-check
+      alone misses in-tree symlinks. T-SYMLINK-1/-2 wording aligned (Copilot 3142471830).
+      `make check` green twice. All 6 comments replied via gh API (gemini replies
+      include `/gemini review` trigger). Replies Posted: 6/6.
+    reviews_addressed: 6
+    commit_sha: "f8c9834"
+  - timestamp: "2026-04-26T07:40:43Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #5 squash-merged to main as 33effa6."
+  - timestamp: "2026-04-26T07:42:00Z"
+    action: workflow_complete
+    phase: complete
+    details: "Task CLO-246 fully completed. Linear set to Done with final summary comment. Aggregation file updates skipped (PROJECT.md/ROADMAP.md/DEPENDENCIES.md do not exist in this repo). Linear remains source of truth."
