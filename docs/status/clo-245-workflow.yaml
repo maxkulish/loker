@@ -15,6 +15,7 @@ linear:
   team: Cloud-ai
   project: Loker
   status_at_start: Backlog
+  status_at_complete: Done
   priority: Medium
   branch_suggested: kmamemo/clo-245-define-atomic-run-state-write-protocol-d3
   branch_actual: feat/clo-245-atomic
@@ -22,10 +23,10 @@ linear:
   blocked_by: []
 
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-25T20:45:00Z"
-  updated_at: "2026-04-25T21:05:00Z"
+  updated_at: "2026-04-26T07:57:45Z"
 
 phases:
   discovery:
@@ -50,16 +51,29 @@ phases:
       - "docs/run-state.md"
     decisions_recorded:
       - "Canonical artefacts live at runs/<id>/<phase>/<artefact> and are committed via tmp+rename+fsync (NamedTempFile::persist + parent-dir sync_all in Rust). Failed attempts archived to attempts/<phase>/<n>/. Symlink/pointer alternative rejected due to portability + reader-path complexity."
-      - "Per-phase commit order: started -> artefact -> manifest -> completed. phase.completed is the single source of truth - its absence forces rerun even if artefact + manifest appear complete."
-      - "Manifest is full-rewrite-via-tmp-rename, not text-append. Avoids partial-line corruption. Cheap because manifests are small."
+      - "Per-phase commit order: started -> artefact -> manifest -> completed. markers/<phase>.completed is the single source of truth - its absence forces rerun even if artefact + manifest appear complete."
+      - "Manifest is full-rewrite-via-tmp-rename, not text-append. Avoids partial-line corruption. Cheap because manifests are small. manifest_entry_sha256 is the authoritative key for completed phases; completed marker's artefact_paths is a denormalised debug hint."
       - "Heartbeat with 5min default TTL distinguishes alive-writer from dead-writer; advisory .lock in T-031 reinforces parallel-writer detection."
-      - "14-row kill matrix specified for T-031 crash-injection tests. Row 9 (kill between manifest and phase.completed) requires T-024 to implement orphan-entry sweep on resume."
+      - "14-row kill matrix specified for T-031 crash-injection tests, scoped to process-crash semantics via std::process::abort. Rows 6 and 11 (power-loss) require a separate harness. Row 9 (kill between manifest and phase.completed) requires T-024 to implement orphan-entry sweep on resume."
+      - "Started marker is rewritten on every attempt with current attempt value (self-describing); resolves contradiction surfaced in PR review."
+      - "Stale-tmp sweep uses portable YYYYMMDDTHHMMSSZ timestamp (no colons) so paths remain Windows-safe."
   pr:
-    status: in_progress
+    status: complete
     required: true
     required_reason: "Doc unblocks T-024 (manifest writer), T-025 (phase status markers), T-031 (resumability). Decision must live in repo for downstream PRs to reference."
+    pr_url: "https://github.com/maxkulish/loker/pull/4"
+    pr_number: 4
+    commit_sha: "e17eab2"
+    review_commit_sha: "0dc8007"
+    merge_commit_sha: "46b58bd"
+    merged_at: "2026-04-26T07:49:58Z"
+    reviews_addressed: 8
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_files_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md do not exist in this repo. Linear is the source of truth."
+    linear_status_set: "Done"
+    linear_completion_comment_id: "02d60ab3-f39b-4dda-a8fa-9eb873c88421"
 
 acceptance_criteria:
   - "docs/run-state.md committed with: (1) comparison + trade-offs of `.tmp + rename + status marker` vs. attempt-directory, (2) chosen protocol with temp filename pattern, fsync rules, marker semantics (phase.started/completed/failed), (3) reader/writer rules, (4) fault-injection plan covering kill at every observable transition with expected reader behaviour"
@@ -68,6 +82,8 @@ acceptance_criteria:
 project_sync:
   start_skipped: true
   start_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md aggregation files do not exist in this repo. Linear is the source of truth (same as CLO-243)."
+  complete_skipped: true
+  complete_skip_reason: "Same as start: no aggregation files. Linear set to Done directly."
 
 history:
   - timestamp: "2026-04-25T20:45:00Z"
@@ -86,3 +102,27 @@ history:
     action: phase_completed
     phase: document
     details: "Wrote docs/run-state.md (full doc). Sections: why, layout recap, decision + comparison table, atomic-commit primitive, marker schemas, per-phase commit order, manifest rewrite policy, failed-attempt archive, heartbeat, resume walk, stale-tmp sweep, 14-row fault-injection kill matrix mapping to T-031 tests, open items deferred to T-024/T-025/T-031, non-goals."
+  - timestamp: "2026-04-25T21:08:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit e17eab2: docs(CLO-245): atomic run-state write protocol (D3). 2 files, 400 insertions. make check green (fmt + clippy -D warnings + 473 unit + 6 integration)."
+  - timestamp: "2026-04-25T21:09:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Pushed feat/clo-245-atomic to origin with upstream tracking."
+  - timestamp: "2026-04-25T21:10:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #4 opened: https://github.com/maxkulish/loker/pull/4"
+  - timestamp: "2026-04-26T07:30:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 8 inline review comments (2 gemini-code-assist + 6 copilot-pull-request-reviewer) in commit 0dc8007. Clarifications: NamedTempFile::persist fsync requirements (file + parent dir explicit); started marker rewrite-every-attempt (resolves contradiction); manifest_entry_sha256 authoritative; markers/<phase>.* notation standardised; kill matrix scoped to process-crash semantics with rows 6/11 called out as power-loss; YYYYMMDDTHHMMSSZ portable stale-tmp timestamp. All 8 replies posted; gemini auto-re-validated via /gemini review trigger; Copilot auto-re-reviewed on push. make check green."
+  - timestamp: "2026-04-26T07:49:58Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #4 merged to main. Merge commit 46b58bd. Both bot reviewers re-validated cleanly after the review-addressed push."
+  - timestamp: "2026-04-26T07:57:25Z"
+    action: workflow_complete
+    phase: complete
+    details: "Linear CLO-245 set to Done. Final completion comment posted (02d60ab3). Aggregation file updates skipped (no PROJECT.md / ROADMAP.md / DEPENDENCIES.md in repo - Linear is source of truth). Workflow marked complete."
