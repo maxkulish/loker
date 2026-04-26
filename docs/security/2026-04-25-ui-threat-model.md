@@ -62,7 +62,7 @@ Each threat below maps to one Security NFR row in PRD §5 and to one or more con
 
 1. Every POST handler asserts the request `Origin` header equals `http://127.0.0.1:<port>` (or `http://localhost:<port>`); reject with `403 Forbidden` on mismatch or absence.
 2. As defense-in-depth, also assert `Referer` is absent or matches the same origin.
-3. Reject POST with `Content-Type: text/plain` (a known CSRF dodge that avoids browser preflight) - require `application/x-www-form-urlencoded` or `application/json`.
+3. Reject POST with `Content-Type: text/plain` or `multipart/form-data` (both are CORS "simple" content types that bypass browser preflight and are usable for CSRF; `application/x-www-form-urlencoded` is also "simple" but is needed by the legitimate form). Require `application/x-www-form-urlencoded` or `application/json`.
 4. No CORS headers emitted. The default same-origin policy is the desired posture.
 
 **Why this is sufficient**: All major browsers (Chrome 90+, Firefox 90+, Safari 16+) attach an `Origin` header on cross-origin POSTs including `<form>` submissions. A request without a recognised `Origin` is either same-origin (acceptable) or non-browser (where the same-user trust boundary applies, A6).
@@ -86,10 +86,10 @@ Each threat below maps to one Security NFR row in PRD §5 and to one or more con
 
 **Mitigation** (PRD §5 row 198 - "refuse path traversal"):
 
-1. Reject any path component containing `..`, NUL bytes, `/`, or `\` *before* canonicalisation. Reject percent-encoded variants by decoding first then re-checking.
-2. After component validation, build the candidate path and call `tokio::fs::canonicalize` - assert the canonicalised path begins with the canonicalised `runs/<id>/` root. Reject otherwise.
-3. Reject absolute paths in the URL parameter outright.
-4. Treat the artefact path as opaque: never `path.join(user_input)` without validation.
+1. Nested artefact paths are allowed. Percent-decode the captured `<path>` first, split it on `/` into components, then validate each decoded component individually. Reject any component that is empty, `.`, `..`, contains a NUL byte, contains `\` (Windows-style separator), or is otherwise not a normal path segment on the target platform. `/` is the separator that produced the component list, so it is not itself a per-component check.
+2. Reject absolute paths in the URL parameter outright (a leading `/` after percent-decoding, or any platform-specific rooted form such as `C:\` or `\\?\` on Windows).
+3. After component validation, build the candidate path by joining the validated component list under `runs/<id>/`; never `path.join(user_input)` on the raw captured string.
+4. Pass the candidate path to T4 (symlink) validation. Only after both T3 and T4 succeed does the handler open the file.
 
 ### T4. Symlink escape
 
@@ -97,11 +97,12 @@ Each threat below maps to one Security NFR row in PRD §5 and to one or more con
 
 **Mitigation** (PRD §5 row 198 - "follow no symlinks outside the run directory"):
 
-1. After T3 canonicalisation, walk every component of the resolved path and call `std::fs::symlink_metadata` on each ancestor inside `runs/<id>/`. If any component is a symlink, refuse the read.
-2. Use `std::fs::File::open` only after validation. Do not rely on `O_NOFOLLOW` alone (it does not protect against intermediate symlinks).
-3. Trace events emitted by the workflow itself never traverse symlinks; the engine writes artefacts via `<tmp> -> rename` per design doc D3.
+1. **Walk the *unresolved* candidate path first.** After T3 produces the validated component list, walk each ancestor under `runs/<id>/` and call `tokio::fs::symlink_metadata` on it. If any component (intermediate or leaf) is a symlink, refuse the read. This must happen *before* canonicalisation, because `canonicalize` resolves symlinks and the resolved path no longer carries the link components. An `openat`/`O_NOFOLLOW`-per-component traversal is an acceptable equivalent if it enforces the same property for every component, but plain `open` with `O_NOFOLLOW` is **not** sufficient (it only protects the final component).
+2. **Then canonicalise and prefix-check.** After the unresolved-path symlink walk passes, call `tokio::fs::canonicalize` on the candidate path and assert the canonicalised result begins with the canonicalised `runs/<id>/` root. Reject otherwise. This is defence-in-depth against any race between the walk and the open, and against TOCTOU on platforms where `symlink_metadata` and `open` are not atomic.
+3. **Open via tokio.** Use `tokio::fs::File::open` (not `std::fs`) inside the axum handler so the blocking syscall does not stall the runtime. Do not rely on `O_NOFOLLOW` alone.
+4. Trace events emitted by the workflow itself never traverse symlinks; the engine writes artefacts via `<tmp> -> rename` per design doc D3.
 
-**Why ancestor-walk and not just last-component check**: a symlink at `runs/<id>/intermediate/` pointing outside the run root would let `runs/<id>/intermediate/file.md` escape even if `file.md` itself is a regular file.
+**Why walk the unresolved path and not just the canonicalised one**: `canonicalize` resolves every symlink along the way. A symlink at `runs/<id>/intermediate/` pointing to `/etc/` would canonicalise `runs/<id>/intermediate/passwd` to `/etc/passwd`, which a prefix check correctly rejects - but if the symlink pointed *inside* `runs/<id>/` (a self-relative loop, or a link to a sibling run), the prefix check would pass and we would silently follow a link the policy forbids. Walking the unresolved path catches that case.
 
 ### T5. Stale-lock takeover (FR-26)
 
@@ -171,15 +172,15 @@ Each test below is a concrete fixture for the M11 threat-model test suite. The c
 | T-CSRF-1 | `POST /runs/<id>/responses/<phase>` with `Origin: http://evil.com` returns `403`; no response file written | T1 | row 198 (origin match) |
 | T-CSRF-2 | POST without `Origin` header returns `403` (defense in depth) | T1 | row 198 |
 | T-CSRF-3 | POST with `Origin: http://127.0.0.1:<port>` succeeds and writes the response file | T1 | row 198 (positive case) |
-| T-CSRF-4 | POST with `Content-Type: text/plain` returns `415` regardless of Origin | T1 | row 198 |
+| T-CSRF-4 | POST with `Content-Type: text/plain` or `multipart/form-data` returns `415` regardless of Origin (covers both CORS "simple" content types that bypass preflight) | T1 | row 198 |
 | T-XFRAME-1 | Every HTML response includes `X-Frame-Options: DENY` and `Content-Security-Policy` with `frame-ancestors 'none'` | T7 | row 198 (X-Frame-Options) |
 | T-CORP-1 | `GET /runs/<id>/artefact/<path>` includes `Cross-Origin-Resource-Policy: same-origin` and `X-Content-Type-Options: nosniff` | T2 | row 198 |
 | T-MIME-1 | Unknown-extension artefact served as `Content-Type: text/plain; charset=utf-8` with `Content-Disposition: attachment` | T2 | row 198 |
 | T-TRAVERSAL-1 | `GET /runs/<id>/artefact/../../../etc/passwd` returns `400`; reads no file outside the run root | T3 | row 198 |
 | T-TRAVERSAL-2 | Percent-encoded traversal (`%2e%2e%2f`) returns `400` after decode | T3 | row 198 |
 | T-TRAVERSAL-3 | Absolute-path artefact param (`/etc/passwd`) returns `400` | T3 | row 198 |
-| T-SYMLINK-1 | Symlink at `runs/<id>/escape -> /etc/passwd`, GET `/artefact/escape` returns `403`; canonicalise refuses traversal | T4 | row 198 |
-| T-SYMLINK-2 | Intermediate-component symlink (`runs/<id>/dir -> /tmp`, file `foo` inside) is refused even though the leaf is a regular file | T4 | row 198 |
+| T-SYMLINK-1 | Symlink at `runs/<id>/escape -> /etc/passwd`, GET `/artefact/escape` returns `403`; the unresolved-path symlink walk (T4 step 1) refuses the read before canonicalisation, and the post-canonicalise prefix check would also reject the resolved `/etc/passwd` | T4 | row 198 |
+| T-SYMLINK-2 | Intermediate-component symlink (`runs/<id>/dir -> /tmp`, file `foo` inside) is refused even though the leaf `foo` is a regular file; the policy is "no symlinks anywhere along the unresolved path", not just at the leaf | T4 | row 198 |
 | T-LOCK-1 | Client A claims lock, never heartbeats; advance test clock 70 s; client B claims successfully | T5 | FR-26 |
 | T-LOCK-2 | Two simultaneous claimants: second sees `read-only` UI state; only the holder can submit | T5 | FR-26 |
 | T-LOCK-3 | After `responses/<phase>.json` exists, further POSTs to the same phase return `409` regardless of lock state (first-write-wins) | T5 | FR-26 |
