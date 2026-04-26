@@ -98,7 +98,7 @@ impl Backend for TensorZeroBackend {
             .client
             .exec_chat(&effective_model, chat_req, None)
             .await
-            .map_err(|e| map_genai_error(e, start.elapsed()))?;
+            .map_err(|e| BackendError::from(e).with_elapsed(start.elapsed()))?;
 
         let elapsed = start.elapsed();
 
@@ -121,64 +121,6 @@ fn token_usage_from_genai(usage: &Usage) -> Option<TokenUsage> {
     let p = usage.prompt_tokens?;
     let c = usage.completion_tokens?;
     Some(TokenUsage::new(p.max(0) as u32, c.max(0) as u32))
-}
-
-fn map_genai_error(err: genai::Error, elapsed: Duration) -> BackendError {
-    match err {
-        genai::Error::WebModelCall { webc_error, .. }
-        | genai::Error::WebAdapterCall { webc_error, .. } => map_webc_error(webc_error, elapsed),
-        genai::Error::ChatResponseGeneration { cause, .. } => BackendError::Parse {
-            message: format!("TensorZero response parse error: {cause}"),
-        },
-        genai::Error::StreamParse { serde_error, .. } => BackendError::Parse {
-            message: format!("TensorZero stream parse error: {serde_error}"),
-        },
-        genai::Error::Resolver { resolver_error, .. } => BackendError::Config {
-            message: format!("TensorZero resolver error: {resolver_error}"),
-        },
-        genai::Error::RequiresApiKey { .. }
-        | genai::Error::NoAuthData { .. }
-        | genai::Error::NoAuthResolver { .. } => BackendError::Auth {
-            message: format!("TensorZero auth missing: {err}"),
-        },
-        genai::Error::HttpError { status, body, .. } => map_status(status.as_u16(), body),
-        other => BackendError::ExecutionFailed {
-            message: format!("TensorZero call failed: {other}"),
-            exit_code: None,
-        },
-    }
-}
-
-fn map_webc_error(err: genai::webc::Error, elapsed: Duration) -> BackendError {
-    use genai::webc::Error as W;
-    match err {
-        W::ResponseFailedStatus { status, body, .. } => map_status(status.as_u16(), body),
-        W::ResponseFailedInvalidJson { body, cause } => BackendError::Parse {
-            message: format!("TensorZero invalid JSON response: {cause}; body: {body}"),
-        },
-        W::ResponseFailedNotJson { content_type, body } => BackendError::Parse {
-            message: format!("TensorZero non-JSON response (content-type {content_type}): {body}"),
-        },
-        W::Reqwest(e) => {
-            if e.is_timeout() {
-                BackendError::Timeout {
-                    message: format!("TensorZero request timed out: {e}"),
-                    elapsed_ms: elapsed.as_millis() as u64,
-                }
-            } else if e.is_connect() {
-                BackendError::Network {
-                    message: format!("TensorZero connection failed: {e}"),
-                }
-            } else {
-                BackendError::Network {
-                    message: format!("TensorZero request failed: {e}"),
-                }
-            }
-        }
-        W::JsonValueExt(e) => BackendError::Parse {
-            message: format!("TensorZero JSON value error: {e}"),
-        },
-    }
 }
 
 /// Normalize a configured endpoint URL to the canonical TensorZero
@@ -234,94 +176,6 @@ fn canonicalize_wire_model(model: &str) -> String {
     format!("loker::{canonical}")
 }
 
-/// Inspect a 502 response body and reclassify gateway-wrapped upstream
-/// failures. The TensorZero gateway forwards a 401 from Anthropic / OpenAI as
-/// a 502 carrying the upstream error JSON in the body; the same goes for
-/// upstream rate-limit (429) signals. Returns `None` to fall through to the
-/// default 5xx classification (`Network`).
-fn classify_5xx_body(status: u16, body: &str) -> Option<BackendError> {
-    let lower = body.to_lowercase();
-    let auth_match = lower.contains("authentication_error")
-        || lower.contains("unauthorized")
-        || lower.contains("invalid x-api-key")
-        || lower.contains("invalid api key")
-        || contains_status_code(&lower, "401");
-    if auth_match {
-        return Some(BackendError::Auth {
-            message: format!("TensorZero HTTP {status} (upstream auth failure): {body}"),
-        });
-    }
-    let rate_match = lower.contains("rate_limit")
-        || lower.contains("rate limit")
-        || lower.contains("too many requests")
-        || contains_status_code(&lower, "429");
-    if rate_match {
-        return Some(BackendError::RateLimit {
-            message: format!("TensorZero HTTP {status} (upstream rate limit): {body}"),
-            retry_after_ms: None,
-        });
-    }
-    None
-}
-
-/// Boundary-aware HTTP status-code substring check.
-///
-/// Matches `code` when surrounded by non-ASCII-alphanumeric boundaries
-/// (start/end of string or any non-ASCII-alphanumeric character). This
-/// catches forms like `" 401 "`, `"\"401\""`, `"401:"`, `"(429)"`, and
-/// `{"status":429}` in minified JSON, while avoiding false positives such
-/// as `"4011"` or `"H429X"` where the digits are part of a longer
-/// alphanumeric identifier.
-fn contains_status_code(haystack: &str, code: &str) -> bool {
-    let bytes = haystack.as_bytes();
-    let needle = code.as_bytes();
-    let mut start = 0;
-    while let Some(rel) = haystack[start..].find(code) {
-        let i = start + rel;
-        let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
-        let after = i + needle.len();
-        let after_ok = after == bytes.len() || !bytes[after].is_ascii_alphanumeric();
-        if before_ok && after_ok {
-            return true;
-        }
-        start = i + 1;
-    }
-    false
-}
-
-/// Reclassify a 404 body that signals an "Unknown function:" config error
-/// (see `tests/fixtures/tensorzero/unknown_function_response.json`). Such
-/// failures will not become healthy on retry; they require config edits.
-fn classify_404_body(body: &str) -> Option<BackendError> {
-    if body.to_lowercase().contains("unknown function") {
-        return Some(BackendError::Config {
-            message: format!("TensorZero unknown function: {body}"),
-        });
-    }
-    None
-}
-
-fn map_status(status: u16, body: String) -> BackendError {
-    let msg = format!("TensorZero HTTP {status}: {body}");
-    match status {
-        401 | 403 => BackendError::Auth { message: msg },
-        404 => classify_404_body(&body).unwrap_or(BackendError::ExecutionFailed {
-            message: msg,
-            exit_code: None,
-        }),
-        429 => BackendError::RateLimit {
-            message: msg,
-            retry_after_ms: None,
-        },
-        502 => classify_5xx_body(status, &body).unwrap_or(BackendError::Network { message: msg }),
-        500..=599 => BackendError::Network { message: msg },
-        _ => BackendError::ExecutionFailed {
-            message: msg,
-            exit_code: None,
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,29 +225,6 @@ mod tests {
             assert_eq!(
                 wire, expected_wire,
                 "input={input:?} resolved={resolved:?} wire={wire:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn contains_status_code_handles_punctuation_boundaries() {
-        for body in [
-            r#"{"error":"401 unauthorized"}"#,
-            r#"{"error":"\"401\""}"#,
-            "status 401:",
-            "(401)",
-            r#"{"status":401}"#,
-            "401",
-        ] {
-            assert!(
-                contains_status_code(&body.to_lowercase(), "401"),
-                "expected match in {body:?}"
-            );
-        }
-        for body in ["4011", "H401X", "no auth here", "code=14010"] {
-            assert!(
-                !contains_status_code(&body.to_lowercase(), "401"),
-                "unexpected match in {body:?}"
             );
         }
     }
@@ -591,44 +422,6 @@ mod tests {
         assert_eq!(
             normalize_endpoint("http://gateway/openai/v1/"),
             "http://gateway/openai/v1/"
-        );
-    }
-
-    #[test]
-    fn classify_5xx_body_detects_anthropic_auth_fixture() {
-        let fixture =
-            include_str!("../../tests/fixtures/tensorzero/anthropic_auth_failure_response.json");
-        let classified = classify_5xx_body(502, fixture);
-        assert!(
-            matches!(classified, Some(BackendError::Auth { .. })),
-            "expected Auth from anthropic 502 auth fixture, got {classified:?}"
-        );
-    }
-
-    #[test]
-    fn classify_5xx_body_detects_rate_limit_signature() {
-        let body = r#"{"error":{"message":"All variants failed: rate_limit hit upstream"}}"#;
-        let classified = classify_5xx_body(502, body);
-        assert!(
-            matches!(classified, Some(BackendError::RateLimit { .. })),
-            "expected RateLimit, got {classified:?}"
-        );
-    }
-
-    #[test]
-    fn classify_5xx_body_returns_none_for_generic_5xx() {
-        assert!(classify_5xx_body(500, "internal server error").is_none());
-        assert!(classify_5xx_body(502, "").is_none());
-    }
-
-    #[test]
-    fn classify_404_body_detects_unknown_function_fixture() {
-        let fixture =
-            include_str!("../../tests/fixtures/tensorzero/unknown_function_response.json");
-        let classified = classify_404_body(fixture);
-        assert!(
-            matches!(classified, Some(BackendError::Config { .. })),
-            "expected Config from unknown_function fixture, got {classified:?}"
         );
     }
 

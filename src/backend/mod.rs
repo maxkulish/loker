@@ -3,6 +3,7 @@ mod bedrock;
 mod claude;
 mod codex;
 mod gemini;
+mod genai_error;
 mod ollama;
 mod retry;
 #[allow(dead_code)]
@@ -74,6 +75,22 @@ impl BackendError {
                 | BackendError::RateLimit { .. }
                 | BackendError::Network { .. }
         )
+    }
+
+    /// Stamp wall-clock elapsed time onto a `Timeout` error. No-op for other variants.
+    ///
+    /// Centralised mappings (e.g. `From<genai::Error>`) cannot observe the call-site
+    /// duration, so they emit `Timeout { elapsed_ms: 0 }` and let the caller chain
+    /// `.with_elapsed(start.elapsed())` to attach the measured value.
+    #[allow(dead_code)]
+    pub fn with_elapsed(mut self, elapsed: Duration) -> Self {
+        if let BackendError::Timeout {
+            ref mut elapsed_ms, ..
+        } = self
+        {
+            *elapsed_ms = elapsed.as_millis() as u64;
+        }
+        self
     }
 }
 
@@ -556,6 +573,66 @@ pub fn list_backends(config: &Config) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn with_elapsed_overrides_timeout_elapsed_ms() {
+        let err = BackendError::Timeout {
+            message: "deadline exceeded".to_string(),
+            elapsed_ms: 0,
+        }
+        .with_elapsed(Duration::from_millis(500));
+        match err {
+            BackendError::Timeout { elapsed_ms, .. } => assert_eq!(elapsed_ms, 500),
+            other => panic!("expected Timeout, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn with_elapsed_is_idempotent_on_repeated_calls() {
+        let err = BackendError::Timeout {
+            message: "deadline exceeded".to_string(),
+            elapsed_ms: 0,
+        }
+        .with_elapsed(Duration::from_millis(250))
+        .with_elapsed(Duration::from_millis(750));
+        match err {
+            BackendError::Timeout { elapsed_ms, .. } => assert_eq!(elapsed_ms, 750),
+            other => panic!("expected Timeout, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn with_elapsed_is_noop_on_non_timeout_variants() {
+        let cases = vec![
+            BackendError::RateLimit {
+                message: "rl".to_string(),
+                retry_after_ms: None,
+            },
+            BackendError::Auth {
+                message: "auth".to_string(),
+            },
+            BackendError::Network {
+                message: "net".to_string(),
+            },
+            BackendError::Parse {
+                message: "parse".to_string(),
+            },
+            BackendError::ExecutionFailed {
+                message: "exec".to_string(),
+                exit_code: None,
+            },
+            BackendError::Unavailable {
+                message: "unavail".to_string(),
+            },
+            BackendError::Config {
+                message: "cfg".to_string(),
+            },
+        ];
+        for original in cases {
+            let stamped = original.clone().with_elapsed(Duration::from_secs(1));
+            assert_eq!(format!("{original:?}"), format!("{stamped:?}"));
+        }
+    }
 
     #[test]
     fn test_query_output_from_text() {

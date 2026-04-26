@@ -1,0 +1,89 @@
+task_id: CLO-249
+task_title: "Map genai errors to BackendError variants"
+task_url: "https://linear.app/cloud-ai/issue/CLO-249/map-genai-errors-to-backenderror-variants"
+task_type: specification
+classification_reason: |
+  Single-module mechanical change: centralise `genai::Error -> BackendError`
+  translation behind a single `From` impl, tag retryability, document the
+  mapping. The `BackendError` enum already exists in `src/backend/mod.rs`
+  with `is_retryable()` semantics; the enum is only extended if a real
+  observed `genai::Error` variant has nowhere to land. Acceptance criteria
+  are testable (unit tests pin each variant -> mapped result + retryability).
+  No architecture decisions required - the /spec workflow fits, mirroring
+  CLO-247's specification path.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-249-map-genai-errors-to-backenderror-variants
+  branch_actual: feat/clo-249-genai
+  blocks:
+    - "CLO-258 (Implement Strategy::EscalatingRetry walker) - needs retryability flags from this task"
+  blocked_by:
+    - "CLO-247 (Reconcile tensorzero backend with D1 spike findings) - merged 2026-04-26 (PR #7, commit 048b6cd)"
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-26T00:00:00Z"
+  updated_at: "2026-04-26T16:00:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task - D1 spike (CLO-243) and CLO-247 reconciliation already produced the genai surface area we need to map. No discovery needed."
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task - using /spec instead of full design doc. No architecture decisions; just centralise existing error translation."
+  spec:
+    status: complete
+    spec_file: "specs/2026-04-26-clo-249-map-genai-errors.md"
+    approved: true
+    auto_approved: true
+    auto_approval_reason: "Auto mode active; spec is a refactor against an existing working baseline (map_genai_error in tensorzero.rs:126), no architecture decisions, all acceptance criteria mechanically testable. User may course-correct at any point."
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_completed: false
+    review_applied: false
+    review_skip_reason: "No .lok/workflows/spec-review.toml present in this repo; AI review tooling unavailable (consistent with CLO-247). Proceeding to user checkpoint with draft spec unchanged."
+    applied_suggestions: []
+    flagged_suggestions: []
+  implement:
+    status: complete
+    sub_tasks_completed:
+      - "ST1: BackendError::with_elapsed builder + 3 unit tests (mod.rs)"
+      - "ST2: created src/backend/genai_error.rs, moved helpers + 13 unit tests"
+      - "ST3: rewired tensorzero.rs::query() call site to BackendError::from(e).with_elapsed(...)"
+      - "ST4: verified spec §5 evaluation matrix coverage (13 + 3 + 11 = 27 tests)"
+      - "ST5: make check (fmt + clippy + 501 unit + 6 integration + 1 schema test) — all green"
+  pr:
+    status: pending
+  complete:
+    status: pending
+
+history:
+  - timestamp: "2026-04-26T00:00:00Z"
+    action: workflow_started
+    phase: spec
+    details: "Created CLO-249 workflow as specification task. Blocker CLO-247 resolved (PR #7 merged). Branch feat/clo-249-genai already checked out. No PROJECT.md/DEPENDENCIES.md/ROADMAP.md in this repo, so /project:sync --start step skipped."
+  - timestamp: "2026-04-26T15:00:00Z"
+    action: spec_drafted
+    phase: spec
+    details: "Wrote 5-section spec at specs/2026-04-26-clo-249-map-genai-errors.md. Scope S, 4 sub-tasks (ST1: BackendError::with_elapsed builder; ST2: create src/backend/genai_error.rs and move helpers; ST3: rewire tensorzero.rs::query() call site; ST4: doc table + variant-coverage tests). Acceptance criteria AC1-AC10 all mechanically testable (cargo test + rg + make check). Evaluation table covers 24 cases including catch-all + idempotent with_elapsed."
+  - timestamp: "2026-04-26T15:00:00Z"
+    action: spec_review_skipped
+    phase: spec
+    details: "AI spec-review unavailable: .lok/workflows/spec-review.toml not present in this repo (consistent with CLO-247). Proceeding directly to user checkpoint with the draft spec unchanged."
+  - timestamp: "2026-04-26T15:30:00Z"
+    action: spec_approved
+    phase: spec
+    details: "Auto-mode approval. Spec scope S, mechanically testable, no architecture decisions."
+  - timestamp: "2026-04-26T16:00:00Z"
+    action: implementation_complete
+    phase: implement
+    details: "ST1-ST5 done. Files: src/backend/mod.rs (+77 lines: with_elapsed builder + 3 tests + mod genai_error), src/backend/genai_error.rs (new, helpers + 13 unit tests + mapping doc tables), src/backend/tensorzero.rs (-208 lines: deleted duplicated helpers, rewired call site to BackendError::from(e).with_elapsed). make check: 501 unit + 6 integration + 1 schema test all pass."
