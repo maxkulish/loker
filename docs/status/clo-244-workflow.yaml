@@ -27,10 +27,11 @@ linear:
   blocked_by: []
 
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-25T20:45:00Z"
-  updated_at: "2026-04-25T22:15:00Z"
+  updated_at: "2026-04-26T07:43:00Z"
+  completed_at: "2026-04-26T07:43:00Z"
 
 phases:
   discovery:
@@ -74,14 +75,25 @@ phases:
       validator_dev_dep: "jsonschema 0.46 (dev-dependencies only; verified absent from cargo tree -e=normal)"
     make_check_status: pass
   pr:
-    status: open
+    status: merged
     pr_number: 6
     pr_url: "https://github.com/maxkulish/loker/pull/6"
-    commit_sha: b5f2ef6
-    pushed_at: "2026-04-25T22:18:00Z"
+    commit_sha: f9e4f69
+    initial_commit_sha: b5f2ef6
+    merge_commit: 0a68143
+    pushed_at: "2026-04-26T07:10:00Z"
     opened_at: "2026-04-25T22:18:00Z"
+    merged_at: "2026-04-26T07:41:41Z"
+    reviews_addressed: 1
+    review_comments_total: 10
+    review_comments_replied: 10
+    review_iteration_commit: f9e4f69
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_files_skip_reason: "PROJECT.md / ROADMAP.md / DEPENDENCIES.md not present in repo; project_sync.start was skipped at workflow start. Linear is source of truth."
+    merged_at: "2026-04-26T07:41:41Z"
+    completed_at: "2026-04-26T07:43:00Z"
 
 acceptance_criteria:
   - "Draft-2020-12 JSON Schemas committed under docs/schemas/ with stable file names: trace.jsonl events, manifest.json, per-phase result files, HITL pending/responses, summary.json"
@@ -129,3 +141,23 @@ history:
     action: pr_created
     phase: pr
     details: "Opened PR #6 https://github.com/maxkulish/loker/pull/6. Title 'feat(CLO-244): JSON schemas for run artefacts (D2)'. Body covers schemas, fixtures, validator, dev-dep verification, and unblocks list (T-024/T-029/T-048/T-050)."
+  - timestamp: "2026-04-26T07:10:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 10 review comments (5 from gemini-code-assist, 5 from copilot-pull-request-reviewer). Aligned spec to HITL canonical (severity enum low/medium/high; run_id workflow slug; schema_version integer const 1, un-namespaced). Added if/then/else to pending.schema.json enforcing timeout_at=null when severity=high; added high_severity_with_timeout.json and low_severity_null_timeout.json negative fixtures. Renamed non_monotonic_attempts -> unknown_tier. Documented schema_version namespace exception in spec line 73. Commit f9e4f69 (31 files, +114/-58). make check green (480 tests). Pushed to origin feat/clo-244-json."
+  - timestamp: "2026-04-26T07:16:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Posted replies to all 10 review comments via gh api .../replies. Each gemini-code-assist reply ends with '/gemini review' to trigger re-validation. Replies posted: 10/10."
+  - timestamp: "2026-04-26T07:41:41Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #6 merged into main as squash commit 0a68143. Branch feat/clo-244-json merged to main."
+  - timestamp: "2026-04-26T07:42:47Z"
+    action: project_sync_complete
+    phase: complete
+    details: "Linear CLO-244 transitioned to Done. Final completion comment posted on Linear issue. Aggregation files (PROJECT.md/ROADMAP.md/DEPENDENCIES.md) skipped - not present in repo."
+  - timestamp: "2026-04-26T07:43:00Z"
+    action: workflow_complete
+    phase: complete
+    details: "Task CLO-244 fully completed. PR #6 merged (commit 0a68143), Linear set to Done, workflow YAML finalized. Worktree cleanup pending: user runs 'gd' after exiting Claude Code to delete loker--feat-clo-244-json worktree and feat/clo-244-json branch."
