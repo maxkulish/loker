@@ -26,26 +26,30 @@ These four spikes / written artefacts gate later milestones. T-001 must
 finish before Phase 1 work hardens; T-002, T-003, T-004 can run alongside
 Phase 1 - 4.
 
-| ID | Task | After | Blocks | PRD | Notes |
-|----|------|-------|--------|-----|-------|
-| T-001 | D1 TensorZero round-trip spike. Stand up local Tier 2, run a `single_model` end-to-end via `genai::ServiceTargetResolver`, capture request/response shapes, family identity, token counts. Land verdict in `docs/spikes/2026-04-25-tensorzero-roundtrip.md`. | - | T-005 onward | §11 D1 | M1 stays "in flight" until this lands. |
-| T-002 | D2 JSON schemas. Author draft-2020-12 schemas for `trace.jsonl`, `manifest.json`, per-phase result files, HITL `pending/<phase>.json` + `responses/<phase>.json`, `summary.json`. Drop fixtures + CI validator. | - | T-024, T-029, T-050 | §11 D2 | [parallel-ok] |
-| T-003 | D3 atomic run-state rules. Pick between `.tmp + rename + status marker` vs. attempt-directory schemes; document the chosen write protocol + fault-injection plan in `docs/run-state.md`. | - | T-024, T-031 | §11 D3 | [parallel-ok] |
-| T-004 | D4 UI threat model. Concrete attacker model (cross-origin tabs, extensions, symlinks, traversal, stale locks) + mitigations + M11 test list in `docs/security/2026-04-25-ui-threat-model.md`. | - | T-050 onward | §11 D4 | [parallel-ok] |
+**Status (2026-04-26): all four shipped via PRs #3, #4, #5, #6.**
+
+| ID | Linear | Task | After | Blocks | PRD | Notes |
+|----|--------|------|-------|--------|-----|-------|
+| ~~T-001~~ | CLO-243 done | D1 TensorZero round-trip spike. Stand up local Tier 2, run a `single_model` end-to-end via `genai::ServiceTargetResolver`, capture request/response shapes, family identity, token counts. Land verdict in `docs/spikes/2026-04-25-tensorzero-roundtrip.md`. | - | T-005 onward | §11 D1 | Unblocked T-005. |
+| ~~T-002~~ | CLO-244 done | D2 JSON schemas. Author draft-2020-12 schemas for `trace.jsonl`, `manifest.json`, per-phase result files, HITL `pending/<phase>.json` + `responses/<phase>.json`, `summary.json`. Drop fixtures + CI validator. | - | T-024, T-029, T-050 | §11 D2 | [parallel-ok] |
+| ~~T-003~~ | CLO-245 done | D3 atomic run-state rules. Pick between `.tmp + rename + status marker` vs. attempt-directory schemes; document the chosen write protocol + fault-injection plan in `docs/run-state.md`. | - | T-024, T-031 | §11 D3 | [parallel-ok] |
+| ~~T-004~~ | CLO-246 done | D4 UI threat model. Concrete attacker model (cross-origin tabs, extensions, symlinks, traversal, stale locks) + mitigations + M11 test list in `docs/security/2026-04-25-ui-threat-model.md`. | - | T-050 onward | §11 D4 | [parallel-ok] |
 
 ## Phase 1 - HTTP-gateway backend (M1, in flight)
 
 `src/backend/tensorzero.rs` is already scaffolded. T-005 reconciles it
 with the spike findings; the rest hardens it to the FR-2 / FR-3 contract.
 
-| ID | Task | After | Blocks | PRD |
-|----|------|-------|--------|-----|
-| T-005 | Reconcile in-flight `tensorzero.rs` with D1 findings. Confirm `genai::ServiceTargetResolver` wiring, header set, model-name mapping. | T-001 | T-006 | FR-3 |
-| T-006 | Wiremock unit-test contract per M1 plan: 200, 429, 500, malformed JSON, timeout, auth fail. | T-005 | T-009, Phase 2 | FR-2 |
-| T-007 | Error mapping `genai::Error -> BackendError`. Single source of truth for retryability flags. | T-005 | T-013 | FR-2 |
-| T-008 | Config schema for TensorZero in `src/config.rs` (endpoint, default model, timeout, retry policy). | T-005 | T-034 | FR-2 |
-| T-009 | Opt-in integration test gated by `LOKER_TZ_INTEGRATION=1`. One end-to-end round-trip against local gateway. | T-006 | - | FR-2 |
-| T-010 | `BackendCapabilities` struct: tool-use, streaming, file-edit. Validation rejects backends missing required capability. | T-005 | T-029 | FR-4 |
+**Status (2026-04-26): T-005 (CLO-247) unblocked - D1 verdict landed.**
+
+| ID | Linear | Task | After | Blocks | PRD |
+|----|--------|------|-------|--------|-----|
+| T-005 | CLO-247 | Reconcile in-flight `tensorzero.rs` with D1 findings. Confirm `genai::ServiceTargetResolver` wiring, header set, model-name mapping. | T-001 | T-006 | FR-3 |
+| T-006 | CLO-248 | Wiremock unit-test contract per M1 plan: 200, 429, 500, malformed JSON, timeout, auth fail. | T-005 | T-009, Phase 2 | FR-2 |
+| T-007 | CLO-249 | Error mapping `genai::Error -> BackendError`. Single source of truth for retryability flags. | T-005 | T-013 | FR-2 |
+| T-008 | CLO-250 | Config schema for TensorZero in `src/config.rs` (endpoint, default model, timeout, retry policy). | T-005 | T-034 | FR-2 |
+| T-009 | CLO-252 | Opt-in integration test gated by `LOKER_TZ_INTEGRATION=1`. One end-to-end round-trip against local gateway. | T-006 | - | FR-2 |
+| T-010 | CLO-251 | `BackendCapabilities` struct: tool-use, streaming, file-edit. Validation rejects backends missing required capability. | T-005 | T-029 | FR-4 |
 
 ## Phase 2 - Strategy primitives (M2)
 
