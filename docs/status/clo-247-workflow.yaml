@@ -73,8 +73,8 @@ phases:
     pr_url: "https://github.com/maxkulish/loker/pull/7"
     pr_number: 7
     branch: "feat/clo-247-reconcile"
-    commit_sha: "3b9f0ca"
-    reviews_addressed: 3
+    commit_sha: "1940df4"
+    reviews_addressed: 5
   complete:
     status: pending
 
@@ -145,3 +145,7 @@ history:
     action: review_addressed
     phase: pr
     details: "Addressed 3 PR review comments in commit 3b9f0ca. (1) gemini-code-assist: replaced literal substring 401/429 checks with boundary-aware contains_status_code helper (rejects 4011, code=14010, H401X). (2) Copilot: restricted body inspection to 502 only — generic 5xx now maps directly to BackendError::Network. (3) Copilot: added unit tests canonicalize_wire_model_strips_to_canonical_on_wire and contains_status_code_handles_punctuation_boundaries. make check green: 487 unit + 6 integration + 1 schema. Replies posted on all 3 comments (gemini reply includes /gemini review trailer)."
+  - timestamp: "2026-04-26T14:25:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 2 additional Copilot doc-consistency comments in commit 1940df4. (1) Module doc 502 body-inspection paragraph now uses BackendError::Auth / BackendError::RateLimit / BackendError::Network consistently (was: BackendError::Auth / RateLimit / Network). (2) contains_status_code doc now describes non-ASCII-alphanumeric boundaries (matches is_ascii_alphanumeric implementation; was: non-digit / non-ASCII-digit). Doc-only; no behavior change. make check green: 487 unit + 6 integration + 1 schema. Replies posted on both comments with /gemini review trailer (now universal per updated /pr:review skill)."
