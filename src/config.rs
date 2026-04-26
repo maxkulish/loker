@@ -126,26 +126,18 @@ fn default_enabled() -> bool {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RetryPolicy {
-    #[serde(default = "default_retry_max")]
-    pub max_retries: u32,
-    #[serde(default = "default_retry_delay_ms_u64")]
+pub struct RetryPolicyConfig {
+    #[serde(default = "default_retries")]
+    pub max_retries: usize,
+    #[serde(default = "default_retry_delay_ms")]
     pub delay_ms: u64,
 }
 
-fn default_retry_max() -> u32 {
-    0
-}
-
-fn default_retry_delay_ms_u64() -> u64 {
-    1000
-}
-
-impl Default for RetryPolicy {
+impl Default for RetryPolicyConfig {
     fn default() -> Self {
         Self {
-            max_retries: default_retry_max(),
-            delay_ms: default_retry_delay_ms_u64(),
+            max_retries: default_retries(),
+            delay_ms: default_retry_delay_ms(),
         }
     }
 }
@@ -160,7 +152,7 @@ pub struct TensorZeroConfig {
     #[serde(default = "default_tz_timeout_secs")]
     pub timeout_secs: u64,
     #[serde(default)]
-    pub retry_policy: RetryPolicy,
+    pub retry_policy: RetryPolicyConfig,
 }
 
 fn default_tz_timeout_secs() -> u64 {
@@ -199,6 +191,9 @@ impl TensorZeroConfig {
                 scheme,
                 self.endpoint
             );
+        }
+        if self.default_model.is_empty() {
+            anyhow::bail!("tensorzero.default_model: must not be empty");
         }
         if self.timeout_secs == 0 {
             anyhow::bail!("tensorzero.timeout_secs: must be greater than zero");
@@ -927,7 +922,7 @@ timeout = 999
             default_model: "tensorzero::function_name::loker_d1_openai".to_string(),
             api_key_env: Some("TENSORZERO_API_KEY".to_string()),
             timeout_secs: 90,
-            retry_policy: RetryPolicy {
+            retry_policy: RetryPolicyConfig {
                 max_retries: 3,
                 delay_ms: 500,
             },
@@ -1008,18 +1003,14 @@ timeout_secs = 0
     #[test]
     fn test_tensorzero_to_backend_opts_resolves_env() {
         let var_name = "LOK_TEST_TENSORZERO_KEY_CLO250";
-        // SAFETY: tests in this module run serially via cargo's default behaviour
-        // for the same process; the var name is unique to this test.
-        unsafe {
-            std::env::set_var(var_name, "secret-token-xyz");
-        }
+        std::env::set_var(var_name, "secret-token-xyz");
 
         let cfg = TensorZeroConfig {
             endpoint: "https://gateway.local".to_string(),
             default_model: "loker_d1_openai".to_string(),
             api_key_env: Some(var_name.to_string()),
             timeout_secs: 60,
-            retry_policy: RetryPolicy::default(),
+            retry_policy: RetryPolicyConfig::default(),
         };
 
         let opts = cfg.to_backend_opts().expect("env var is set");
@@ -1028,8 +1019,6 @@ timeout_secs = 0
         assert_eq!(opts.api_key.as_deref(), Some("secret-token-xyz"));
         assert_eq!(opts.timeout, std::time::Duration::from_secs(60));
 
-        unsafe {
-            std::env::remove_var(var_name);
-        }
+        std::env::remove_var(var_name);
     }
 }
