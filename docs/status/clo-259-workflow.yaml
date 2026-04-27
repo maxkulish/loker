@@ -1,0 +1,56 @@
+task_id: clo-259
+task_type: development
+classification_reason: >-
+  Title starts with 'Implement' and issue contains mechanical acceptance criteria (cargo test, make check). No [spec] or
+  [ops] labels present.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by:
+    - CLO-257
+  branch_suggested: kmamemo/clo-259-implement-strategyparallelfanout-with-min_responses-floor
+  priority: Medium
+workflow:
+  current_phase: discovery
+  status: active
+  created_at: '2026-04-27T19:16:11.286Z'
+  updated_at: '2026-04-27T19:17:59.056Z'
+phases:
+  discovery:
+    status: pending
+  design:
+    status: pending
+  plan:
+    status: pending
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-04-27T19:16:11.286Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-259 as development
+  - timestamp: '2026-04-27T19:17:38.511Z'
+    action: workflow_resumed
+    phase: init
+    details: >-
+      Resumed existing workflow for CLO-259. Enriching from Linear issue. Classified as development: title starts with
+      'Implement' and contains mechanical ACs.
+  - timestamp: '2026-04-27T19:17:59.056Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+task_title: Implement Strategy::ParallelFanOut with min_responses floor
+task_url: https://linear.app/cloud-ai/issue/CLO-259/implement-strategyparallelfanout-with-min-responses-floor
