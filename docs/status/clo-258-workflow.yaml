@@ -182,3 +182,11 @@ history:
     action: review_addressed
     phase: pr
     details: "Addressed Copilot round-2 review (6 comments on PR #15, ids 3148336267/324/367/391/421/455). One code fix at src/strategy/mod.rs::pick_model to filter Some(\"\") from both query.model and prompt.model so the schema's minLength: 1 guarantee holds. Five doc-status fixes in clo-258-workflow.yaml: nulled missing design_doc/codex_review/plan_file/codex_report references (artifacts live in the superseded PR #14 worktree) and corrected AC text (PhaseError -> StrategyError, retryability AC replaced with actual no-skip behavior). Pushed commit 5aef7a8; replied to all 6 threads with /gemini review trailer."
+  - timestamp: "2026-04-27T19:00:34Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #15 merged via squash to main. Merge commit bf50fbb4c7a957d3857160c1b167fa71e6450d06."
+  - timestamp: "2026-04-27T19:00:34Z"
+    action: workflow_complete
+    phase: complete
+    details: "Workflow finalized after PR #15 merge. No aggregation files (PROJECT.md/ROADMAP.md/DEPENDENCIES.md) exist in this project; tracking lives in docs/status/ and docs/handoff.md, so aggregation_files_updated remains false."
