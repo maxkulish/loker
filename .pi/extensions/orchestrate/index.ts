@@ -430,9 +430,11 @@ export default function (pi: ExtensionAPI) {
       addHistoryEvent(state, "phase_transition", params.from_phase, `Transitioned from ${params.from_phase} to ${params.to_phase}`);
       await saveStateSerialized(statePath, state);
 
+      await dispatchPhase(pi, params.task_id, params.to_phase, state, statePath, workspaceRoot);
+
       return {
-        content: [{ type: "text", text: `Transitioned to ${params.to_phase} phase` }],
-        details: { new_phase: params.to_phase }
+        content: [{ type: "text", text: `Transitioned to ${params.to_phase} phase and dispatched instructions` }],
+        details: { new_phase: params.to_phase, dispatched: true }
       };
     }
   });

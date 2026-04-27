@@ -70,6 +70,7 @@ impl Strategy for SingleModel {
 
         let attempt = Attempt {
             tier: None,
+            family: None,
             backend: chosen.name().to_string(),
             model: pick_model(&query, prompt),
             finish_reasons: vec![FinishReason::Stop],
@@ -85,6 +86,9 @@ impl Strategy for SingleModel {
             run_id: ctx.run_id,
             attempts: vec![attempt],
             final_status: None,
+            aggregator: None,
+            aggregate_output_path: None,
+            verify: None,
         })
     }
 }

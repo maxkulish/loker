@@ -128,6 +128,7 @@ impl Strategy for EscalatingRetry {
                             };
                             attempts.push(Attempt {
                                 tier: Some(rung.tier),
+                                family: None,
                                 backend: backend.name().to_string(),
                                 model,
                                 finish_reasons: vec![FinishReason::Stop],
@@ -144,6 +145,9 @@ impl Strategy for EscalatingRetry {
                                     run_id: ctx.run_id,
                                     attempts,
                                     final_status: Some(FinalStatus::Succeeded),
+                                    aggregator: None,
+                                    aggregate_output_path: None,
+                                    verify: None,
                                 });
                             }
                         }
@@ -153,6 +157,7 @@ impl Strategy for EscalatingRetry {
                             // walking the ladder.
                             attempts.push(Attempt {
                                 tier: Some(rung.tier),
+                                family: None,
                                 backend: backend.name().to_string(),
                                 model,
                                 finish_reasons: vec![FinishReason::Stop],
@@ -175,6 +180,7 @@ impl Strategy for EscalatingRetry {
                         .unwrap_or_else(|| "default".to_string());
                     attempts.push(Attempt {
                         tier: Some(rung.tier),
+                        family: None,
                         backend: rung.backend.clone(),
                         model,
                         finish_reasons: vec![FinishReason::Error],
@@ -193,6 +199,9 @@ impl Strategy for EscalatingRetry {
             run_id: ctx.run_id,
             attempts,
             final_status: Some(FinalStatus::Exhausted),
+            aggregator: None,
+            aggregate_output_path: None,
+            verify: None,
         };
         Err(StrategyError::Exhausted {
             output: Box::new(exhausted),
