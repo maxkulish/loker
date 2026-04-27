@@ -191,7 +191,6 @@ fn canonicalize_wire_model(model: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{TensorZeroBackend, TensorZeroConfig};
     use serde_json::json;
     use std::time::Duration;
     use wiremock::matchers::{header, method, path};
