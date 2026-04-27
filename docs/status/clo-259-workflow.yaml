@@ -24,7 +24,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-04-27T19:16:11.286Z'
-  updated_at: '2026-04-27T20:12:58.649Z'
+  updated_at: '2026-04-27T20:27:55.923Z'
 phases:
   discovery:
     status: complete
@@ -62,6 +62,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - 25e156a
   pr:
     status: pending
   complete:
@@ -123,6 +125,12 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-04-27T20:27:55.923Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      T-1+T-2 landed: extended StrategyKind with Parallel variant, added FloorViolation error, added conditional
+      StrategyOutput serialization with branches/attempts and parallel schema fields. Commit 25e156a.
 task_title: Implement Strategy::ParallelFanOut with min_responses floor
 task_url: https://linear.app/cloud-ai/issue/CLO-259/implement-strategyparallelfanout-with-min-responses-floor
 review_notes: Design self-reviewed due to missing tooling

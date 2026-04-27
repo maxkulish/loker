@@ -15,7 +15,7 @@ use serde_json::Value;
 use loker::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use loker::strategy::single_model::SingleModel;
 use loker::strategy::{
-    PhaseContext, Prompt, Strategy, StrategyError, StrategyKind, StrategyOutput, SCHEMA_VERSION,
+    PhaseContext, Prompt, Strategy, StrategyError, StrategyKind, SCHEMA_VERSION,
 };
 
 const SCHEMA_PATH: &str = "docs/schemas/phase_result_single.schema.json";

@@ -23,10 +23,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod escalating_retry;
+pub mod parallel_fanout;
 pub mod single_model;
 pub mod verify;
 
 pub use escalating_retry::EscalatingRetry;
+pub use parallel_fanout::{Aggregator, ParallelFanOut, TargetSpec};
 pub use single_model::SingleModel;
 pub use verify::{VerifyError, VerifyHook, VerifyResult};
 
@@ -250,13 +252,12 @@ impl Serialize for StrategyOutput {
                 .collect();
 
             state.serialize_field("branches", &branches)?;
-            state.serialize_field(
-                "aggregator",
-                self.aggregator.as_deref().unwrap_or("concat"),
-            )?;
+            state.serialize_field("aggregator", self.aggregator.as_deref().unwrap_or("concat"))?;
             state.serialize_field(
                 "aggregate_output_path",
-                self.aggregate_output_path.as_deref().unwrap_or("aggregated.txt"),
+                self.aggregate_output_path
+                    .as_deref()
+                    .unwrap_or("aggregated.txt"),
             )?;
             state.serialize_field(
                 "verify",
