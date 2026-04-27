@@ -28,10 +28,10 @@ linear:
     - "CLO-247 (T-005 reconcile tensorzero with D1 spike) - merged 2026-04-26 (PR #7, commit 048b6cd)"
 
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-26T18:00:00Z"
-  updated_at: "2026-04-27T07:00:00Z"
+  updated_at: "2026-04-27T10:42:00Z"
 
 phases:
   discovery:
@@ -69,15 +69,19 @@ phases:
     pr_url: "https://github.com/maxkulish/loker/pull/11"
     pr_number: 11
     branch: feat/clo-251-backend
-    commit_sha: HEAD
+    commit_sha: 23e86f9
+    merged_at: "2026-04-27T10:41:33Z"
     reviews_addressed: 9
     review_fix_commits:
       - "9389a2c (5 PR comments + tensorzero defensive import)"
       - "55bd7fd (drop redundant explicit imports breaking CI tests on fresh build)"
       - "053ac73 (cargo cache bust v1->v2 to clear poisoned target/)"
-      - "HEAD (4 Copilot comments + tensorzero const-pattern bypass for E0422)"
+      - "33265a4 (4 Copilot comments + tensorzero const-pattern bypass for E0422)"
+      - "d648f43 (merge origin/main to resolve DIRTY mergeStateStatus from CLO-250 landing)"
+      - "ab7027a (post-merge fmt fix on tensorzero CAPABILITIES const indentation)"
   complete:
-    status: pending
+    status: complete
+    merged_commit: "23e86f9108be0391c65afa9e560804334fac42be"
 
 history:
   - timestamp: "2026-04-26T18:00:00Z"
@@ -128,3 +132,15 @@ history:
     action: review_addressed
     phase: pr
     details: "Round-2 fixes: (1) Empirically work around CI's E0422 by mirroring the bedrock pattern from bedrock.rs:97 - introduce `pub(crate) const TensorZeroBackend::CAPABILITIES` and rewrite `capabilities_match_current_wiring` to assert against the const without constructing a backend. Local make check green (519 lib + 6 + 1 + 7 tests). (2) Reply to 4 outstanding Copilot review comments on PR #11 with /gemini review trailer. Commit also rolls in three previously-staged review fixes: workflow.rs validate-doc cleanup (drops phantom dependency-graph claim), backend/mod.rs DRY via `..BackendCapabilities::none()` spread in capabilities_for_name, and spec AC5 expansion to cover ApplyEditsMultiBackend + MissingBackendForCapability variants."
+  - timestamp: "2026-04-27T10:35:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Merge commit d648f43: integrated origin/main (CLO-250 tensorzero config schema #10 + 263276b docs) to clear PR #11 mergeStateStatus DIRTY that was blocking CI re-runs. Mergiraf auto-resolved a conflict in tensorzero.rs; merge succeeded via 'ort' strategy. make check green (524 lib + 6 + 1 + 7 = 538 tests). Follow-up commit ab7027a fixed cargo fmt indentation on TensorZeroBackend::CAPABILITIES const struct literal (8-space inside impl block, mergiraf left 4-space). 5 Copilot review-comment replies posted with /gemini review trailers (4 'Fixed in 33265a4' + 1 'Acknowledged - real divergence, M1 follow-up' for capabilities_for_name vs create_backend tensorzero divergence, the latter promised as Linear follow-up issue)."
+  - timestamp: "2026-04-27T10:41:33Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #11 squash-merged to main as commit 23e86f9. CI on merged HEAD ab7027a was fully green (test/format/clippy SUCCESS), mergeStateStatus CLEAN, all 5 round-2 review-comment replies received positive gemini-code-assist acknowledgments. The const-pattern E0422 workaround held on fresh stable rustc x86_64."
+  - timestamp: "2026-04-27T10:42:00Z"
+    action: workflow_complete
+    phase: complete
+    details: "CLO-251 (T-009 BackendCapabilities + Workflow capability gating, FR-4) complete. Post-merge follow-up tracked: file Linear issue for `create_backend(\"tensorzero\")` arm + `BackendConfig` -> `TensorZeroConfig` adapter (promised in PR #11 reply 3145377073). Out of scope for CLO-251 (FR-4 capability declaration only); belongs to M1 milestone."
