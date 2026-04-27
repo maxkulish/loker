@@ -302,14 +302,15 @@ pub enum StrategyError {
 /// model the prompt requested, otherwise the literal `"default"`.
 ///
 /// The schema requires `model` to be a non-empty string; this helper
-/// guarantees that even when both sources are `None` the field is still
-/// populated.
+/// treats empty strings from either source as missing so the result is
+/// guaranteed non-empty.
 pub(crate) fn pick_model(query: &QueryOutput, prompt: &Prompt) -> String {
     query
         .model
-        .as_ref()
-        .or(prompt.model.as_ref())
-        .cloned()
+        .as_deref()
+        .filter(|m| !m.is_empty())
+        .or_else(|| prompt.model.as_deref().filter(|m| !m.is_empty()))
+        .map(str::to_string)
         .unwrap_or_else(|| "default".to_string())
 }
 

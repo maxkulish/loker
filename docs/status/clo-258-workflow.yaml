@@ -13,8 +13,8 @@ task:
     - "Strategy::EscalatingRetry carries ordered backends, verify hook, and pass_failure_context scaffold defaulting false."
     - "First-pass success returns immediately and does not call later backends."
     - "Mid-list pass returns the winning attempt while preserving earlier attempts."
-    - "Full exhaustion returns PhaseError::Exhausted with all attempt records."
-    - "Retryability flags decide whether a backend-level retryable error burns/retries the current slot before moving on; non-retryable errors do not skip subsequent backends."
+    - "Full exhaustion returns StrategyError::Exhausted with all attempt records."
+    - "Backend errors advance evaluation to the next backend; a failure on one backend does not skip subsequent backends."
     - "A phase-result shape test covers the escalating output contract."
   validation:
     - "cargo test -q strategy::"
@@ -28,7 +28,7 @@ workflow:
 phases:
   design:
     status: complete
-    design_doc: docs/design-docs/clo-258-escalating-retry-walker.md
+    design_doc: null
     draft_ready: true
     finalized: true
     review_completed: true
@@ -38,7 +38,7 @@ phases:
       - "Scope includes a minimal VerifyHook/VerifyResult trait boundary because T-020 has not landed locally; concrete hook implementations remain out of scope."
       - "Keep pass_failure_context as an explicit config field defaulting false without prompt mutation behavior."
     flagged_suggestions: []
-    codex_review: docs/reviews/clo-258-codex-design-review.md
+    codex_review: null
 
   spec:
     status: skipped
@@ -47,8 +47,8 @@ phases:
 
   plan:
     status: complete
-    plan_file: docs/plans/clo-258-escalating-retry-walker.md
-    approved: true
+    plan_file: null
+    approved: false
 
   implement:
     status: complete
@@ -58,7 +58,7 @@ phases:
     last_phase_completed: pre_pr_review
     codex_validated: true
     codex_verdict: pass_with_notes
-    codex_report: docs/reviews/clo-258-codex-pre-pr-review.md
+    codex_report: null
     gemini_validation_report: null
     codex_changed_files:
       - src/strategy/mod.rs
