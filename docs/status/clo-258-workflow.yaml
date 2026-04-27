@@ -4,7 +4,7 @@ title: "Implement Strategy::EscalatingRetry walker"
 branch: feat/clo-258-escalating
 task_type: development
 created: "2026-04-27T14:28:43Z"
-updated_at: "2026-04-27T14:38:55Z"
+updated_at: "2026-04-27T14:39:01Z"
 
 task:
   status: complete
@@ -73,8 +73,8 @@ phases:
 
   pr:
     status: in_progress
-    pr_url: null
-    pr_number: null
+    pr_url: "https://github.com/maxkulish/loker/pull/14"
+    pr_number: 14
     reviews_addressed: 0
     approved: false
     ci_passed: false
@@ -85,8 +85,10 @@ phases:
           - "cargo test -q strategy::"
           - "cargo test -q run_artefact_schemas_validate_their_fixtures"
           - "make check"
+        codex_validation_report: "created draft PR https://github.com/maxkulish/loker/pull/14"
     codex_fix_rounds: 0
-    codex_checks: []
+    codex_checks:
+      - "make check"
     codex_unresolved_threads: []
 
   complete:
@@ -129,3 +131,7 @@ history:
     action: commit_created
     phase: pr
     details: "Created commit b1161f8: feat(CLO-258): implement Strategy::EscalatingRetry walker."
+  - timestamp: "2026-04-27T14:40:44Z"
+    action: pr_created
+    phase: pr
+    details: "Created draft PR #14 at https://github.com/maxkulish/loker/pull/14."

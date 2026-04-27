@@ -8,7 +8,7 @@
 - [x] Implementation
 - [x] Validation
 - [x] Pre-PR review
-- [~] PR
+- [x] PR
 
 ## Architecture Context
 
