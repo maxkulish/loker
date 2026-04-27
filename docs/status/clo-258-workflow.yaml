@@ -79,7 +79,7 @@ phases:
     approved: false
     ci_passed: false
     codex_validation:
-      - commit: "ad19b78"
+      - commit: "b1161f8"
         action: commit_created
         checks:
           - "cargo test -q strategy::"
@@ -128,4 +128,4 @@ history:
   - timestamp: "2026-04-27T14:38:55Z"
     action: commit_created
     phase: pr
-    details: "Created commit ad19b78: feat(CLO-258): implement Strategy::EscalatingRetry walker."
+    details: "Created commit b1161f8: feat(CLO-258): implement Strategy::EscalatingRetry walker."
