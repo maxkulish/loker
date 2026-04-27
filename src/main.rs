@@ -1168,6 +1168,7 @@ async fn run_workflow(
 ) -> Result<()> {
     let source = workflow::find_workflow(name).await?;
     let wf = workflow::load_workflow_from_source(source).await?;
+    wf.validate_with_capabilities(crate::backend::capabilities_for_name)?;
 
     let cwd = crate::utils::canonicalize_async(dir).await;
     let runner = workflow::WorkflowRunner::new(config.clone(), cwd, args)
@@ -1485,6 +1486,7 @@ async fn list_workflows() -> Result<()> {
 
 async fn validate_workflow(path: &Path) -> Result<()> {
     let wf = workflow::load_workflow(path).await?;
+    wf.validate_with_capabilities(crate::backend::capabilities_for_name)?;
 
     println!("{} {}", "✓".green(), "Workflow is valid".bold());
     println!();

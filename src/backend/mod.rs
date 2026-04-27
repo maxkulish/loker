@@ -249,6 +249,61 @@ impl QueryOutput {
     }
 }
 
+/// Declares which optional features a `Backend` actually wires up *today*.
+///
+/// PRD FR-4 (CLO-251). Each field is honest about current implementation, not
+/// upstream API potential — flip a flag only when the corresponding code path
+/// is wired (e.g. `tool_use` flips when tools are actually passed through
+/// `query()`; `streaming` flips when `query()` consumes a streaming response).
+///
+/// Marked `#[non_exhaustive]` so a future capability (e.g. `parallel_tools`)
+/// can be added without breaking source compatibility for downstream
+/// consumers. Construct via `BackendCapabilities::none()` and field updates,
+/// not struct literals.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendCapabilities {
+    pub tool_use: bool,
+    pub streaming: bool,
+    pub file_edit: bool,
+}
+
+impl BackendCapabilities {
+    /// All-false constructor. Default for `Backend::capabilities()` so
+    /// out-of-tree implementors compile without source changes; safest
+    /// honest baseline for a backend that has not opted in.
+    pub const fn none() -> Self {
+        Self {
+            tool_use: false,
+            streaming: false,
+            file_edit: false,
+        }
+    }
+}
+
+/// Static name -> capabilities lookup mirroring each backend's `capabilities()`
+/// impl. Returns `None` for unknown names so `validate_with_capabilities`
+/// rejects demands via `MissingCapability`. Keep this mapping in sync with
+/// each backend's `capabilities()` implementation; the per-backend
+/// `capabilities_match_current_wiring` tests pin each `capabilities()` against
+/// its struct literal, and `capabilities_for_name_matches_*` tests in this
+/// module pin the entries here against the same expected struct.
+pub fn capabilities_for_name(name: &str) -> Option<BackendCapabilities> {
+    match name {
+        "tensorzero" | "claude" | "codex" | "gemini" => Some(BackendCapabilities {
+            file_edit: true,
+            ..BackendCapabilities::none()
+        }),
+        "ollama" => Some(BackendCapabilities::none()),
+        #[cfg(feature = "bedrock")]
+        "bedrock" => Some(BackendCapabilities {
+            file_edit: true,
+            ..BackendCapabilities::none()
+        }),
+        _ => None,
+    }
+}
+
 #[async_trait]
 pub trait Backend: Send + Sync {
     fn name(&self) -> &str;
@@ -259,6 +314,17 @@ pub trait Backend: Send + Sync {
         model: Option<&str>,
     ) -> std::result::Result<QueryOutput, BackendError>;
     fn is_available(&self) -> bool;
+
+    /// Declares which optional features this backend actually supports today.
+    /// Default returns `BackendCapabilities::none()` so out-of-tree backends
+    /// compile without modification; in-tree backends override with honest
+    /// values reflecting current wiring. Production validation reads via the
+    /// static `capabilities_for_name` lookup; this method is the FR-4 trait
+    /// surface and is exercised by per-backend pinning tests.
+    #[allow(dead_code)]
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities::none()
+    }
 }
 
 pub struct QueryResult {
@@ -858,6 +924,69 @@ mod tests {
             exit_code: Some(1),
         };
         assert_eq!(err.to_string(), "execution failed: process exited");
+    }
+
+    #[test]
+    fn backend_capabilities_none_is_all_false() {
+        let caps = BackendCapabilities::none();
+        assert!(!caps.tool_use);
+        assert!(!caps.streaming);
+        assert!(!caps.file_edit);
+    }
+
+    #[test]
+    fn default_capabilities_are_none() {
+        struct Stub;
+        #[async_trait]
+        impl Backend for Stub {
+            fn name(&self) -> &str {
+                "stub"
+            }
+            async fn query(
+                &self,
+                _prompt: &str,
+                _cwd: &Path,
+                _model: Option<&str>,
+            ) -> std::result::Result<QueryOutput, BackendError> {
+                unreachable!("test-only stub")
+            }
+            fn is_available(&self) -> bool {
+                false
+            }
+        }
+        assert_eq!(Stub.capabilities(), BackendCapabilities::none());
+    }
+
+    #[test]
+    fn capabilities_for_name_unknown_returns_none() {
+        assert!(capabilities_for_name("deepseek").is_none());
+        assert!(capabilities_for_name("").is_none());
+    }
+
+    #[test]
+    fn capabilities_for_name_matches_static_expectations() {
+        // Pin every name in the lookup against a struct literal. Per-backend
+        // `capabilities_match_current_wiring` tests pin each `capabilities()`
+        // impl to the same expected values, so any drift on one side surfaces
+        // here or there.
+        let edit_capable = BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        };
+        assert_eq!(
+            capabilities_for_name("tensorzero"),
+            Some(edit_capable.clone())
+        );
+        assert_eq!(capabilities_for_name("claude"), Some(edit_capable.clone()));
+        assert_eq!(capabilities_for_name("codex"), Some(edit_capable.clone()));
+        assert_eq!(capabilities_for_name("gemini"), Some(edit_capable.clone()));
+        assert_eq!(
+            capabilities_for_name("ollama"),
+            Some(BackendCapabilities::none())
+        );
+        #[cfg(feature = "bedrock")]
+        assert_eq!(capabilities_for_name("bedrock"), Some(edit_capable));
     }
 
     #[test]

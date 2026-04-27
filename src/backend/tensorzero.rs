@@ -43,6 +43,18 @@ pub struct TensorZeroBackend {
 }
 
 impl TensorZeroBackend {
+    /// Static capability advertisement for `tensorzero`. Mirrors the body of
+    /// `Backend::capabilities()` below and the entry in
+    /// `crate::backend::capabilities_for_name`. Exposing it as a constant lets
+    /// the pinning test assert the values without constructing a backend
+    /// (which requires a `TensorZeroConfig` literal that has tripped CI's
+    /// fresh stable-x86_64 rustc with a fuzzy E0422 import suggestion).
+    pub(crate) const CAPABILITIES: super::BackendCapabilities = super::BackendCapabilities {
+        tool_use: false,
+        streaming: false,
+        file_edit: true,
+    };
+
     pub fn new(cfg: TensorZeroBackendOpts) -> Result<Self, BackendError> {
         let endpoint = Endpoint::from_owned(normalize_endpoint(&cfg.endpoint));
         let auth = AuthData::from_single(cfg.api_key.clone().unwrap_or_default());
@@ -114,6 +126,14 @@ impl Backend for TensorZeroBackend {
         // Server-side gateway. We don't probe synchronously; runtime call
         // surfaces connectivity errors as `BackendError::Network`.
         true
+    }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // genai `exec_chat` (non-streaming), no tool param wired today; the
+        // gateway forwards to capable models, but the call site is single-shot.
+        // `file_edit=true` because Claude/Sonnet-class models behind the
+        // gateway reliably emit JSON edit blocks.
+        Self::CAPABILITIES
     }
 }
 
@@ -386,6 +406,21 @@ mod tests {
             "expected Timeout, got {err:?}"
         );
         assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        // Pin the const that `Backend::capabilities()` returns, without
+        // constructing `TensorZeroBackend`. Matches the bedrock pattern at
+        // `bedrock.rs:269-282`.
+        assert_eq!(
+            TensorZeroBackend::CAPABILITIES,
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
     }
 
     #[test]

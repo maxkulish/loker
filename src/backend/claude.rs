@@ -306,6 +306,17 @@ impl super::Backend for ClaudeBackend {
             ClaudeMode::Cli { command, .. } => which::which(command).is_ok(),
         }
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // API: single-shot messages call, no `tools` param wired today, no SSE.
+        // CLI: `claude -p` is single-shot text in/out, no streaming, no tools.
+        // Both modes target Claude models that reliably emit JSON edit blocks.
+        super::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -337,5 +348,24 @@ mod tests {
         assert_eq!(parsed.content.len(), 1);
         assert!(parsed.model.is_none());
         assert!(parsed.usage.is_none());
+    }
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        use super::super::Backend;
+        let backend = ClaudeBackend {
+            mode: ClaudeMode::Cli {
+                command: "claude".to_string(),
+                model: None,
+            },
+        };
+        assert_eq!(
+            backend.capabilities(),
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
     }
 }

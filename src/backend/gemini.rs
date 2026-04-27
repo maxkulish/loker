@@ -121,4 +121,39 @@ impl super::Backend for GeminiBackend {
     fn is_available(&self) -> bool {
         which::which(&self.command).is_ok()
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // CLI subprocess: `echo '' | npx @google/gemini-cli '<prompt>'`. Single
+        // shell invocation, output buffered then parsed. No tool turn surface,
+        // no streaming. Gemini models reliably emit JSON edit blocks.
+        super::BackendCapabilities {
+            tool_use: false,
+            streaming: false,
+            file_edit: true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        use super::super::Backend;
+        let backend = GeminiBackend {
+            command: "npx".to_string(),
+            args: vec!["@google/gemini-cli".to_string()],
+            skip_lines: 0,
+            default_model: None,
+        };
+        assert_eq!(
+            backend.capabilities(),
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
+    }
 }

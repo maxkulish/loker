@@ -88,6 +88,18 @@ pub enum ResponseBlock {
 }
 
 impl BedrockBackend {
+    /// Static capability advertisement for `bedrock`. Mirrors the body of
+    /// `Backend::capabilities()` below and the entry in
+    /// `crate::backend::capabilities_for_name`. Exposing it as a constant lets
+    /// the pinning test assert the values without invoking
+    /// `BedrockBackend::new`, which would call into the AWS SDK during
+    /// `cargo test`.
+    pub(crate) const CAPABILITIES: super::BackendCapabilities = super::BackendCapabilities {
+        tool_use: false,
+        streaming: false,
+        file_edit: true,
+    };
+
     pub async fn new(config: &BackendConfig) -> Result<Self> {
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let client = Client::new(&aws_config);
@@ -210,6 +222,14 @@ impl super::Backend for BedrockBackend {
             ))
             .exists()
     }
+
+    fn capabilities(&self) -> super::BackendCapabilities {
+        // `query()` always invokes `invoke_with_messages_model` with `tools:
+        // None` (line 171). The InvokeModel API is non-streaming. Default
+        // model is a Claude Sonnet variant that reliably emits JSON edit
+        // blocks.
+        Self::CAPABILITIES
+    }
 }
 
 #[cfg(test)]
@@ -244,5 +264,20 @@ mod tests {
         let parsed: BedrockResponse = serde_json::from_str(json).expect("should parse");
         assert!(parsed.model.is_none());
         assert!(parsed.usage.is_none());
+    }
+
+    #[test]
+    fn capabilities_match_current_wiring() {
+        // Pin the const that `Backend::capabilities()` returns, without
+        // constructing `BedrockBackend` (which would invoke the AWS SDK
+        // configuration loader during `cargo test`).
+        assert_eq!(
+            BedrockBackend::CAPABILITIES,
+            super::super::BackendCapabilities {
+                tool_use: false,
+                streaming: false,
+                file_edit: true,
+            }
+        );
     }
 }
