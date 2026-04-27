@@ -18,7 +18,7 @@
 use crate::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use crate::template::{TemplateContext, TemplateEngine, TemplateError};
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 

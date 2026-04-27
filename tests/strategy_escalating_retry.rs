@@ -8,7 +8,7 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -28,6 +28,7 @@ const SCHEMA_PATH: &str = "docs/schemas/phase_result_escalating.schema.json";
 struct MockBackend {
     name: String,
     calls: AtomicUsize,
+    prompts: Mutex<Vec<String>>,
     response: Box<dyn Fn() -> Result<QueryOutput, BackendError> + Send + Sync>,
 }
 
@@ -39,6 +40,7 @@ impl MockBackend {
         Arc::new(Self {
             name: name.to_string(),
             calls: AtomicUsize::new(0),
+            prompts: Mutex::new(Vec::new()),
             response: Box::new(move || {
                 Ok(QueryOutput::from_text(
                     text_owned.clone(),
@@ -59,12 +61,17 @@ impl MockBackend {
         Arc::new(Self {
             name: name.to_string(),
             calls: AtomicUsize::new(0),
+            prompts: Mutex::new(Vec::new()),
             response: Box::new(move || Err(err())),
         })
     }
 
     fn calls(&self) -> usize {
         self.calls.load(Ordering::SeqCst)
+    }
+
+    fn last_prompt(&self) -> Option<String> {
+        self.prompts.lock().unwrap().last().cloned()
     }
 }
 
@@ -76,11 +83,12 @@ impl Backend for MockBackend {
 
     async fn query(
         &self,
-        _prompt: &str,
+        prompt: &str,
         _cwd: &Path,
         _model: Option<&str>,
     ) -> Result<QueryOutput, BackendError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        self.prompts.lock().unwrap().push(prompt.to_string());
         (self.response)()
     }
 
@@ -364,6 +372,179 @@ fn missing_backend_in_pool_returns_backend_not_found() {
 
     let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
     assert!(matches!(err, StrategyError::BackendNotFound { name } if name == "absent"));
+}
+
+// ---------------------------------------------------------------------------
+// CLO-260: pass_failure_context wiring
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pass_failure_context_off_passes_bare_prompt() {
+    let cheap = MockBackend::ok("cheap", "cheap-model", "bad");
+    let medium = MockBackend::ok("medium", "medium-model", "good");
+    let backends: Vec<Arc<dyn Backend>> = vec![cheap.clone(), medium.clone()];
+
+    let strategy = EscalatingRetry::new(
+        vec![
+            Rung::new(Tier::Cheap, "cheap"),
+            Rung::new(Tier::Medium, "medium"),
+        ],
+        "render-me",
+        SequenceVerify::new(vec![
+            Ok(VerifyResult::fail("expected JSON object, got prose")),
+            Ok(VerifyResult::pass()),
+        ]),
+    )
+    .with_pass_failure_context(false);
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.attempts.len(), 2);
+    assert_eq!(medium.last_prompt(), Some("render-me".to_string()));
+    assert_eq!(cheap.last_prompt(), Some("render-me".to_string()));
+}
+
+#[test]
+fn pass_failure_context_on_after_verify_fail() {
+    let cheap = MockBackend::ok("cheap", "cheap-model", "bad");
+    let medium = MockBackend::ok("medium", "medium-model", "good");
+    let backends: Vec<Arc<dyn Backend>> = vec![cheap.clone(), medium.clone()];
+
+    let strategy = EscalatingRetry::new(
+        vec![
+            Rung::new(Tier::Cheap, "cheap"),
+            Rung::new(Tier::Medium, "medium"),
+        ],
+        "render-me",
+        SequenceVerify::new(vec![
+            Ok(VerifyResult::fail("expected JSON object, got prose")),
+            Ok(VerifyResult::pass()),
+        ]),
+    )
+    .with_pass_failure_context(true);
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.attempts.len(), 2);
+
+    let prompt = medium.last_prompt().unwrap();
+    assert!(prompt.starts_with("<previous-attempt>\n  tier: cheap\n  backend: cheap"));
+    assert!(prompt.contains("<original-prompt>\nrender-me\n</original-prompt>"));
+}
+
+#[test]
+fn pass_failure_context_on_after_backend_error() {
+    let cheap = MockBackend::fail("cheap", || BackendError::Timeout {
+        message: "timed out".to_string(),
+        elapsed_ms: 5000,
+    });
+    let medium = MockBackend::ok("medium", "medium-model", "good");
+    let backends: Vec<Arc<dyn Backend>> = vec![cheap.clone(), medium.clone()];
+
+    let strategy = EscalatingRetry::new(
+        vec![
+            Rung::new(Tier::Cheap, "cheap"),
+            Rung::new(Tier::Medium, "medium"),
+        ],
+        "render-me",
+        SequenceVerify::new(vec![Ok(VerifyResult::pass())]),
+    )
+    .with_pass_failure_context(true);
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.attempts.len(), 2);
+
+    let prompt = medium.last_prompt().unwrap();
+    assert!(prompt.contains("verify_reason: null"));
+    assert!(prompt.contains(r#"backend_error: "Timeout""#));
+    assert!(prompt.contains("response_excerpt: null"));
+}
+
+#[test]
+fn pass_failure_context_truncates_large_body() {
+    let huge = "x".repeat(100_000);
+    let cheap = MockBackend::ok("cheap", "cheap-model", &huge);
+    let medium = MockBackend::ok("medium", "medium-model", "good");
+    let backends: Vec<Arc<dyn Backend>> = vec![cheap.clone(), medium.clone()];
+
+    let strategy = EscalatingRetry::new(
+        vec![
+            Rung::new(Tier::Cheap, "cheap"),
+            Rung::new(Tier::Medium, "medium"),
+        ],
+        "render-me",
+        SequenceVerify::new(vec![
+            Ok(VerifyResult::fail("too long")),
+            Ok(VerifyResult::pass()),
+        ]),
+    )
+    .with_pass_failure_context(true);
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.attempts.len(), 2);
+
+    let prompt = medium.last_prompt().unwrap();
+    assert!(prompt.len() <= 8192);
+    assert!(prompt.contains("…[truncated,"));
+}
+
+#[test]
+fn pass_failure_context_redacts_secrets() {
+    let body = "api_key=AKIA0123456789ABCDEF and Bearer eyJhbGciOiJIUzI1NiIsInR5cCI";
+    let cheap = MockBackend::ok("cheap", "cheap-model", body);
+    let medium = MockBackend::ok("medium", "medium-model", "good");
+    let backends: Vec<Arc<dyn Backend>> = vec![cheap.clone(), medium.clone()];
+
+    let strategy = EscalatingRetry::new(
+        vec![
+            Rung::new(Tier::Cheap, "cheap"),
+            Rung::new(Tier::Medium, "medium"),
+        ],
+        "render-me",
+        SequenceVerify::new(vec![
+            Ok(VerifyResult::fail("bad")),
+            Ok(VerifyResult::pass()),
+        ]),
+    )
+    .with_pass_failure_context(true);
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.attempts.len(), 2);
+
+    let prompt = medium.last_prompt().unwrap();
+    assert!(prompt.contains("[REDACTED]"));
+    // The literal secrets should NOT appear
+    assert!(!prompt.contains("AKIA0123456789ABCDEF"));
+    assert!(!prompt.contains("eyJhbGciOiJIUzI1NiIsInR5cCI"));
+}
+
+#[test]
+fn pass_failure_context_three_rung_chain() {
+    let cheap = MockBackend::ok("cheap", "cheap-model", "a");
+    let medium = MockBackend::ok("medium", "medium-model", "b");
+    let strong = MockBackend::ok("strong", "strong-model", "c");
+    let backends: Vec<Arc<dyn Backend>> = vec![cheap.clone(), medium.clone(), strong.clone()];
+
+    let strategy = EscalatingRetry::new(
+        vec![
+            Rung::new(Tier::Cheap, "cheap"),
+            Rung::new(Tier::Medium, "medium"),
+            Rung::new(Tier::Strong, "strong"),
+        ],
+        "render-me",
+        SequenceVerify::new(vec![
+            Ok(VerifyResult::fail("rung 1 fail")),
+            Ok(VerifyResult::fail("rung 2 fail")),
+            Ok(VerifyResult::pass()),
+        ]),
+    )
+    .with_pass_failure_context(true);
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.attempts.len(), 3);
+
+    let prompt = strong.last_prompt().unwrap();
+    // Should reference rung 2 failure, NOT rung 1
+    assert!(prompt.contains("rung 2 fail"));
+    assert!(!prompt.contains("rung 1 fail"));
 }
 
 fn load_schema() -> Validator {

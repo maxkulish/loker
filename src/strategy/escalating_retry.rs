@@ -15,8 +15,8 @@
 use crate::backend::Backend;
 use crate::strategy::{
     pick_model, Attempt, BackendError, FinalStatus, FinishReason, PhaseContext, Prompt, Strategy,
-    StrategyError, StrategyKind, StrategyOutput, Tier, TokenUsageReport, VerifyError, VerifyHook,
-    VerifyOutcome, VerifyResult, SCHEMA_VERSION,
+    StrategyError, StrategyKind, StrategyOutput, Tier, TokenUsageReport, VerifyHook, VerifyOutcome,
+    VerifyResult, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
 use regex::Regex;
@@ -33,7 +33,7 @@ const MAX_FAILURE_CONTEXT_BYTES: usize = 8192;
 
 /// Single rung of the ladder: which tier this slot represents and which
 /// backend (matched against `Backend::name()`) should serve it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rung {
     pub tier: Tier,
     pub backend: String,
@@ -83,9 +83,8 @@ impl FailureContext {
         response: Option<impl Into<String>>,
     ) -> Self {
         let reason = redact_secrets(&reason.into());
-        let response_excerpt = response.map(|r| {
-            truncate_excerpt(&redact_secrets(&r.into()), MAX_RESPONSE_EXCERPT_BYTES)
-        });
+        let response_excerpt = response
+            .map(|r| truncate_excerpt(&redact_secrets(&r.into()), MAX_RESPONSE_EXCERPT_BYTES));
         Self {
             previous_tier: tier,
             previous_backend: backend.into(),
@@ -144,13 +143,12 @@ pub fn redact_secrets(input: &str) -> String {
     result = aws.replace_all(&result, "[REDACTED]").to_string();
 
     // Pattern 2: generic key=value (case-insensitive; redacts only the value side)
-    let key_val = Regex::new(r"(?i)((?:api[_-]?key|secret|token|password)\s*[=:]\s*)[^\s'\"]+")
+    let key_val = Regex::new(r#"(?i)((?:api[_-]?key|secret|token|password)\s*[=:]\s*)[^\s'\"]+"#)
         .expect("valid regex");
     result = key_val.replace_all(&result, "${1}[REDACTED]").to_string();
 
     // Pattern 3: Bearer tokens
-    let bearer = Regex::new(r"(?i)Bearer\s+[A-Za-z0-9._\-~+/=]+")
-        .expect("valid regex");
+    let bearer = Regex::new(r"(?i)Bearer\s+[A-Za-z0-9._\-~+/=]+").expect("valid regex");
     result = bearer.replace_all(&result, "[REDACTED]").to_string();
 
     // Pattern 4: heuristic – long base64-ish blob preceded by key/secret/token
@@ -189,10 +187,7 @@ pub fn build_failure_envelope(ctx: &FailureContext, body: &str) -> String {
             ctx.response_excerpt.as_deref().unwrap_or(""),
             excerpt_budget,
         );
-        let verify = truncate_excerpt(
-            ctx.verify_reason.as_deref().unwrap_or(""),
-            verify_cap,
-        );
+        let verify = truncate_excerpt(ctx.verify_reason.as_deref().unwrap_or(""), verify_cap);
         let err = ctx.backend_error_class.as_deref().unwrap_or("null");
         let verify_field = if ctx.verify_reason.is_some() {
             format!("{:?}", verify)
@@ -221,8 +216,7 @@ pub fn build_failure_envelope(ctx: &FailureContext, body: &str) -> String {
             body,
         );
 
-        if envelope.len() <= MAX_FAILURE_CONTEXT_BYTES
-            || (excerpt_budget == 0 && verify_cap <= 64)
+        if envelope.len() <= MAX_FAILURE_CONTEXT_BYTES || (excerpt_budget == 0 && verify_cap <= 64)
         {
             return envelope;
         }
@@ -312,12 +306,13 @@ impl Strategy for EscalatingRetry {
             // Build the prompt for this rung. Rung 1 always gets the bare
             // rendered prompt. Later rungs get the failure envelope prepended
             // when the flag is on and there is a previous failure.
-            let rung_prompt = if idx > 0
-                && self.pass_failure_context
-                && let Some(ref fail_ctx) = previous_failure
-            {
-                let envelope = build_failure_envelope(fail_ctx, &rendered);
-                redact_secrets(&envelope)
+            let rung_prompt = if idx > 0 && self.pass_failure_context {
+                if let Some(ref fail_ctx) = previous_failure {
+                    let envelope = build_failure_envelope(fail_ctx, &rendered);
+                    redact_secrets(&envelope)
+                } else {
+                    rendered.clone()
+                }
             } else {
                 rendered.clone()
             };
@@ -376,7 +371,7 @@ impl Strategy for EscalatingRetry {
                                 rung.tier,
                                 backend.name(),
                                 reason,
-                                Some(query.text.clone()),
+                                Some(query.stdout.clone()),
                             ));
                         }
                         Err(verify_err) => {
@@ -398,7 +393,7 @@ impl Strategy for EscalatingRetry {
                                 rung.tier,
                                 backend.name(),
                                 &verify_err.message,
-                                Some(query.text.clone()),
+                                Some(query.stdout.clone()),
                             ));
                         }
                     }
@@ -424,12 +419,11 @@ impl Strategy for EscalatingRetry {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    previous_failure =
-                        Some(FailureContext::from_backend_error(
-                            rung.tier,
-                            &rung.backend,
-                            &err,
-                        ));
+                    previous_failure = Some(FailureContext::from_backend_error(
+                        rung.tier,
+                        &rung.backend,
+                        &err,
+                    ));
                 }
             }
         }
@@ -476,10 +470,7 @@ mod tests {
     #[test]
     fn redaction_long_blob_heuristic() {
         let s = "token abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678 extra";
-        assert_eq!(
-            redact_secrets(s),
-            "token [REDACTED] extra"
-        );
+        assert_eq!(redact_secrets(s), "token [REDACTED] extra");
     }
 
     #[test]
@@ -496,8 +487,8 @@ mod tests {
     #[test]
     fn truncate_multibyte_safe() {
         // 🎉 is 4 bytes; place it right at the 5-byte boundary.
-        let s = "ab🎉cd";
-        assert_eq!(truncate_excerpt(s, 5), "ab …[truncated, 4 bytes elided]");
+        let s = "ab🎉cd"; // 8 bytes total
+        assert_eq!(truncate_excerpt(s, 5), "ab …[truncated, 6 bytes elided]");
     }
 
     #[test]
@@ -523,12 +514,8 @@ mod tests {
     #[test]
     fn envelope_over_budget_truncates_excerpt() {
         let huge = "x".repeat(100_000);
-        let ctx = FailureContext::from_verify_fail(
-            Tier::Cheap,
-            "ollama-local",
-            "fail",
-            Some(&huge),
-        );
+        let ctx =
+            FailureContext::from_verify_fail(Tier::Cheap, "ollama-local", "fail", Some(&huge));
         let out = build_failure_envelope(&ctx, "prompt");
         assert!(out.len() <= MAX_FAILURE_CONTEXT_BYTES);
         assert!(out.contains("…[truncated,"));
@@ -536,12 +523,7 @@ mod tests {
 
     #[test]
     fn envelope_verify_reason_only_when_no_response() {
-        let ctx = FailureContext::from_verify_fail::<String>(
-            Tier::Cheap,
-            "backend",
-            "bad",
-            None,
-        );
+        let ctx = FailureContext::from_verify_fail(Tier::Cheap, "backend", "bad", None::<String>);
         let out = build_failure_envelope(&ctx, "p");
         assert!(out.contains("response_excerpt: null"));
         assert!(out.contains(r#"verify_reason: "bad""#));
