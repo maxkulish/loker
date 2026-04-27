@@ -28,10 +28,10 @@ linear:
     - "CLO-248 (T-006 wiremock unit-test contract for tensorzero) - merged 2026-04-26 (Done)"
 
 workflow:
-  current_phase: implement
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: "2026-04-27T12:00:00Z"
-  updated_at: "2026-04-27T15:20:00Z"
+  updated_at: "2026-04-27T14:35:00Z"
 
 phases:
   discovery:
@@ -67,11 +67,18 @@ phases:
     applied_suggestions: []
     flagged_suggestions: []
   implement:
-    status: in_progress
+    status: complete
   pr:
-    status: pending
+    status: complete
+    pr_number: 13
+    pr_url: "https://github.com/maxkulish/loker/pull/13"
+    merged_at: "2026-04-27T14:30:14Z"
+    merge_commit: "8a5ec476be6e4237884b07c7bea1fc78b955df80"
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_files_skip_reason: "No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo (consistent with CLO-247/248/249/250/251/252)."
+    merged_at: "2026-04-27T14:30:14Z"
 
 history:
   - timestamp: "2026-04-27T12:00:00Z"
@@ -95,3 +102,45 @@ history:
     action: phase_completed
     phase: spec
     details: "Transitioning spec -> implement. Skipping plan phase (spec decomposition IS the plan)."
+  - timestamp: "2026-04-27T13:30:00Z"
+    action: implementation_complete
+    phase: implement
+    details: |
+      ST1-ST4 landed. Strategy trait + Prompt + PhaseContext + StrategyOutput
+      + Attempt + FinishReason + TokenUsageReport + VerifyOutcome + StrategyError
+      in src/strategy/mod.rs. SingleModel variant in src/strategy/single_model.rs.
+      Schema docs/schemas/phase_result_single.schema.json. 9 mock-backend tests
+      in tests/strategy_single_model.rs cover happy path, error pass-through,
+      no-retry, no-aggregation, schema validation, prompt render failure,
+      backend-not-found, empty backends, missing usage zeroes, model override.
+      make check green: 547 tests pass (524 lib + 9 strategy + 6 integration +
+      1 schema + 7 tensorzero).
+  - timestamp: "2026-04-27T13:45:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #13 opened: https://github.com/maxkulish/loker/pull/13 (feat(CLO-257): Strategy trait + SingleModel (FR-5))."
+  - timestamp: "2026-04-27T14:10:00Z"
+    action: review_addressed
+    phase: pr
+    details: |
+      Addressed 7 PR review comments (3 Copilot, 4 Gemini), pushed 3f09154,
+      replied to all 7 with /gemini review trailer (Replies Posted: 7/7).
+      Fixes: (a) src/lib.rs reverted to public-only surface with #![allow(dead_code)]
+      at lib root; (b) src/strategy/mod.rs dropped Prompt.template field, added
+      PhaseContext.cwd, renamed new_for_test -> new, simplified pick_model;
+      (c) src/strategy/single_model.rs threads ctx.cwd into backend.query,
+      tightened usage extraction; (d) tests/strategy_single_model.rs updated
+      to PhaseContext::new / Prompt::new() / Prompt::with_model builder shape,
+      jsonschema Draft202012 builder pattern. make check green.
+  - timestamp: "2026-04-27T14:30:14Z"
+    action: pr_merged
+    phase: pr
+    details: "PR #13 merged to main. Merge commit 8a5ec47."
+  - timestamp: "2026-04-27T14:35:00Z"
+    action: workflow_complete
+    phase: complete
+    details: |
+      Task CLO-257 fully completed. PR #13 merged, workflow YAML committed
+      to main. Aggregation files skipped (none exist in repo). Unblocks
+      CLO-259 (ParallelFanOut shares the trait) and T-029 (phase runner
+      consumes strategy outputs).
