@@ -37,6 +37,7 @@ help:
 	@echo "  make sync                          - Pull latest from upstream into main"
 	@echo "  make feature NAME=my-feature       - Create feature branch from main"
 	@echo "  make merge                         - Merge current feature branch into main"
+	@echo "  make pi-init                       - Install npm deps for .pi extensions"
 	@echo ""
 	@echo "Release:"
 	@echo "  make release                       - Auto-version release ($(VERSION))"
@@ -70,10 +71,13 @@ clean:
 	cargo clean
 
 pi-init:
-	@for d in .pi/extensions/*/; do \
-		if [ -f "$$d/package.json" ]; then \
-			echo "Installing deps in $$d"; \
-			(cd "$$d" && npm install --silent) || exit 1; \
+	@for ext in .pi/extensions/*/package.json; do \
+		dir=$$(dirname $$ext); \
+		echo "Installing deps in $$dir..."; \
+		if [ -f "$$dir/package-lock.json" ]; then \
+			(cd $$dir && npm ci --silent); \
+		else \
+			(cd $$dir && npm install --silent); \
 		fi; \
 	done
 	@echo "Pi extensions ready"

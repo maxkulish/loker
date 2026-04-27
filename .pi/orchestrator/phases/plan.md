@@ -17,15 +17,10 @@ phases:
 
 History events required: `plan_created`, `plan_approved`.
 
-## Step 1 - Run /plan:create (if available)
+## Step 1 - Build the plan document
 
-If the slash command is available in this environment:
-
-```
-/plan:create CLO-XX
-```
-
-Otherwise build the plan manually with this structure:
+Pi has no `/plan:create` slash command. Build the plan manually at
+`docs/plans/clo-XX-<slug>.md` using this structure:
 
 ```markdown
 # Plan: CLO-XX <title>

@@ -54,15 +54,12 @@ update_workflow_state({
 })
 ```
 
-## Optional - run /project:sync --block
+## Project sync block
 
-If aggregation files exist:
-
-```
-/project:sync --block CLO-XX "<blocker>"
-```
-
-Otherwise skip with a logged reason.
+Pi has no `/project:sync` slash command, and the loker repo has no
+aggregation files (`PROJECT.md` / `ROADMAP.md` / `DEPENDENCIES.md`). The
+blocker is already recorded in the workflow YAML and on the Linear
+issue - that is the canonical record. No further sync step.
 
 ## Clearing the block
 
