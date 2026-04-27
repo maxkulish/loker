@@ -71,12 +71,14 @@ when `LOKER_TZ_INTEGRATION` is unset, so plain `cargo test` is unaffected.
 To run it:
 
 1. `cd tensorzero && docker compose up -d` to start the Tier-2 stack.
-2. Wait for `curl -fsS http://localhost:3000/health` to return 200.
+2. Wait for `curl -fsS "${TENSORZERO_GATEWAY_URL:-http://localhost:3000}/health"`
+   to return 200.
 3. `LOKER_TZ_INTEGRATION=1 cargo test --test tensorzero_integration`.
 4. Optional overrides: `TENSORZERO_GATEWAY_URL` (default
    `http://localhost:3000`), `LOKER_TZ_INTEGRATION_FUNCTION` (default
-   `loker_d1_openai`), `TENSORZERO_API_KEY` (any non-empty Bearer; the
-   gateway accepts any value, upstream provider enforces auth).
+   `loker_d1_openai`), `TENSORZERO_API_KEY` (any non-empty token - the
+   `genai` client prepends `Bearer ` automatically; the gateway accepts any
+   value, upstream provider enforces auth).
 
 ## Function-name family convention (TensorZero, M1)
 

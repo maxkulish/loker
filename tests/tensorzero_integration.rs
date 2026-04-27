@@ -39,11 +39,17 @@ fn integration_enabled() -> bool {
 }
 
 fn gateway_url() -> String {
-    env::var("TENSORZERO_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_GATEWAY_URL.to_string())
+    env::var("TENSORZERO_GATEWAY_URL")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_GATEWAY_URL.to_string())
 }
 
 fn function_name() -> String {
-    env::var("LOKER_TZ_INTEGRATION_FUNCTION").unwrap_or_else(|_| DEFAULT_FUNCTION.to_string())
+    env::var("LOKER_TZ_INTEGRATION_FUNCTION")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_FUNCTION.to_string())
 }
 
 fn api_key() -> Option<String> {
@@ -85,14 +91,15 @@ async fn tz_integration_round_trip_via_loker_d1_openai() {
         "gateway returned empty assistant content"
     );
 
+    // `TensorZeroBackend::query` populates `QueryOutput.model` from the
+    // *effective input* (the configured function name / per-call override),
+    // not the gateway's echoed response `model` field. Pin that contract so a
+    // future change that switches to propagating the response echo trips this
+    // assertion deliberately.
     let model = out.model.as_deref().expect("response model field was None");
-    assert!(
-        model.starts_with("tensorzero::function_name::"),
-        "expected model to start with 'tensorzero::function_name::', got {model:?}"
-    );
-    assert!(
-        model.contains(&function),
-        "expected model to contain function name {function:?}, got {model:?}"
+    assert_eq!(
+        model, function,
+        "expected QueryOutput.model to equal the effective input function {function:?}, got {model:?}"
     );
 
     let usage = out.usage.as_ref().expect("usage block missing");
