@@ -85,7 +85,6 @@ phases:
           - "cargo test -q strategy::"
           - "cargo test -q run_artefact_schemas_validate_their_fixtures"
           - "make check"
-        codex_validation_report: "created draft PR https://github.com/maxkulish/loker/pull/14"
     codex_fix_rounds: 0
     codex_checks:
       - "make check"
