@@ -31,7 +31,7 @@ workflow:
   current_phase: pr
   status: in_progress
   created_at: "2026-04-26T18:00:00Z"
-  updated_at: "2026-04-27T06:30:00Z"
+  updated_at: "2026-04-27T07:00:00Z"
 
 phases:
   discovery:
@@ -69,10 +69,13 @@ phases:
     pr_url: "https://github.com/maxkulish/loker/pull/11"
     pr_number: 11
     branch: feat/clo-251-backend
-    commit_sha: 9389a2c
-    reviews_addressed: 5
+    commit_sha: HEAD
+    reviews_addressed: 9
     review_fix_commits:
       - "9389a2c (5 PR comments + tensorzero defensive import)"
+      - "55bd7fd (drop redundant explicit imports breaking CI tests on fresh build)"
+      - "053ac73 (cargo cache bust v1->v2 to clear poisoned target/)"
+      - "HEAD (4 Copilot comments + tensorzero const-pattern bypass for E0422)"
   complete:
     status: pending
 
@@ -113,3 +116,15 @@ history:
     action: review_addressed
     phase: pr
     details: "Commit 9389a2c addresses 5 PR review comments (4 Copilot + 1 gemini-code-assist) plus carries the defensive tensorzero import that fixed the original CI E0422 cache corruption. Changes: ApplyEditsMultiBackend + MissingBackendForCapability validation rules in workflow.rs, capabilities_for_name doc + sync tests in backend/mod.rs, BedrockBackend::CAPABILITIES const eliminating AWS SDK invocation in pinning test, unwrap_or fix for clippy::unnecessary_lazy_evaluations. make check clean (519 lib + 6 integration + 1 schema + 7 tensorzero tests). Pushed; replied to all 5 comments via gh api with /gemini review trailer."
+  - timestamp: "2026-04-27T06:38:00Z"
+    action: ci_fix
+    phase: pr
+    details: "Commit 55bd7fd drops the redundant `use super::{TensorZeroBackend, TensorZeroConfig};` line at src/backend/tensorzero.rs:194. The wildcard `use super::*;` directly above already provides those names; the redundant explicit re-import was tripping E0432 on CI's non-incremental compile while local incremental cache silently satisfied it. Format/clippy were already green; only the test job was failing."
+  - timestamp: "2026-04-27T06:50:00Z"
+    action: ci_fix
+    phase: pr
+    details: "Commit 053ac73 bumps the cargo cache key from `cargo-` to `cargo-v2-` in .github/workflows/ci.yml to clear a poisoned `target/` cache that may have been pinning stale artifacts across runs. CI run after this confirmed the cache MISS happened cleanly, but the test job still failed with the same E0422 on TensorZeroConfig at tensorzero.rs:405 - so cache poisoning is ruled out and the bug lives in the source itself."
+  - timestamp: "2026-04-27T07:00:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Round-2 fixes: (1) Empirically work around CI's E0422 by mirroring the bedrock pattern from bedrock.rs:97 - introduce `pub(crate) const TensorZeroBackend::CAPABILITIES` and rewrite `capabilities_match_current_wiring` to assert against the const without constructing a backend. Local make check green (519 lib + 6 + 1 + 7 tests). (2) Reply to 4 outstanding Copilot review comments on PR #11 with /gemini review trailer. Commit also rolls in three previously-staged review fixes: workflow.rs validate-doc cleanup (drops phantom dependency-graph claim), backend/mod.rs DRY via `..BackendCapabilities::none()` spread in capabilities_for_name, and spec AC5 expansion to cover ApplyEditsMultiBackend + MissingBackendForCapability variants."

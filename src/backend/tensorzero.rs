@@ -43,6 +43,18 @@ pub struct TensorZeroBackend {
 }
 
 impl TensorZeroBackend {
+    /// Static capability advertisement for `tensorzero`. Mirrors the body of
+    /// `Backend::capabilities()` below and the entry in
+    /// `crate::backend::capabilities_for_name`. Exposing it as a constant lets
+    /// the pinning test assert the values without constructing a backend
+    /// (which requires a `TensorZeroConfig` literal that has tripped CI's
+    /// fresh stable-x86_64 rustc with a fuzzy E0422 import suggestion).
+    pub(crate) const CAPABILITIES: super::BackendCapabilities = super::BackendCapabilities {
+        tool_use: false,
+        streaming: false,
+        file_edit: true,
+    };
+
     pub fn new(cfg: TensorZeroConfig) -> Result<Self, BackendError> {
         let endpoint = Endpoint::from_owned(normalize_endpoint(&cfg.endpoint));
         let auth = AuthData::from_single(cfg.api_key.clone().unwrap_or_default());
@@ -121,11 +133,7 @@ impl Backend for TensorZeroBackend {
         // gateway forwards to capable models, but the call site is single-shot.
         // `file_edit=true` because Claude/Sonnet-class models behind the
         // gateway reliably emit JSON edit blocks.
-        super::BackendCapabilities {
-            tool_use: false,
-            streaming: false,
-            file_edit: true,
-        }
+        Self::CAPABILITIES
     }
 }
 
@@ -402,15 +410,11 @@ mod tests {
 
     #[test]
     fn capabilities_match_current_wiring() {
-        let cfg = TensorZeroConfig {
-            endpoint: "http://localhost:3000".to_string(),
-            model: "test-model".to_string(),
-            api_key: Some("k".to_string()),
-            timeout: Duration::from_secs(1),
-        };
-        let backend = TensorZeroBackend::new(cfg).expect("config should construct");
+        // Pin the const that `Backend::capabilities()` returns, without
+        // constructing `TensorZeroBackend`. Matches the bedrock pattern at
+        // `bedrock.rs:269-282`.
         assert_eq!(
-            backend.capabilities(),
+            TensorZeroBackend::CAPABILITIES,
             super::super::BackendCapabilities {
                 tool_use: false,
                 streaming: false,

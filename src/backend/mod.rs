@@ -291,20 +291,14 @@ impl BackendCapabilities {
 pub fn capabilities_for_name(name: &str) -> Option<BackendCapabilities> {
     match name {
         "tensorzero" | "claude" | "codex" | "gemini" => Some(BackendCapabilities {
-            tool_use: false,
-            streaming: false,
             file_edit: true,
+            ..BackendCapabilities::none()
         }),
-        "ollama" => Some(BackendCapabilities {
-            tool_use: false,
-            streaming: false,
-            file_edit: false,
-        }),
+        "ollama" => Some(BackendCapabilities::none()),
         #[cfg(feature = "bedrock")]
         "bedrock" => Some(BackendCapabilities {
-            tool_use: false,
-            streaming: false,
             file_edit: true,
+            ..BackendCapabilities::none()
         }),
         _ => None,
     }

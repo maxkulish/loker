@@ -59,10 +59,15 @@ defaults. All architecture decisions are settled by the PRD.
 - [ ] **AC4**: Unit tests in each backend's `tests` module pin the expected
       `BackendCapabilities` value with one assertion per backend (six tests behind
       the appropriate `#[cfg]` gates).
-- [ ] **AC5**: `WorkflowError` gains one new variant, `MissingCapability { workflow,
+- [ ] **AC5**: `WorkflowError` gains the variants needed to express capability
+      validation failures. The primary one is `MissingCapability { workflow,
       step, backend, capability, reason }`, where `capability` is a `&'static str`
       naming the field (`"file_edit"`) and `reason` is a `&'static str` naming the
-      step feature that demanded it (`"apply_edits = true"`).
+      step feature that demanded it (`"apply_edits = true"`). Companion variants
+      `ApplyEditsMultiBackend` and `MissingBackendForCapability` cover the
+      adjacent failure shapes surfaced by the same validation pass (steps that
+      pair `apply_edits = true` with multiple backends, and capability lookups
+      that hit an unknown backend name).
 - [ ] **AC6**: `Workflow::validate()` (workflow.rs:119) iterates each `Step`; for
       each `step.get_backends()` it resolves the `Arc<dyn Backend>` and checks the
       capability demand. v0 demand rule: `step.apply_edits == true` requires
@@ -122,8 +127,9 @@ defaults. All architecture decisions are settled by the PRD.
   capabilities; the wiring is later tasks (T-013/T-024 onward). Any attempt to
   invoke a tool-use API in this PR is out-of-scope and would invalidate AC10.
 - Introduce new public surface beyond `BackendCapabilities`, `Backend::
-  capabilities()`, `Workflow::validate_with_capabilities()`, and
-  `WorkflowError::MissingCapability`. No new traits, no new modules.
+  capabilities()`, `capabilities_for_name`, `Workflow::validate_with_capabilities()`,
+  and the `WorkflowError` variants added for capability validation (including
+  `WorkflowError::MissingCapability`). No new traits, no new modules.
 - Edit the consensus / strategy / verify-hook enums - they don't exist yet
   (T-011..T-019) and their capability demands belong in those tasks.
 - Edit `Cargo.toml`, `examples/workflows/*.toml`, or any fixture files. The

@@ -189,10 +189,14 @@ impl Workflow {
 
     /// Validate the workflow including per-step backend capability demands.
     ///
-    /// Runs the standard `validate()` checks first (dependencies, timeouts,
-    /// min_deps_success), then iterates each step's `required_capabilities`
-    /// and resolves each backend through `lookup`. Fails on the first
-    /// `MissingCapability` it encounters.
+    /// Runs the standard `validate()` checks first (currently timeout
+    /// minimums and `min_deps_success` bounds), then iterates each step's
+    /// `required_capabilities` and resolves each backend through `lookup`.
+    /// Fails on the first `MissingCapability` it encounters.
+    ///
+    /// This does not validate dependency graph correctness; dependency
+    /// existence/order checks happen later when the workflow is grouped for
+    /// execution by `WorkflowRunner::group_by_depth`.
     ///
     /// Unknown backend names (`lookup` returns `None`) are treated as
     /// `BackendCapabilities::none()` - i.e. all-false - so a step that demands
