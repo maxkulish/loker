@@ -14,9 +14,10 @@ use jsonschema::Validator;
 use serde_json::Value;
 
 use loker::backend::{Backend, BackendError, QueryOutput, TokenUsage};
-use loker::strategy::parallel_fanout::{Aggregator, ParallelFanOut, TargetSpec};
+use loker::strategy::parallel_fanout::{ParallelFanOut, TargetSpec};
 use loker::strategy::{
-    FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind, SCHEMA_VERSION,
+    Aggregator, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
+    SCHEMA_VERSION,
 };
 
 const SCHEMA_PATH: &str = "docs/schemas/phase_result_parallel.schema.json";
@@ -25,6 +26,7 @@ struct MockBackend {
     name: String,
     calls: AtomicUsize,
     response: Box<dyn Fn(usize) -> Result<QueryOutput, BackendError> + Send + Sync>,
+    delay_ms: Option<u64>,
 }
 
 impl MockBackend {
@@ -47,6 +49,7 @@ impl MockBackend {
                     total_tokens: 18,
                 })))
             }),
+            delay_ms: None,
         })
     }
 
@@ -55,6 +58,7 @@ impl MockBackend {
             name: name.to_string(),
             calls: AtomicUsize::new(0),
             response: Box::new(move |_| Err(err())),
+            delay_ms: None,
         })
     }
 
@@ -65,7 +69,6 @@ impl MockBackend {
             name: name.to_string(),
             calls: AtomicUsize::new(0),
             response: Box::new(move |_| {
-                std::thread::sleep(Duration::from_millis(delay_ms));
                 Ok(QueryOutput::from_text(
                     text_owned.clone(),
                     backend_name.clone(),
@@ -73,6 +76,7 @@ impl MockBackend {
                 )
                 .with_model(Some("mock-1")))
             }),
+            delay_ms: Some(delay_ms),
         })
     }
 
@@ -93,6 +97,9 @@ impl Backend for MockBackend {
         _cwd: &Path,
         _model: Option<&str>,
     ) -> Result<QueryOutput, BackendError> {
+        if let Some(ms) = self.delay_ms {
+            tokio::time::sleep(Duration::from_millis(ms)).await;
+        }
         let n = self.calls.fetch_add(1, Ordering::SeqCst);
         (self.response)(n)
     }

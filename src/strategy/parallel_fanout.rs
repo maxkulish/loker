@@ -13,13 +13,12 @@
 
 use crate::backend::{Backend, QueryOutput};
 use crate::strategy::{
-    Attempt, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
+    Aggregator, Attempt, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
     StrategyOutput, TokenUsageReport, VerifyOutcome, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use serde::Serialize;
 use std::sync::Arc;
 
 /// Target specification for one branch of the fan-out.
@@ -43,27 +42,6 @@ impl TargetSpec {
     }
 }
 
-/// Aggregator label for schema compliance.  Actual logic deferred to M3.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Aggregator {
-    Concat,
-    AnyFail,
-    Vote,
-    LLMJudge,
-}
-
-impl Aggregator {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Concat => "concat",
-            Self::AnyFail => "any_fail",
-            Self::Vote => "vote",
-            Self::LLMJudge => "llm_judge",
-        }
-    }
-}
-
 /// Parallel fan-out strategy.
 #[derive(Debug, Clone)]
 pub struct ParallelFanOut {
@@ -80,6 +58,10 @@ impl ParallelFanOut {
         prompt_template: impl Into<String>,
         aggregator: Aggregator,
     ) -> Self {
+        assert!(
+            min_responses > 0,
+            "min_responses must be greater than 0, got {min_responses}"
+        );
         Self {
             targets,
             min_responses,
@@ -98,10 +80,6 @@ impl Strategy for ParallelFanOut {
         ctx: &PhaseContext,
     ) -> Result<StrategyOutput, StrategyError> {
         if self.targets.is_empty() || backends.is_empty() {
-            return Err(StrategyError::NoBackends);
-        }
-
-        if self.min_responses == 0 {
             return Err(StrategyError::NoBackends);
         }
 
@@ -204,7 +182,7 @@ impl Strategy for ParallelFanOut {
                 run_id: ctx.run_id,
                 attempts,
                 final_status: None,
-                aggregator: Some(self.aggregator.as_str().to_string()),
+                aggregator: Some(self.aggregator),
                 aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
                 verify: Some(VerifyOutcome::skipped()),
             };
@@ -222,7 +200,7 @@ impl Strategy for ParallelFanOut {
             run_id: ctx.run_id,
             attempts,
             final_status: None,
-            aggregator: Some(self.aggregator.as_str().to_string()),
+            aggregator: Some(self.aggregator),
             aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
             verify: Some(VerifyOutcome::skipped()),
         })
@@ -246,6 +224,7 @@ fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec
 mod tests {
     use super::*;
     use crate::backend::BackendError;
+    use crate::strategy::Aggregator;
     use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
@@ -254,6 +233,7 @@ mod tests {
         name: String,
         calls: AtomicUsize,
         response: Box<dyn Fn(usize) -> Result<QueryOutput, BackendError> + Send + Sync>,
+        delay_ms: Option<u64>,
     }
 
     impl MockBackend {
@@ -271,6 +251,7 @@ mod tests {
                     )
                     .with_model(Some("mock-1")))
                 }),
+                delay_ms: None,
             })
         }
 
@@ -279,6 +260,7 @@ mod tests {
                 name: name.to_string(),
                 calls: AtomicUsize::new(0),
                 response: Box::new(move |_| Err(err())),
+                delay_ms: None,
             })
         }
 
@@ -289,7 +271,6 @@ mod tests {
                 name: name.to_string(),
                 calls: AtomicUsize::new(0),
                 response: Box::new(move |_| {
-                    std::thread::sleep(Duration::from_millis(delay_ms));
                     Ok(QueryOutput::from_text(
                         text_owned.clone(),
                         backend_name.clone(),
@@ -297,6 +278,7 @@ mod tests {
                     )
                     .with_model(Some("mock-1")))
                 }),
+                delay_ms: Some(delay_ms),
             })
         }
 
@@ -317,6 +299,9 @@ mod tests {
             _cwd: &Path,
             _model: Option<&str>,
         ) -> Result<QueryOutput, BackendError> {
+            if let Some(ms) = self.delay_ms {
+                tokio::time::sleep(Duration::from_millis(ms)).await;
+            }
             let n = self.calls.fetch_add(1, Ordering::SeqCst);
             (self.response)(n)
         }

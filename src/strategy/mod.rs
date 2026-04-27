@@ -28,7 +28,7 @@ pub mod single_model;
 pub mod verify;
 
 pub use escalating_retry::EscalatingRetry;
-pub use parallel_fanout::{Aggregator, ParallelFanOut, TargetSpec};
+pub use parallel_fanout::{ParallelFanOut, TargetSpec};
 pub use single_model::SingleModel;
 pub use verify::{VerifyError, VerifyHook, VerifyResult};
 
@@ -174,6 +174,26 @@ pub enum FinalStatus {
 /// For the `Parallel` strategy, `attempts` is serialised as `branches`, and
 /// `aggregator`, `aggregate_output_path`, and `verify` are emitted at the
 /// top level (per `phase_result_parallel.schema.json`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Aggregator {
+    Concat,
+    AnyFail,
+    Vote,
+    LLMJudge,
+}
+
+impl Aggregator {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Concat => "concat",
+            Self::AnyFail => "any_fail",
+            Self::Vote => "vote",
+            Self::LLMJudge => "llm_judge",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct StrategyOutput {
     pub schema_version: u32,
@@ -182,7 +202,7 @@ pub struct StrategyOutput {
     pub run_id: uuid::Uuid,
     pub attempts: Vec<Attempt>,
     pub final_status: Option<FinalStatus>,
-    pub aggregator: Option<String>,
+    pub aggregator: Option<Aggregator>,
     pub aggregate_output_path: Option<String>,
     pub verify: Option<VerifyOutcome>,
 }
@@ -252,7 +272,13 @@ impl Serialize for StrategyOutput {
                 .collect();
 
             state.serialize_field("branches", &branches)?;
-            state.serialize_field("aggregator", self.aggregator.as_deref().unwrap_or("concat"))?;
+            state.serialize_field(
+                "aggregator",
+                self.aggregator
+                    .as_ref()
+                    .map(|a| a.as_str())
+                    .unwrap_or("concat"),
+            )?;
             state.serialize_field(
                 "aggregate_output_path",
                 self.aggregate_output_path
