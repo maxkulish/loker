@@ -63,6 +63,7 @@ libc = "0.2"
 tempfile = "3"
 wiremock = "0.6"
 jsonschema = "0.46"
+insta = "1"
 
 [package.metadata.docs.rs]
 all-features = true

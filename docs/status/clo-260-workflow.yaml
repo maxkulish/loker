@@ -1,0 +1,85 @@
+task_id: CLO-260
+task_title: "Add pass_failure_context flag on Strategy::EscalatingRetry"
+task_url: "https://linear.app/cloud-ai/issue/CLO-260/add-pass-failure-context-flag-on-strategyescalatingretry"
+task_type: specification
+classification_reason: |
+  Single-concept feature flag addition on top of merged CLO-258 walker.
+  Architecture decisions already made: PRD FR-8 specifies failure
+  context propagation; design doc §6 covers escalating retry shape;
+  §11 covers redaction. Scaffold field `pass_failure_context: bool`
+  was already added to the EscalatingRetry stage in CLO-258
+  (defaulting false). This task wires it through: build a
+  FailureContext payload, plumb into next stage's prompt envelope,
+  reuse existing redaction filter, document byte budget, lock
+  injection location. Acceptance criteria are mechanically
+  testable (config round-trip, snapshot of off-state, four
+  wiremock cases for on-state). No architecture decisions
+  remain. Mirrors approved approach for CLO-247/248/249/251/257.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_actual: feat/clo-260-pas-failure
+  blocks: []
+  blocked_by:
+    - "CLO-258 (Strategy::EscalatingRetry walker) - merged 2026-04-27 in PR #15 (Done)"
+  soft_depends_on:
+    - "T-020 VerifyHook trait (Phase 4) - until landed, fall back to verifier stdout/stderr strings"
+
+workflow:
+  current_phase: implement
+  status: in_progress
+  created_at: "2026-04-27T00:00:00Z"
+  updated_at: "2026-04-27T00:00:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task - PRD FR-8 specifies failure context propagation behaviour; design doc §6/§11 cover escalating retry and redaction. No discovery needed."
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task - using /spec instead of full design doc. Behaviour pre-specified by PRD FR-8 + design doc §6/§11; no architecture decisions to make."
+  spec:
+    status: complete
+    spec_file: "specs/2026-04-27-clo-260-pass-failure-context.md"
+    approved: true
+    review_completed: false
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_applied: false
+    applied_suggestions: []
+    flagged_suggestions: []
+    review_skip_reason: ".lok/workflows/spec-review.toml does not exist in this repo (consistent with CLO-247-257). AI review skipped; spec auto-approved on the same grounds as prior specification tasks: mechanically testable ACs, no architecture decisions, mirrors approved CLO-257 pattern, scaffold (`pass_failure_context: bool`) already in tree from CLO-258."
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+
+history:
+  - timestamp: "2026-04-27T00:00:00Z"
+    action: workflow_started
+    phase: spec
+    details: "CLO-260 workflow initialized as specification task. Branch feat/clo-260-pas-failure already checked out (worktree). Blocker CLO-258 merged."
+  - timestamp: "2026-04-27T00:00:00Z"
+    action: project_sync_skipped
+    phase: spec
+    details: "No PROJECT.md/ROADMAP.md/DEPENDENCIES.md aggregation files in repo (consistent with CLO-247-257). project:sync step skipped."
+  - timestamp: "2026-04-27T00:00:00Z"
+    action: spec_written
+    phase: spec
+    details: "Wrote 5-section spec at specs/2026-04-27-clo-260-pass-failure-context.md. Scope: S (~4 sub-tasks). Resolved redaction-scope ambiguity by landing a module-local helper in strategy/escalating_retry.rs (no project-wide filter exists yet); deferred design-doc-tdd workflow file landing (no such file exists in src/workflows/) by documenting the on-default in rustdoc instead."
+  - timestamp: "2026-04-27T00:00:00Z"
+    action: spec_review_skipped
+    phase: spec
+    details: ".lok/workflows/spec-review.toml does not exist in repo. AI review skipped; consistent with CLO-247-257."
+  - timestamp: "2026-04-27T00:00:00Z"
+    action: spec_approved
+    phase: spec
+    details: "Auto-approved in auto mode. Spec mirrors validated CLO-257 pattern, ACs are mechanically testable, scope is S, no architecture decisions remain."
