@@ -29,7 +29,7 @@ workflow:
   current_phase: pr
   status: in_progress
   created_at: "2026-04-27T00:00:00Z"
-  updated_at: "2026-04-27T16:10:00Z"
+  updated_at: "2026-04-27T16:25:00Z"
 
 phases:
   discovery:
@@ -85,8 +85,8 @@ phases:
     pr_url: "https://github.com/maxkulish/loker/pull/12"
     pr_number: 12
     branch_pushed: true
-    commit_sha: "87a4a23"
-    reviews_addressed: 2
+    commit_sha: "6b26449"
+    reviews_addressed: 3
   complete:
     status: pending
 
@@ -139,3 +139,7 @@ history:
     action: review_addressed
     phase: pr
     details: "Addressed 4 round-2 Copilot comments flagging doc/code drift introduced by the round-1 model-assertion fix. Pushed 87a4a23, replied to all 4 with /gemini review trailer. Fixes are documentation-only (no logic change): (a) tests/tensorzero_integration.rs module doc now explicitly states the test does NOT assert the gateway echo because TensorZeroBackend::query overwrites QueryOutput.model with the effective input; (b) specs AC3 bullet (4) rewritten to describe the actual assert_eq!(out.model, function) effective-input contract; (c) specs AC3 bullet (5) field names corrected (prompt_tokens/completion_tokens); (d) workflow YAML ST2 details string updated to match current test body. make check green."
+  - timestamp: "2026-04-27T16:25:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 2 round-3 Copilot doc nits. Pushed 6b26449, replied to both with /gemini review trailer. Documentation-only changes (no code touched): (a) docs/handoff.md /health probe step now clarifies TENSORZERO_GATEWAY_URL must be the gateway root (no /openai/v1 suffix) - because normalize_endpoint accepts both shapes for chat-completions but /health lives at the root; (b) workflow YAML classification_reason reworded to drop ambiguous 'ignored/skipped' phrasing that implied #[ignore]/`-- --ignored` semantics, replaced with explicit 'runs, returns early as a no-op, and is reported as passed' description. make check green."
