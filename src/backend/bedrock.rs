@@ -88,6 +88,18 @@ pub enum ResponseBlock {
 }
 
 impl BedrockBackend {
+    /// Static capability advertisement for `bedrock`. Mirrors the body of
+    /// `Backend::capabilities()` below and the entry in
+    /// `crate::backend::capabilities_for_name`. Exposing it as a constant lets
+    /// the pinning test assert the values without invoking
+    /// `BedrockBackend::new`, which would call into the AWS SDK during
+    /// `cargo test`.
+    pub(crate) const CAPABILITIES: super::BackendCapabilities = super::BackendCapabilities {
+        tool_use: false,
+        streaming: false,
+        file_edit: true,
+    };
+
     pub async fn new(config: &BackendConfig) -> Result<Self> {
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let client = Client::new(&aws_config);
@@ -216,11 +228,7 @@ impl super::Backend for BedrockBackend {
         // None` (line 171). The InvokeModel API is non-streaming. Default
         // model is a Claude Sonnet variant that reliably emits JSON edit
         // blocks.
-        super::BackendCapabilities {
-            tool_use: false,
-            streaming: false,
-            file_edit: true,
-        }
+        Self::CAPABILITIES
     }
 }
 
@@ -258,23 +266,13 @@ mod tests {
         assert!(parsed.usage.is_none());
     }
 
-    #[tokio::test]
-    async fn capabilities_match_current_wiring() {
-        use super::super::Backend;
-        let cfg = BackendConfig {
-            enabled: true,
-            command: None,
-            args: vec![],
-            skip_lines: 0,
-            api_key_env: None,
-            model: None,
-            timeout: None,
-            max_retries: None,
-            retry_delay_ms: None,
-        };
-        let backend = BedrockBackend::new(&cfg).await.expect("backend builds");
+    #[test]
+    fn capabilities_match_current_wiring() {
+        // Pin the const that `Backend::capabilities()` returns, without
+        // constructing `BedrockBackend` (which would invoke the AWS SDK
+        // configuration loader during `cargo test`).
         assert_eq!(
-            backend.capabilities(),
+            BedrockBackend::CAPABILITIES,
             super::super::BackendCapabilities {
                 tool_use: false,
                 streaming: false,

@@ -77,6 +77,21 @@ pub enum WorkflowError {
         capability: &'static str,
         reason: &'static str,
     },
+
+    #[error("Workflow '{workflow}': step '{step}' has apply_edits = true with multiple backends ({backends})\n  hint: multi-backend consensus does not apply edits or run verify hooks - run apply_edits on a single backend, or move apply_edits to a follow-up step that consumes the consensus output")]
+    ApplyEditsMultiBackend {
+        workflow: String,
+        step: String,
+        backends: String,
+    },
+
+    #[error("Workflow '{workflow}': step '{step}' demands capability '{capability}' ({reason}) but no backend is configured\n  hint: set `backend` (or `backends`) on the step to a backend whose capabilities() reports {capability}=true")]
+    MissingBackendForCapability {
+        workflow: String,
+        step: String,
+        capability: &'static str,
+        reason: &'static str,
+    },
 }
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
@@ -199,9 +214,33 @@ impl Workflow {
             if demands.is_empty() {
                 continue;
             }
-            for backend_name in step.get_backends() {
+            let backends = step.get_backends();
+            // apply_edits + multi-backend is silently dropped at runtime
+            // (workflow.rs:~1994 takes the consensus branch which never calls
+            // apply_edits or verify). Reject the combination at load time so
+            // the user does not file a bug when their edits never appear.
+            if step.apply_edits && backends.len() > 1 {
+                return Err(WorkflowError::ApplyEditsMultiBackend {
+                    workflow: self.name.clone(),
+                    step: step.name.clone(),
+                    backends: backends.join(", "),
+                });
+            }
+            // No backend listed but the step demands a capability: the demand
+            // can never be satisfied. Surface this explicitly rather than
+            // silently treating it as an empty iteration.
+            if backends.is_empty() {
+                let (capability, reason) = demands[0];
+                return Err(WorkflowError::MissingBackendForCapability {
+                    workflow: self.name.clone(),
+                    step: step.name.clone(),
+                    capability,
+                    reason,
+                });
+            }
+            for backend_name in &backends {
                 let caps =
-                    lookup(&backend_name).unwrap_or_else(crate::backend::BackendCapabilities::none);
+                    lookup(backend_name).unwrap_or(crate::backend::BackendCapabilities::none());
                 for (capability, reason) in &demands {
                     let satisfied = match *capability {
                         "tool_use" => caps.tool_use,
@@ -6711,9 +6750,13 @@ prompt = "p"
     }
 
     #[test]
-    fn validate_rejects_apply_edits_on_first_failing_backend_in_multi() {
+    fn validate_rejects_apply_edits_with_multiple_backends() {
+        // Multi-backend consensus path silently drops apply_edits and verify
+        // hooks (workflow.rs ~1994 takes the consensus branch which never
+        // applies edits). Reject the combination at load time even when
+        // every listed backend is independently file_edit-capable.
         let mut step = make_step("edit", "", true);
-        step.backends = vec!["claude".to_string(), "ollama".to_string()];
+        step.backends = vec!["claude".to_string(), "codex".to_string()];
         let workflow = Workflow {
             name: "wf".to_string(),
             description: None,
@@ -6724,12 +6767,45 @@ prompt = "p"
         };
         let err = workflow
             .validate_with_capabilities(capability_lookup())
-            .expect_err("ollama in the list must trip validation");
+            .expect_err("apply_edits + multi-backend must be rejected");
         match err {
-            WorkflowError::MissingCapability { backend, .. } => {
-                assert_eq!(backend, "ollama");
+            WorkflowError::ApplyEditsMultiBackend { backends, step, .. } => {
+                assert_eq!(step, "edit");
+                assert_eq!(backends, "claude, codex");
             }
-            other => panic!("expected MissingCapability, got {:?}", other),
+            other => panic!("expected ApplyEditsMultiBackend, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn validate_rejects_apply_edits_with_no_backend() {
+        // apply_edits=true with no backend listed: the demand can never be
+        // satisfied. Surface this explicitly rather than skipping the empty
+        // backend iteration silently.
+        let step = make_step("edit", "", true);
+        let workflow = Workflow {
+            name: "wf".to_string(),
+            description: None,
+            extends: None,
+            steps: vec![step],
+            continue_on_error: false,
+            timeout: None,
+        };
+        let err = workflow
+            .validate_with_capabilities(capability_lookup())
+            .expect_err("apply_edits without a backend must be rejected");
+        match err {
+            WorkflowError::MissingBackendForCapability {
+                step,
+                capability,
+                reason,
+                ..
+            } => {
+                assert_eq!(step, "edit");
+                assert_eq!(capability, "file_edit");
+                assert_eq!(reason, "apply_edits = true");
+            }
+            other => panic!("expected MissingBackendForCapability, got {:?}", other),
         }
     }
 
