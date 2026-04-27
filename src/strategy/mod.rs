@@ -123,6 +123,7 @@ pub trait Strategy: Send + Sync {
 pub enum StrategyKind {
     Single,
     Escalating,
+    Parallel,
 }
 
 /// Tier of a single attempt in an `EscalatingRetry` ladder.
@@ -167,18 +168,109 @@ pub enum FinalStatus {
 /// `docs/schemas/phase_result_*.schema.json` set. `final_status` is only
 /// populated by ladder strategies (currently `EscalatingRetry`); SingleModel
 /// omits the field so the same struct serialises against the single schema.
-#[derive(Debug, Clone, Serialize)]
+///
+/// For the `Parallel` strategy, `attempts` is serialised as `branches`, and
+/// `aggregator`, `aggregate_output_path`, and `verify` are emitted at the
+/// top level (per `phase_result_parallel.schema.json`).
+#[derive(Debug, Clone)]
 pub struct StrategyOutput {
     pub schema_version: u32,
-    #[serde(rename = "loker.strategy")]
     pub strategy: StrategyKind,
-    #[serde(rename = "loker.phase")]
     pub phase: String,
-    #[serde(rename = "loker.run_id")]
     pub run_id: uuid::Uuid,
     pub attempts: Vec<Attempt>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub final_status: Option<FinalStatus>,
+    pub aggregator: Option<String>,
+    pub aggregate_output_path: Option<String>,
+    pub verify: Option<VerifyOutcome>,
+}
+
+impl Default for StrategyOutput {
+    fn default() -> Self {
+        Self {
+            schema_version: SCHEMA_VERSION,
+            strategy: StrategyKind::Single,
+            phase: String::new(),
+            run_id: uuid::Uuid::nil(),
+            attempts: Vec::new(),
+            final_status: None,
+            aggregator: None,
+            aggregate_output_path: None,
+            verify: None,
+        }
+    }
+}
+
+impl Serialize for StrategyOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let is_parallel = matches!(self.strategy, StrategyKind::Parallel);
+        let mut field_count = 4; // schema_version, loker.strategy, loker.phase, loker.run_id
+        if is_parallel {
+            field_count += 4; // branches, aggregator, aggregate_output_path, verify
+        } else {
+            field_count += 1; // attempts
+            if self.final_status.is_some() {
+                field_count += 1;
+            }
+        }
+
+        let mut state = serializer.serialize_struct("StrategyOutput", field_count)?;
+        state.serialize_field("schema_version", &self.schema_version)?;
+        state.serialize_field("loker.strategy", &self.strategy)?;
+        state.serialize_field("loker.phase", &self.phase)?;
+        state.serialize_field("loker.run_id", &self.run_id)?;
+
+        if is_parallel {
+            #[derive(Serialize)]
+            struct Branch<'a> {
+                backend: &'a str,
+                family: &'a str,
+                model: &'a str,
+                finish_reasons: &'a [FinishReason],
+                usage: &'a TokenUsageReport,
+                output_path: &'a str,
+            }
+
+            let branches: Vec<Branch> = self
+                .attempts
+                .iter()
+                .map(|a| Branch {
+                    backend: &a.backend,
+                    family: a.family.as_deref().unwrap_or("local"),
+                    model: &a.model,
+                    finish_reasons: &a.finish_reasons,
+                    usage: &a.usage,
+                    output_path: &a.output_path,
+                })
+                .collect();
+
+            state.serialize_field("branches", &branches)?;
+            state.serialize_field(
+                "aggregator",
+                self.aggregator.as_deref().unwrap_or("concat"),
+            )?;
+            state.serialize_field(
+                "aggregate_output_path",
+                self.aggregate_output_path.as_deref().unwrap_or("aggregated.txt"),
+            )?;
+            state.serialize_field(
+                "verify",
+                self.verify.as_ref().unwrap_or(&VerifyOutcome::skipped()),
+            )?;
+        } else {
+            state.serialize_field("attempts", &self.attempts)?;
+            if let Some(ref fs) = self.final_status {
+                state.serialize_field("final_status", fs)?;
+            }
+        }
+
+        state.end()
+    }
 }
 
 /// Per-call record. SingleModel emits exactly one; `EscalatingRetry` emits
@@ -187,6 +279,8 @@ pub struct StrategyOutput {
 pub struct Attempt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier: Option<Tier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
     pub backend: String,
     pub model: String,
     pub finish_reasons: Vec<FinishReason>,
@@ -295,6 +389,13 @@ pub enum StrategyError {
 
     #[error("escalating retry exhausted all backends")]
     Exhausted { output: Box<StrategyOutput> },
+
+    #[error("parallel floor violated: {successes}/{min_responses} targets succeeded")]
+    FloorViolation {
+        successes: usize,
+        min_responses: usize,
+        output: Box<StrategyOutput>,
+    },
 }
 
 /// Build the `model` field that lands in `Attempt`, applying the v0

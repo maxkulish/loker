@@ -19,18 +19,47 @@ linear:
     - CLO-257
   branch_suggested: kmamemo/clo-259-implement-strategyparallelfanout-with-min_responses-floor
   priority: Medium
+  branch_actual: feat/clo-259-parallel
 workflow:
-  current_phase: discovery
+  current_phase: implement
   status: active
   created_at: '2026-04-27T19:16:11.286Z'
-  updated_at: '2026-04-27T19:17:59.056Z'
+  updated_at: '2026-04-27T20:12:58.649Z'
 phases:
   discovery:
-    status: pending
+    status: complete
+    approach_chosen: Minimally-invasive struct expansion
+    approaches_identified: 3
+    approved: true
+    baseline_score: 7
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-259.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-259-parallel-fanout.md
+    problem_framed: true
   design:
-    status: pending
+    status: complete
+    design_doc: docs/designs/clo-259-parallel-fanout.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions:
+      - Added aggregate_output_path and verify fields to parallel schema requirements in design doc
+      - Clarified Attempt::family default ('local') for v0 since family_of() deferred to M3
+      - Added schema validation test for FloorViolation error payload
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: N/A
+    review_skip_reason: >-
+      Design review workflow .lok/workflows/design-review.toml missing; lok binary has no built-in design-review
+      persona; pi gemini-architect skill unavailable in this harness. Conducted self-review instead.
+    review_synthesis: docs/reviews/clo-259-design-synthesis.md
+    review_verdict: approve_with_changes
+    finalized: true
   plan:
-    status: pending
+    status: complete
+    plan_file: docs/plans/clo-259-parallel-fanout.md
+    approved: true
   implement:
     status: pending
   pr:
@@ -52,5 +81,48 @@ history:
     action: project_sync_skipped
     phase: init
     details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-27T19:59:03.873Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: Minimally-invasive struct expansion. Baseline 7/10. 3 approaches considered (minimally-invasive, full
+      aggregator trait, enum-based unified strategy).
+  - timestamp: '2026-04-27T19:59:15.360Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-04-27T20:04:32.960Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc draft at docs/designs/clo-259-parallel-fanout.md
+  - timestamp: '2026-04-27T20:06:48.949Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Self-review: added aggregate_output_path+verify schema requirements, family default, floor-violation schema
+      validation. 3 applied, 0 flagged.
+  - timestamp: '2026-04-27T20:07:29.984Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. artifacts: docs/designs/clo-259-parallel-fanout.md,
+      docs/reviews/clo-259-design-synthesis.md
+  - timestamp: '2026-04-27T20:07:34.785Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-04-27T20:11:24.000Z'
+    action: plan_created
+    phase: plan
+    details: Implementation plan created with 6 sub-tasks across 3 files. Total effort ~2.5 hours.
+  - timestamp: '2026-04-27T20:12:54.836Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 6 sub-tasks queued. Total ~2.5h. Pre-merge gate: make check.'
+  - timestamp: '2026-04-27T20:12:58.649Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
 task_title: Implement Strategy::ParallelFanOut with min_responses floor
 task_url: https://linear.app/cloud-ai/issue/CLO-259/implement-strategyparallelfanout-with-min-responses-floor
+review_notes: Design self-reviewed due to missing tooling
