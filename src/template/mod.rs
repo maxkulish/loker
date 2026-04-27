@@ -59,6 +59,12 @@ pub struct TemplateEngine {
     env: minijinja::Environment<'static>,
 }
 
+impl Default for TemplateEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[allow(dead_code)]
 impl TemplateEngine {
     /// Create a new template engine with custom filters registered.
