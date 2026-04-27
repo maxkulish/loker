@@ -50,10 +50,10 @@ impl TensorZeroBackend {
     /// (which requires a `TensorZeroConfig` literal that has tripped CI's
     /// fresh stable-x86_64 rustc with a fuzzy E0422 import suggestion).
     pub(crate) const CAPABILITIES: super::BackendCapabilities = super::BackendCapabilities {
-    tool_use: false,
-    streaming: false,
-    file_edit: true,
-};
+        tool_use: false,
+        streaming: false,
+        file_edit: true,
+    };
 
     pub fn new(cfg: TensorZeroBackendOpts) -> Result<Self, BackendError> {
         let endpoint = Endpoint::from_owned(normalize_endpoint(&cfg.endpoint));
