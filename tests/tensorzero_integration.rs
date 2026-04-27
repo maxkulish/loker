@@ -8,9 +8,15 @@
 //!
 //! Mocked wire-contract coverage lives in `tests/tensorzero_backend.rs`
 //! (CLO-248). This file exists to catch drift between that mock and the real
-//! gateway - auth header propagation, the `genai`-OpenAI adapter path, and the
-//! `model` echo shape `tensorzero::function_name::<fn>::variant_name::<v>`
-//! captured by the D1 spike (`docs/spikes/2026-04-25-tensorzero-roundtrip.md`).
+//! gateway on the parts wiremock cannot exercise: auth-header propagation,
+//! the `genai`-OpenAI adapter path actually reaching `/openai/v1/chat/completions`,
+//! and the `genai` layer's extraction of assistant content + token usage from
+//! the response (D1 §2-§4, `docs/spikes/2026-04-25-tensorzero-roundtrip.md`).
+//! It does **not** assert the gateway's echoed `model` field
+//! (`tensorzero::function_name::<fn>::variant_name::<v>`) because
+//! `TensorZeroBackend::query` overwrites `QueryOutput.model` with the effective
+//! input (the configured function name) before returning - validating the echo
+//! shape would require exposing it as a separate field.
 //!
 //! Run instructions: see `docs/handoff.md` ("How to run the live integration
 //! test"). TL;DR:

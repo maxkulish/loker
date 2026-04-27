@@ -64,7 +64,7 @@ phases:
         details: "Created tests/tensorzero_integration.rs with env-gated #[tokio::test]. Skip path silent (return early when LOKER_TZ_INTEGRATION unset/empty)."
       - id: ST2
         status: complete
-        details: "Filled in live round-trip body. Reads TENSORZERO_GATEWAY_URL (default http://localhost:3000), LOKER_TZ_INTEGRATION_FUNCTION (default loker_d1_openai), TENSORZERO_API_KEY. Builds TensorZeroBackend with 5s timeout, queries 'Reply with the single word: pong.', asserts backend name, non-empty stdout, model prefix tensorzero::function_name:: + contains function name, usage prompt/completion tokens > 0, duration > ZERO."
+        details: "Filled in live round-trip body. Reads TENSORZERO_GATEWAY_URL (default http://localhost:3000), LOKER_TZ_INTEGRATION_FUNCTION (default loker_d1_openai), TENSORZERO_API_KEY. Builds TensorZeroBackend with 5s timeout, queries 'Reply with the single word: pong.', asserts backend name, non-empty stdout, QueryOutput.model equals effective input function name (pinning the contract that backend stamps effective input, not gateway echo), usage prompt_tokens/completion_tokens > 0, duration > ZERO."
       - id: ST3
         status: complete
         details: "Extended docs/handoff.md Constraints section with 'How to run the live integration test' subsection (4 numbered steps + 3 optional env-var overrides)."

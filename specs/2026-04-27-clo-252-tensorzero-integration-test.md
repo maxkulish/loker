@@ -77,14 +77,17 @@ test currently consumes that env var. This task closes that gap with one test.
          occasionally adds punctuation, casing variants, or whitespace; the
          spike fixture (`tests/fixtures/tensorzero/openai_success_response.json`)
          is the source of truth for what "structurally valid" means here.
-      4. `out.model.as_deref().is_some_and(|m| m.starts_with("tensorzero::function_name::"))`
-         and the same `m.contains(&function_name)` (the env-resolved
-         `loker_d1_openai`) - pins the gateway's response-model echoing
-         behaviour (D1 §2). The variant suffix (`::variant_name::mini_v1`) is
-         gateway-chosen and intentionally not pinned.
-      5. `out.usage.is_some()` and `out.usage.unwrap().prompt > 0` and
-         `... .completion > 0` - pins that the genai layer extracted token
-         counts from the response's `usage` block (D1 §4).
+      4. `assert_eq!(out.model.as_deref().unwrap(), function)` where `function`
+         is the env-resolved function name (default `loker_d1_openai`) - pins
+         the contract that `TensorZeroBackend::query` sets `QueryOutput.model`
+         from the *effective input* (the configured function name / per-call
+         override), **not** from the gateway's echoed response `model` field
+         (`tensorzero::function_name::<fn>::variant_name::<v>`). A future change
+         that switches to propagating the response echo would trip this
+         assertion deliberately.
+      5. `out.usage.is_some()` and `out.usage.unwrap().prompt_tokens > 0` and
+         `... .completion_tokens > 0` - pins that the genai layer extracted
+         token counts from the response's `usage` block (D1 §4).
       6. `out.duration > Duration::ZERO` - sanity check that the call actually
          executed (a constructor-default `Duration::ZERO` would mean we built
          an output without making the call).
