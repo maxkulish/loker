@@ -1,0 +1,61 @@
+# Codex task lifecycle state.
+# Copy to docs/status/<task-id>-codex-workflow.yaml and fill values.
+
+task_id: CLO-000
+title: ""
+branch: ""
+created_at: ""
+updated_at: ""
+
+workflow:
+  current_phase: task
+  status: pending
+
+task:
+  status: pending
+  problem: ""
+  acceptance_criteria: []
+  validation: []
+  context_sources: []
+
+design:
+  status: pending
+  design_doc: null
+  draft_ready: false
+
+design_review:
+  status: pending
+  review_file: null
+  verdict: null
+  applied_changes: []
+
+implementation:
+  status: pending
+  changed_files: []
+  tests_run: []
+  open_risks: []
+
+pre_pr_review:
+  status: pending
+  review_file: null
+  tests_run: []
+  verdict: null
+
+pr:
+  status: pending
+  pr_url: null
+  pr_number: null
+  validation: []
+
+pr_fixes:
+  status: pending
+  rounds: 0
+  checks: []
+  unresolved_threads: []
+
+done:
+  status: pending
+  completed_at: null
+  summary: ""
+
+history: []
