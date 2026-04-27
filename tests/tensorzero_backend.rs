@@ -8,13 +8,13 @@
 use std::path::Path;
 use std::time::Duration;
 
-use loker::backend::{Backend, BackendError, TensorZeroBackend, TensorZeroConfig};
+use loker::backend::{Backend, BackendError, TensorZeroBackend, TensorZeroBackendOpts};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-fn config_for(server: &MockServer) -> TensorZeroConfig {
-    TensorZeroConfig {
+fn config_for(server: &MockServer) -> TensorZeroBackendOpts {
+    TensorZeroBackendOpts {
         endpoint: server.uri(),
         model: "test-model".to_string(),
         api_key: Some("test-key".to_string()),

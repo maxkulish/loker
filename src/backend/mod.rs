@@ -15,7 +15,7 @@ pub use bedrock::BedrockBackend;
 pub use claude::ClaudeBackend;
 pub use retry::{RetryExecutor, RetryPolicy};
 #[allow(unused_imports)]
-pub use tensorzero::{TensorZeroBackend, TensorZeroConfig};
+pub use tensorzero::{TensorZeroBackend, TensorZeroBackendOpts};
 
 use crate::config::{BackendConfig, Config};
 use anyhow::Result;
