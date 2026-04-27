@@ -1,9 +1,10 @@
 //! Strategy primitives for orchestrating one or more backend calls within a phase.
 //!
 //! Per loker-design.md §4.2 a `Strategy` decides how a phase consumes backends:
-//! `SingleModel` (one backend, one prompt, one response - this module's
-//! variant), `ParallelFanOut` (CLO-259), `EscalatingRetry` (CLO-258). All
-//! three implement the same `Strategy` trait so the phase runner (T-029)
+//! `SingleModel` (one backend, one prompt, one response), `EscalatingRetry`
+//! (CLO-258 - this module's second variant: try a cheap-to-strong ladder of
+//! backends and stop at the first verify pass), `ParallelFanOut` (CLO-259).
+//! All three implement the same `Strategy` trait so the phase runner (T-029)
 //! can dispatch over them uniformly.
 //!
 //! ## Capability invariant
@@ -21,11 +22,16 @@ use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+pub mod escalating_retry;
 pub mod single_model;
+pub mod verify;
+
+pub use escalating_retry::EscalatingRetry;
 pub use single_model::SingleModel;
+pub use verify::{VerifyError, VerifyHook, VerifyResult};
 
 /// `schema_version` value emitted by every `StrategyOutput`. Pinned to the
-/// const declared in `docs/schemas/phase_result_single.schema.json`.
+/// const declared in `docs/schemas/phase_result_*.schema.json`.
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// Phase-level prompt overrides applied on top of the strategy's own
@@ -91,9 +97,9 @@ impl PhaseContext {
 /// behind `Arc<dyn Strategy>` and drive them across async tasks.
 ///
 /// `prompt: &Prompt` is borrowed so the same prompt can be replayed by
-/// future strategies (`EscalatingRetry`, `ParallelFanOut`) without cloning.
-/// `backends: &[Arc<dyn Backend>]` matches the in-tree convention - the
-/// engine resolves backends to `Arc<dyn Backend>` via `create_backend`
+/// `EscalatingRetry` / `ParallelFanOut` without cloning. `backends:
+/// &[Arc<dyn Backend>]` matches the in-tree convention - the engine resolves
+/// backends to `Arc<dyn Backend>` via `create_backend`
 /// (`src/backend/mod.rs:346`). Design doc §4.2 sketches `&[Box<dyn Backend>]`;
 /// the `Arc` deviation is a deliberate alignment with the rest of the codebase.
 #[async_trait]
@@ -110,19 +116,57 @@ pub trait Strategy: Send + Sync {
 /// `loker.strategy` field of `StrategyOutput`.
 ///
 /// `#[non_exhaustive]` - new variants land alongside new strategy
-/// implementations (CLO-258, CLO-259).
+/// implementations (CLO-259).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StrategyKind {
     Single,
+    Escalating,
+}
+
+/// Tier of a single attempt in an `EscalatingRetry` ladder.
+///
+/// The escalating phase-result schema requires every attempt to declare
+/// which tier produced it; `SingleModel` attempts omit the field via
+/// `#[serde(skip_serializing_if = "Option::is_none")]` on `Attempt::tier`.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Tier {
+    Cheap,
+    Medium,
+    Strong,
+}
+
+impl Tier {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cheap => "cheap",
+            Self::Medium => "medium",
+            Self::Strong => "strong",
+        }
+    }
+}
+
+/// Outcome of an `EscalatingRetry` ladder, recorded in the escalating
+/// phase result. SingleModel omits the field via
+/// `#[serde(skip_serializing_if = "Option::is_none")]`.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinalStatus {
+    Succeeded,
+    Exhausted,
+    Aborted,
 }
 
 /// Phase result emitted by `Strategy::execute`.
 ///
-/// Field names and rename attributes are pinned to
-/// `docs/schemas/phase_result_single.schema.json`. Adding a field requires
-/// updating the schema in the same PR or the D2 snapshot test fails.
+/// Field names and rename attributes are pinned to the
+/// `docs/schemas/phase_result_*.schema.json` set. `final_status` is only
+/// populated by ladder strategies (currently `EscalatingRetry`); SingleModel
+/// omits the field so the same struct serialises against the single schema.
 #[derive(Debug, Clone, Serialize)]
 pub struct StrategyOutput {
     pub schema_version: u32,
@@ -133,12 +177,16 @@ pub struct StrategyOutput {
     #[serde(rename = "loker.run_id")]
     pub run_id: uuid::Uuid,
     pub attempts: Vec<Attempt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub final_status: Option<FinalStatus>,
 }
 
-/// Per-call record. SingleModel emits exactly one; ParallelFanOut /
-/// EscalatingRetry will emit N.
+/// Per-call record. SingleModel emits exactly one; `EscalatingRetry` emits
+/// one per ladder rung. `tier` is `Some` only on escalating attempts.
 #[derive(Debug, Clone, Serialize)]
 pub struct Attempt {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier: Option<Tier>,
     pub backend: String,
     pub model: String,
     pub finish_reasons: Vec<FinishReason>,
@@ -149,9 +197,9 @@ pub struct Attempt {
 
 /// Schema-aligned reason a backend stopped producing tokens.
 ///
-/// v0 maps every successful backend call to `FinishReason::Stop`; the
-/// value becomes data-driven once backends start surfacing real finish
-/// reasons in `QueryOutput`.
+/// v0 maps every successful backend call to `FinishReason::Stop` and every
+/// backend error to `FinishReason::Error`; the value becomes data-driven
+/// once backends start surfacing real finish reasons in `QueryOutput`.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -184,9 +232,9 @@ impl From<&TokenUsage> for TokenUsageReport {
     }
 }
 
-/// Verify-hook outcome recorded for an attempt. v0 always emits
-/// `VerifyOutcome::skipped()`; T-028 (verify hooks) is what flips this to
-/// real Pass / Fail values without touching SingleModel call sites.
+/// Verify-hook outcome recorded for an attempt. SingleModel always emits
+/// `VerifyOutcome::skipped()`; `EscalatingRetry` populates Pass / Fail
+/// using the configured `VerifyHook`.
 #[derive(Debug, Clone, Serialize)]
 pub struct VerifyOutcome {
     pub status: VerifyStatus,
@@ -198,6 +246,20 @@ impl VerifyOutcome {
         Self {
             status: VerifyStatus::Skipped,
             hook: None,
+        }
+    }
+
+    pub fn passed(hook: impl Into<String>) -> Self {
+        Self {
+            status: VerifyStatus::Pass,
+            hook: Some(hook.into()),
+        }
+    }
+
+    pub fn failed(hook: impl Into<String>) -> Self {
+        Self {
+            status: VerifyStatus::Fail,
+            hook: Some(hook.into()),
         }
     }
 }
@@ -214,7 +276,8 @@ pub enum VerifyStatus {
 /// Errors a `Strategy::execute` call can return. `Backend` carries the
 /// inner `BackendError` unchanged so callers can pattern-match the
 /// original variant (the FR-5 acceptance criterion: "error surfaces
-/// unchanged").
+/// unchanged"). `Exhausted` carries the full `StrategyOutput` so the
+/// caller can persist the schema-shaped JSON even on failure.
 #[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum StrategyError {
@@ -229,6 +292,9 @@ pub enum StrategyError {
 
     #[error("backend error: {0}")]
     Backend(#[from] BackendError),
+
+    #[error("escalating retry exhausted all backends")]
+    Exhausted { output: Box<StrategyOutput> },
 }
 
 /// Build the `model` field that lands in `Attempt`, applying the v0
@@ -250,8 +316,8 @@ pub(crate) fn pick_model(query: &QueryOutput, prompt: &Prompt) -> String {
 #[cfg(test)]
 mod future_variant_compiles {
     //! Compile-time check that the `Strategy` trait shape accommodates
-    //! future variants (CLO-258 EscalatingRetry, CLO-259 ParallelFanOut)
-    //! without modifying `SingleModel` or its call sites.
+    //! `ParallelFanOut` (CLO-259) without modifying `SingleModel`,
+    //! `EscalatingRetry`, or their call sites.
     //!
     //! Never executed; only ensures the trait remains object-safe and
     //! does not bake in single-call assumptions in its signature.

@@ -69,6 +69,7 @@ impl Strategy for SingleModel {
             .unwrap_or_default();
 
         let attempt = Attempt {
+            tier: None,
             backend: chosen.name().to_string(),
             model: pick_model(&query, prompt),
             finish_reasons: vec![FinishReason::Stop],
@@ -83,6 +84,7 @@ impl Strategy for SingleModel {
             phase: ctx.phase_name.clone(),
             run_id: ctx.run_id,
             attempts: vec![attempt],
+            final_status: None,
         })
     }
 }
