@@ -7,8 +7,10 @@ classification_reason: |
   silently skips when `LOKER_TZ_INTEGRATION` is unset, and drives a live
   `single_model` round-trip against a local TensorZero gateway when set.
   Acceptance criteria are mechanically testable (cargo test without env
-  var leaves it ignored/skipped; with env var it runs and passes; no CI
-  default flips it on). No architecture decisions required - the gateway
+  var: the test runs, returns early as a no-op, and is reported as passed
+  - it is NOT `#[ignore]`-gated, so `-- --ignored` semantics do not apply;
+  with env var it runs the live round-trip; no CI default flips it on).
+  No architecture decisions required - the gateway
   contract is already pinned by wiremock unit tests (CLO-248) and the D1
   spike. Mirrors CLO-247/248/249/250/251 spec workflow shape.
 

@@ -72,13 +72,17 @@ To run it:
 
 1. `cd tensorzero && docker compose up -d` to start the Tier-2 stack.
 2. Wait for `curl -fsS "${TENSORZERO_GATEWAY_URL:-http://localhost:3000}/health"`
-   to return 200.
+   to return 200. Note: for the probe, `TENSORZERO_GATEWAY_URL` must be the
+   gateway *root* (e.g. `http://host:3000`), not the `…/openai/v1`-suffixed
+   form. The backend's `normalize_endpoint` accepts both shapes for the
+   chat-completions call, but `/health` lives at the root.
 3. `LOKER_TZ_INTEGRATION=1 cargo test --test tensorzero_integration`.
 4. Optional overrides: `TENSORZERO_GATEWAY_URL` (default
-   `http://localhost:3000`), `LOKER_TZ_INTEGRATION_FUNCTION` (default
-   `loker_d1_openai`), `TENSORZERO_API_KEY` (any non-empty token - the
-   `genai` client prepends `Bearer ` automatically; the gateway accepts any
-   value, upstream provider enforces auth).
+   `http://localhost:3000`; root URL, no `/openai/v1` suffix),
+   `LOKER_TZ_INTEGRATION_FUNCTION` (default `loker_d1_openai`),
+   `TENSORZERO_API_KEY` (any non-empty token - the `genai` client prepends
+   `Bearer ` automatically; the gateway accepts any value, upstream provider
+   enforces auth).
 
 ## Function-name family convention (TensorZero, M1)
 
