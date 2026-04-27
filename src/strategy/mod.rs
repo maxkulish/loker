@@ -1,0 +1,283 @@
+//! Strategy primitives for orchestrating one or more backend calls within a phase.
+//!
+//! Per loker-design.md §4.2 a `Strategy` decides how a phase consumes backends:
+//! `SingleModel` (one backend, one prompt, one response - this module's
+//! variant), `ParallelFanOut` (CLO-259), `EscalatingRetry` (CLO-258). All
+//! three implement the same `Strategy` trait so the phase runner (T-029)
+//! can dispatch over them uniformly.
+//!
+//! ## Capability invariant
+//!
+//! Strategy code does *not* check `BackendCapabilities` at execute time.
+//! Capability validation runs at workflow load (FR-4 / CLO-251's
+//! `validate_with_capabilities`). By the time `Strategy::execute` runs the
+//! caller has already proven that every backend it passes can do what the
+//! strategy needs.
+
+use crate::backend::{Backend, BackendError, QueryOutput, TokenUsage};
+use crate::template::{TemplateContext, TemplateEngine, TemplateError};
+use async_trait::async_trait;
+use serde::Serialize;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+pub mod single_model;
+pub use single_model::SingleModel;
+
+/// `schema_version` value emitted by every `StrategyOutput`. Pinned to the
+/// const declared in `docs/schemas/phase_result_single.schema.json`.
+pub const SCHEMA_VERSION: u32 = 1;
+
+/// Phase-level prompt overrides applied on top of the strategy's own
+/// template. Currently carries an optional model override that passes
+/// through to `Backend::query(.., model)`.
+///
+/// `#[non_exhaustive]` so future fields (system prompt, tool definitions)
+/// land additively without breaking call sites.
+#[non_exhaustive]
+#[derive(Debug, Clone, Default)]
+pub struct Prompt {
+    pub model: Option<String>,
+}
+
+impl Prompt {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+}
+
+/// Per-phase metadata the strategy needs to render templates and stamp
+/// the resulting `StrategyOutput`.
+///
+/// Production callers (CLO-261 / T-029 phase runner) build this from the
+/// workflow definition; tests build it via `PhaseContext::new_for_test`.
+///
+/// `#[non_exhaustive]` so future fields (run dir path, verify config)
+/// land additively.
+#[non_exhaustive]
+pub struct PhaseContext {
+    pub phase_name: String,
+    pub run_id: uuid::Uuid,
+    pub cwd: PathBuf,
+    pub template_engine: Arc<TemplateEngine>,
+    pub template_context: TemplateContext,
+}
+
+impl PhaseContext {
+    /// Builds a `PhaseContext` with a fresh `TemplateEngine`, empty
+    /// `TemplateContext`, and `cwd` set to the current directory. Used
+    /// by integration tests today; production callers (CLO-261 / T-029)
+    /// can either call this and override fields or construct the struct
+    /// literally from the workflow definition.
+    pub fn new(phase_name: impl Into<String>, run_id: uuid::Uuid) -> Self {
+        Self {
+            phase_name: phase_name.into(),
+            run_id,
+            cwd: PathBuf::from("."),
+            template_engine: Arc::new(TemplateEngine::new()),
+            template_context: TemplateContext::new(&Default::default(), &[], &[]),
+        }
+    }
+}
+
+/// Strategy primitive: how a phase consumes backends.
+///
+/// Implementations must be `Send + Sync` so the phase runner can hold them
+/// behind `Arc<dyn Strategy>` and drive them across async tasks.
+///
+/// `prompt: &Prompt` is borrowed so the same prompt can be replayed by
+/// future strategies (`EscalatingRetry`, `ParallelFanOut`) without cloning.
+/// `backends: &[Arc<dyn Backend>]` matches the in-tree convention - the
+/// engine resolves backends to `Arc<dyn Backend>` via `create_backend`
+/// (`src/backend/mod.rs:346`). Design doc §4.2 sketches `&[Box<dyn Backend>]`;
+/// the `Arc` deviation is a deliberate alignment with the rest of the codebase.
+#[async_trait]
+pub trait Strategy: Send + Sync {
+    async fn execute(
+        &self,
+        backends: &[Arc<dyn Backend>],
+        prompt: &Prompt,
+        ctx: &PhaseContext,
+    ) -> Result<StrategyOutput, StrategyError>;
+}
+
+/// Discriminator for the active strategy, serialised into the
+/// `loker.strategy` field of `StrategyOutput`.
+///
+/// `#[non_exhaustive]` - new variants land alongside new strategy
+/// implementations (CLO-258, CLO-259).
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StrategyKind {
+    Single,
+}
+
+/// Phase result emitted by `Strategy::execute`.
+///
+/// Field names and rename attributes are pinned to
+/// `docs/schemas/phase_result_single.schema.json`. Adding a field requires
+/// updating the schema in the same PR or the D2 snapshot test fails.
+#[derive(Debug, Clone, Serialize)]
+pub struct StrategyOutput {
+    pub schema_version: u32,
+    #[serde(rename = "loker.strategy")]
+    pub strategy: StrategyKind,
+    #[serde(rename = "loker.phase")]
+    pub phase: String,
+    #[serde(rename = "loker.run_id")]
+    pub run_id: uuid::Uuid,
+    pub attempts: Vec<Attempt>,
+}
+
+/// Per-call record. SingleModel emits exactly one; ParallelFanOut /
+/// EscalatingRetry will emit N.
+#[derive(Debug, Clone, Serialize)]
+pub struct Attempt {
+    pub backend: String,
+    pub model: String,
+    pub finish_reasons: Vec<FinishReason>,
+    pub usage: TokenUsageReport,
+    pub output_path: String,
+    pub verify: VerifyOutcome,
+}
+
+/// Schema-aligned reason a backend stopped producing tokens.
+///
+/// v0 maps every successful backend call to `FinishReason::Stop`; the
+/// value becomes data-driven once backends start surfacing real finish
+/// reasons in `QueryOutput`.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinishReason {
+    Stop,
+    Length,
+    ToolCalls,
+    ContentFilter,
+    Error,
+}
+
+/// Token counts using the schema's wire names (`input_tokens`,
+/// `output_tokens`), distinct from `crate::backend::TokenUsage` which
+/// follows the OpenAI shape (`prompt_tokens`, `completion_tokens`).
+///
+/// Backends without usage reporting yield `{ input_tokens: 0,
+/// output_tokens: 0 }`; the schema requires the keys, not non-zero values.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct TokenUsageReport {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+impl From<&TokenUsage> for TokenUsageReport {
+    fn from(u: &TokenUsage) -> Self {
+        Self {
+            input_tokens: u.prompt_tokens,
+            output_tokens: u.completion_tokens,
+        }
+    }
+}
+
+/// Verify-hook outcome recorded for an attempt. v0 always emits
+/// `VerifyOutcome::skipped()`; T-028 (verify hooks) is what flips this to
+/// real Pass / Fail values without touching SingleModel call sites.
+#[derive(Debug, Clone, Serialize)]
+pub struct VerifyOutcome {
+    pub status: VerifyStatus,
+    pub hook: Option<String>,
+}
+
+impl VerifyOutcome {
+    pub fn skipped() -> Self {
+        Self {
+            status: VerifyStatus::Skipped,
+            hook: None,
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerifyStatus {
+    Pass,
+    Fail,
+    Skipped,
+}
+
+/// Errors a `Strategy::execute` call can return. `Backend` carries the
+/// inner `BackendError` unchanged so callers can pattern-match the
+/// original variant (the FR-5 acceptance criterion: "error surfaces
+/// unchanged").
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
+pub enum StrategyError {
+    #[error("backend not found: {name}")]
+    BackendNotFound { name: String },
+
+    #[error("no backends available")]
+    NoBackends,
+
+    #[error("prompt render failed: {0}")]
+    PromptRender(#[from] TemplateError),
+
+    #[error("backend error: {0}")]
+    Backend(#[from] BackendError),
+}
+
+/// Build the `model` field that lands in `Attempt`, applying the v0
+/// priority rule: prefer the value the backend reports, fall back to the
+/// model the prompt requested, otherwise the literal `"default"`.
+///
+/// The schema requires `model` to be a non-empty string; this helper
+/// guarantees that even when both sources are `None` the field is still
+/// populated.
+pub(crate) fn pick_model(query: &QueryOutput, prompt: &Prompt) -> String {
+    query
+        .model
+        .as_ref()
+        .or(prompt.model.as_ref())
+        .cloned()
+        .unwrap_or_else(|| "default".to_string())
+}
+
+#[cfg(test)]
+mod future_variant_compiles {
+    //! Compile-time check that the `Strategy` trait shape accommodates
+    //! future variants (CLO-258 EscalatingRetry, CLO-259 ParallelFanOut)
+    //! without modifying `SingleModel` or its call sites.
+    //!
+    //! Never executed; only ensures the trait remains object-safe and
+    //! does not bake in single-call assumptions in its signature.
+
+    use super::*;
+
+    struct StubFanOut;
+
+    #[async_trait]
+    impl Strategy for StubFanOut {
+        async fn execute(
+            &self,
+            _backends: &[Arc<dyn Backend>],
+            _prompt: &Prompt,
+            _ctx: &PhaseContext,
+        ) -> Result<StrategyOutput, StrategyError> {
+            unimplemented!("compile-time stub for future-variant check")
+        }
+    }
+
+    #[allow(dead_code)]
+    fn assert_object_safe(_: &dyn Strategy) {}
+
+    #[test]
+    fn stub_fan_out_implements_strategy() {
+        let stub: Arc<dyn Strategy> = Arc::new(StubFanOut);
+        assert_object_safe(&*stub);
+    }
+}
