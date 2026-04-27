@@ -167,10 +167,16 @@ impl Strategy for EscalatingRetry {
                     // Backend errored. Record it as an error-finished attempt
                     // and advance to the next rung. Per AC: non-retryable
                     // backend errors must not abort the ladder.
+                    let model = prompt
+                        .model
+                        .as_ref()
+                        .filter(|m| !m.is_empty())
+                        .cloned()
+                        .unwrap_or_else(|| "default".to_string());
                     attempts.push(Attempt {
                         tier: Some(rung.tier),
                         backend: rung.backend.clone(),
-                        model: prompt.model.clone().unwrap_or_else(|| rung.backend.clone()),
+                        model,
                         finish_reasons: vec![FinishReason::Error],
                         usage: TokenUsageReport::default(),
                         output_path,
