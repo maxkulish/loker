@@ -84,7 +84,7 @@ impl Backend for MockBackend {
 }
 
 fn ctx() -> PhaseContext {
-    PhaseContext::new_for_test("phase-1", uuid::Uuid::new_v4())
+    PhaseContext::new("phase-1", uuid::Uuid::new_v4())
 }
 
 fn run<F: std::future::Future>(f: F) -> F::Output {
@@ -97,7 +97,7 @@ fn happy_path_emits_one_attempt() {
     let backends: Vec<Arc<dyn Backend>> = vec![backend.clone()];
     let strategy = SingleModel::new("mock", "render-me");
 
-    let out = run(strategy.execute(&backends, &Prompt::new("render-me"), &ctx())).unwrap();
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
 
     assert_eq!(out.schema_version, SCHEMA_VERSION);
     assert_eq!(out.strategy, StrategyKind::Single);
@@ -117,7 +117,7 @@ fn no_retry_on_backend_error() {
     let backends: Vec<Arc<dyn Backend>> = vec![backend.clone()];
     let strategy = SingleModel::new("mock", "x");
 
-    let err = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap_err();
+    let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
 
     assert!(matches!(
         err,
@@ -133,7 +133,7 @@ fn no_aggregation_when_multiple_backends_present() {
     let backends: Vec<Arc<dyn Backend>> = vec![chosen.clone(), other.clone()];
     let strategy = SingleModel::new("chosen", "x");
 
-    let out = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap();
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
 
     assert_eq!(out.attempts.len(), 1);
     assert_eq!(out.attempts[0].backend, "chosen");
@@ -147,7 +147,7 @@ fn output_validates_against_d2_schema() {
     let backends: Vec<Arc<dyn Backend>> = vec![backend];
     let strategy = SingleModel::new("mock", "x");
 
-    let out = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap();
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
     let json = serde_json::to_value(&out).expect("serialize");
 
     let schema = load_schema();
@@ -166,7 +166,7 @@ fn prompt_render_failure_surfaces_template_error() {
     let backends: Vec<Arc<dyn Backend>> = vec![backend.clone()];
     let strategy = SingleModel::new("mock", "{{ steps.missing.output }}");
 
-    let err = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap_err();
+    let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
 
     assert!(matches!(err, StrategyError::PromptRender(_)));
     assert_eq!(
@@ -182,7 +182,7 @@ fn backend_not_found() {
     let backends: Vec<Arc<dyn Backend>> = vec![backend.clone()];
     let strategy = SingleModel::new("absent", "x");
 
-    let err = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap_err();
+    let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
 
     assert!(matches!(err, StrategyError::BackendNotFound { name } if name == "absent"));
     assert_eq!(backend.calls(), 0);
@@ -193,7 +193,7 @@ fn empty_backends_yields_no_backends_error() {
     let backends: Vec<Arc<dyn Backend>> = vec![];
     let strategy = SingleModel::new("mock", "x");
 
-    let err = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap_err();
+    let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
 
     assert!(matches!(err, StrategyError::NoBackends));
 }
@@ -226,7 +226,7 @@ fn missing_usage_serialises_zeroes() {
 
     let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(NoUsage)];
     let strategy = SingleModel::new("no-usage", "x");
-    let out = run(strategy.execute(&backends, &Prompt::new("x"), &ctx())).unwrap();
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
 
     assert_eq!(out.attempts[0].usage.input_tokens, 0);
     assert_eq!(out.attempts[0].usage.output_tokens, 0);
@@ -263,7 +263,7 @@ fn prompt_model_override_falls_through_to_attempt() {
 
     let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(NoModel)];
     let strategy = SingleModel::new("nm", "x");
-    let prompt = Prompt::new("x").with_model("override-model");
+    let prompt = Prompt::new().with_model("override-model");
 
     let out = run(strategy.execute(&backends, &prompt, &ctx())).unwrap();
     assert_eq!(out.attempts[0].model, "override-model");
@@ -274,7 +274,10 @@ fn load_schema() -> Validator {
     let raw =
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {}", path.display(), e));
     let schema: Value = serde_json::from_str(&raw).expect("parse schema");
-    Validator::new(&schema).expect("compile schema")
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .build(&schema)
+        .expect("compile schema")
 }
 
 fn repo_root() -> std::path::PathBuf {

@@ -11,7 +11,6 @@ use crate::strategy::{
     StrategyOutput, TokenUsageReport, VerifyOutcome, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
-use std::path::Path;
 use std::sync::Arc;
 
 /// Single-call strategy keyed by `backend` name (matched against
@@ -60,7 +59,7 @@ impl Strategy for SingleModel {
             .render(&self.prompt_template, &ctx.template_context)?;
 
         let query = chosen
-            .query(&rendered, Path::new("."), prompt.model.as_deref())
+            .query(&rendered, &ctx.cwd, prompt.model.as_deref())
             .await?;
 
         let usage = query

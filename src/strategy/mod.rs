@@ -18,6 +18,7 @@ use crate::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use crate::template::{TemplateContext, TemplateEngine, TemplateError};
 use async_trait::async_trait;
 use serde::Serialize;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod single_model;
@@ -27,25 +28,21 @@ pub use single_model::SingleModel;
 /// const declared in `docs/schemas/phase_result_single.schema.json`.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// Phase-level prompt: the mini-jinja source that the strategy renders
-/// before sending it to a backend, plus an optional model override that
-/// passes through to `Backend::query(.., model)`.
+/// Phase-level prompt overrides applied on top of the strategy's own
+/// template. Currently carries an optional model override that passes
+/// through to `Backend::query(.., model)`.
 ///
 /// `#[non_exhaustive]` so future fields (system prompt, tool definitions)
 /// land additively without breaking call sites.
 #[non_exhaustive]
 #[derive(Debug, Clone, Default)]
 pub struct Prompt {
-    pub template: String,
     pub model: Option<String>,
 }
 
 impl Prompt {
-    pub fn new(template: impl Into<String>) -> Self {
-        Self {
-            template: template.into(),
-            model: None,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
@@ -66,21 +63,22 @@ impl Prompt {
 pub struct PhaseContext {
     pub phase_name: String,
     pub run_id: uuid::Uuid,
+    pub cwd: PathBuf,
     pub template_engine: Arc<TemplateEngine>,
     pub template_context: TemplateContext,
 }
 
 impl PhaseContext {
-    /// Test-only constructor that builds a fresh `TemplateEngine` and an
-    /// empty `TemplateContext` so unit tests can drive `Strategy::execute`
-    /// without dragging in a full workflow loader. Reachable from integration
-    /// tests via `loker::strategy::PhaseContext::new_for_test`; production
-    /// callers (CLO-261 / T-029) build `PhaseContext` directly from the
-    /// workflow definition.
-    pub fn new_for_test(phase_name: impl Into<String>, run_id: uuid::Uuid) -> Self {
+    /// Builds a `PhaseContext` with a fresh `TemplateEngine`, empty
+    /// `TemplateContext`, and `cwd` set to the current directory. Used
+    /// by integration tests today; production callers (CLO-261 / T-029)
+    /// can either call this and override fields or construct the struct
+    /// literally from the workflow definition.
+    pub fn new(phase_name: impl Into<String>, run_id: uuid::Uuid) -> Self {
         Self {
             phase_name: phase_name.into(),
             run_id,
+            cwd: PathBuf::from("."),
             template_engine: Arc::new(TemplateEngine::new()),
             template_context: TemplateContext::new(&Default::default(), &[], &[]),
         }
@@ -241,13 +239,12 @@ pub enum StrategyError {
 /// guarantees that even when both sources are `None` the field is still
 /// populated.
 pub(crate) fn pick_model(query: &QueryOutput, prompt: &Prompt) -> String {
-    if let Some(m) = query.model.as_ref() {
-        return m.clone();
-    }
-    if let Some(m) = prompt.model.as_ref() {
-        return m.clone();
-    }
-    "default".to_string()
+    query
+        .model
+        .as_ref()
+        .or(prompt.model.as_ref())
+        .cloned()
+        .unwrap_or_else(|| "default".to_string())
 }
 
 #[cfg(test)]

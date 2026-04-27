@@ -1,20 +1,21 @@
-pub mod apply_verify;
+// Most modules are private to this library and are surfaced only because
+// they sit in the dependency closure of the public ones (`strategy` →
+// `template` → `workflow` → ...). The binary (src/main.rs) re-declares
+// them via its own private `mod` tree, so this file's job is just to
+// satisfy the lib-side compile and expose the integration-test surface.
+#![allow(dead_code)]
+
 pub mod backend;
-pub mod cache;
-pub mod conductor;
-pub mod config;
-pub mod consensus;
-pub mod context;
-pub mod debate;
-pub mod delegation;
-pub mod git_agent;
-pub mod output;
-pub mod role;
-pub mod spawn;
 pub mod strategy;
-pub mod tasks;
-pub mod team;
 pub mod template;
-pub mod utils;
-pub mod workflow;
-pub mod workflows;
+
+mod apply_verify;
+mod cache;
+mod config;
+mod consensus;
+mod context;
+mod git_agent;
+mod role;
+mod utils;
+mod workflow;
+mod workflows;
