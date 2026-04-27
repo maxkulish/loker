@@ -35,12 +35,12 @@ Phase 1 - 4.
 | ~~T-003~~ | CLO-245 done | D3 atomic run-state rules. Pick between `.tmp + rename + status marker` vs. attempt-directory schemes; document the chosen write protocol + fault-injection plan in `docs/run-state.md`. | - | T-024, T-031 | §11 D3 | [parallel-ok] |
 | ~~T-004~~ | CLO-246 done | D4 UI threat model. Concrete attacker model (cross-origin tabs, extensions, symlinks, traversal, stale locks) + mitigations + M11 test list in `docs/security/2026-04-25-ui-threat-model.md`. | - | T-050 onward | §11 D4 | [parallel-ok] |
 
-## Phase 1 - HTTP-gateway backend (M1, in flight)
+## Phase 1 - HTTP-gateway backend (M1, complete)
 
 `src/backend/tensorzero.rs` is already scaffolded. T-005 reconciles it
 with the spike findings; the rest hardens it to the FR-2 / FR-3 contract.
 
-**Status (2026-04-27): T-005/T-006/T-007/T-008/T-010 all shipped. Only T-009 (opt-in integration test) remains in Phase 1; Phase 2 fully unblocked.**
+**Status (2026-04-27): all six tasks shipped. M1 done.**
 
 | ID | Linear | Task | After | Blocks | PRD |
 |----|--------|------|-------|--------|-----|
@@ -48,19 +48,21 @@ with the spike findings; the rest hardens it to the FR-2 / FR-3 contract.
 | ~~T-006~~ | CLO-248 done | Wiremock unit-test contract per M1 plan: 200, 429, 500, malformed JSON, timeout, auth fail. | T-005 | T-009, Phase 2 | FR-2 |
 | ~~T-007~~ | CLO-249 done | Error mapping `genai::Error -> BackendError`. Single source of truth for retryability flags. | T-005 | T-013 | FR-2 |
 | ~~T-008~~ | CLO-250 done | Config schema for TensorZero in `src/config.rs` (endpoint, default model, timeout, retry policy). | T-005 | T-034 | FR-2 |
-| T-009 | CLO-252 | Opt-in integration test gated by `LOKER_TZ_INTEGRATION=1`. One end-to-end round-trip against local gateway. | T-006 | - | FR-2 |
+| ~~T-009~~ | CLO-252 done | Opt-in integration test gated by `LOKER_TZ_INTEGRATION=1`. One end-to-end round-trip against local gateway. | T-006 | - | FR-2 |
 | ~~T-010~~ | CLO-251 done | `BackendCapabilities` struct: tool-use, streaming, file-edit. Validation rejects backends missing required capability. | T-005 | T-029 | FR-4 |
 
-## Phase 2 - Strategy primitives (M2)
+## Phase 2 - Strategy primitives (M2, in flight)
 
 Depends on Phase 1 (`Backend` trait + at least one impl). Parallel with
 Phase 3 and 4. Internal order is sequential.
 
+**Status (2026-04-27): T-011 (CLO-257) + T-013 (CLO-258) shipped. T-012 and T-014 unblocked.**
+
 | ID | Linear | Task | After | Blocks | PRD |
 |----|--------|------|-------|--------|-----|
-| T-011 | CLO-257 | `Strategy::SingleModel`: one backend, one prompt, one response. Mock-backend unit test. | T-006 | T-029 | FR-5 |
+| ~~T-011~~ | CLO-257 done | `Strategy::SingleModel`: one backend, one prompt, one response. Mock-backend unit test. | T-006 | T-029 | FR-5 |
 | T-012 | CLO-259 | `Strategy::ParallelFanOut` with `min_responses` floor. Surplus failures tolerated. | T-011 | T-029 | FR-6 |
-| T-013 | CLO-258 | `Strategy::EscalatingRetry` walker. Stops at first verify pass; exhausts list with structured error. | T-007, T-020 | T-014, T-029 | FR-7 |
+| ~~T-013~~ | CLO-258 done | `Strategy::EscalatingRetry` walker. Stops at first verify pass; exhausts list with structured error. | T-007, T-020 | T-014, T-029 | FR-7 |
 | T-014 | CLO-260 | `pass_failure_context` flag on `EscalatingRetry`. Off in v0 default; on in design-doc-tdd. | T-013 | T-035 | FR-8 |
 
 ## Phase 3 - Aggregator vocabulary (M3)
