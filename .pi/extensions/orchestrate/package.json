@@ -1,0 +1,15 @@
+{
+  "name": "pi-task-orchestrator-loker",
+  "version": "1.0.0",
+  "description": "Task lifecycle orchestrator for the Loker project (CLO / Linear)",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {},
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0"
+  }
+}

@@ -1,3 +1,6 @@
 /target/
 .lok/
 tensorzero/.env
+
+# Node (pi extensions)
+node_modules/
