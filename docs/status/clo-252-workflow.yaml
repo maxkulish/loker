@@ -1,0 +1,145 @@
+task_id: CLO-252
+task_title: "Add opt-in tensorzero integration test gated by LOKER_TZ_INTEGRATION (FR-2)"
+task_url: "https://linear.app/cloud-ai/issue/CLO-252/add-opt-in-tensorzero-integration-test-gated-by-loker-tz-integration"
+task_type: specification
+classification_reason: |
+  Single-purpose test addition: one integration test under `tests/` that
+  silently skips when `LOKER_TZ_INTEGRATION` is unset, and drives a live
+  `single_model` round-trip against a local TensorZero gateway when set.
+  Acceptance criteria are mechanically testable (cargo test without env
+  var: the test runs, returns early as a no-op, and is reported as passed
+  - it is NOT `#[ignore]`-gated, so `-- --ignored` semantics do not apply;
+  with env var it runs the live round-trip; no CI default flips it on).
+  No architecture decisions required - the gateway
+  contract is already pinned by wiremock unit tests (CLO-248) and the D1
+  spike. Mirrors CLO-247/248/249/250/251 spec workflow shape.
+
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-252-add-opt-in-tensorzero-integration-test-gated-by
+  branch_actual: feat/clo-252-tests
+  blocks: []
+  blocked_by:
+    - "CLO-248 (T-006 wiremock unit-test contract) - merged 2026-04-26 (PR #9, commit abf5b72)"
+
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: "2026-04-27T00:00:00Z"
+  updated_at: "2026-04-27T16:25:00Z"
+
+phases:
+  discovery:
+    status: skipped
+    skip_reason: "Specification task - PRD FR-2 + plan T-009 already specify exactly what the test must do (env-gated, single-model round-trip, skipped by default). Wiremock contract from CLO-248 already pins gateway behaviour. No discovery needed."
+    approved: true
+  design:
+    status: skipped
+    skip_reason: "Specification task - using /spec instead of full design doc. No architecture decisions; the test shape, env-var name, and skip semantics are all named in the Linear ticket and plan."
+  spec:
+    status: complete
+    spec_file: "specs/2026-04-27-clo-252-tensorzero-integration-test.md"
+    approved: true
+    review_completed: false
+    review_skip_reason: "No .lok/workflows/spec-review.toml in repo - consistent with CLO-247/248/249/250/251 prior specs. AI review skipped."
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_applied: false
+    applied_suggestions: []
+    flagged_suggestions: []
+    auto_approval_reason: |
+      Auto mode active. Spec is mechanically-testable, no architecture decisions,
+      mirrors CLO-247/248/249/250/251 specification workflow shape. The wiremock
+      layer (CLO-248) already pins gateway contract; this task adds the live-stack
+      smoke test. Sub-tasks ST1 -> ST2 -> ST3 are linear and low-risk: one new
+      test file plus a doc snippet. Proceeding to implement.
+  implement:
+    status: complete
+    sub_tasks:
+      - id: ST1
+        status: complete
+        details: "Created tests/tensorzero_integration.rs with env-gated #[tokio::test]. Skip path silent (return early when LOKER_TZ_INTEGRATION unset/empty)."
+      - id: ST2
+        status: complete
+        details: "Filled in live round-trip body. Reads TENSORZERO_GATEWAY_URL (default http://localhost:3000), LOKER_TZ_INTEGRATION_FUNCTION (default loker_d1_openai), TENSORZERO_API_KEY. Builds TensorZeroBackend with 5s timeout, queries 'Reply with the single word: pong.', asserts backend name, non-empty stdout, QueryOutput.model equals effective input function name (pinning the contract that backend stamps effective input, not gateway echo), usage prompt_tokens/completion_tokens > 0, duration > ZERO."
+      - id: ST3
+        status: complete
+        details: "Extended docs/handoff.md Constraints section with 'How to run the live integration test' subsection (4 numbered steps + 3 optional env-var overrides)."
+    verification:
+      ac1: "Test name + silent early-return path verified by reading source."
+      ac2: "Env-var defaults reuse spike values; verified by reading source."
+      ac3: "All 6 structural assertions present; verified by reading source."
+      ac4: "cargo test -q --test tensorzero_integration: 1 passed; 0 failed; 0 ignored; 0.00s."
+      ac5: "Manual verification deferred to operator with live stack (per spec)."
+      ac6: "rg 'LOKER_TZ_INTEGRATION|tensorzero' .github/ -> 0 matches."
+      ac7: "docs/handoff.md updated; diff +15 lines."
+      ac8: "make check exits 0; fmt + clippy + all test binaries green."
+      ac9: "Imports limited to loker::backend::{Backend, TensorZeroBackend, TensorZeroBackendOpts} + std + tokio. No new dev-dependencies."
+  pr:
+    status: open
+    pr_url: "https://github.com/maxkulish/loker/pull/12"
+    pr_number: 12
+    branch_pushed: true
+    commit_sha: "6b26449"
+    reviews_addressed: 3
+  complete:
+    status: pending
+
+history:
+  - timestamp: "2026-04-27T00:00:00Z"
+    action: workflow_started
+    phase: spec
+    details: "Created CLO-252 workflow as specification task. Blocker CLO-248 resolved (PR #9 merged 2026-04-26, commit abf5b72). Branch feat/clo-252-tests already checked out. No PROJECT.md/DEPENDENCIES.md/ROADMAP.md aggregation files in this repo, so /project:sync --start step skipped (consistent with CLO-247/248/249/250/251)."
+  - timestamp: "2026-04-27T15:13:00Z"
+    action: spec_drafted
+    phase: spec
+    details: "Drafted specs/2026-04-27-clo-252-tensorzero-integration-test.md (5 sections, 9 ACs, 3 sub-tasks, 12-row evaluation table). Test file target tests/tensorzero_integration.rs; one #[tokio::test] gated by LOKER_TZ_INTEGRATION env var with silent skip path. Reuses spike defaults (TENSORZERO_GATEWAY_URL=http://localhost:3000, function loker_d1_openai)."
+  - timestamp: "2026-04-27T15:15:00Z"
+    action: spec_review_complete
+    phase: spec
+    details: "AI review skipped - no .lok/workflows/spec-review.toml present in repo (consistent with CLO-247/248/249/250/251 spec workflows that all skipped review for the same reason)."
+  - timestamp: "2026-04-27T15:15:00Z"
+    action: spec_approved
+    phase: spec
+    details: "Auto-approved per auto mode. Spec is mechanically-testable, no architecture decisions, mirrors prior approved specs. Sub-task decomposition is the implementation plan."
+  - timestamp: "2026-04-27T15:15:00Z"
+    action: phase_completed
+    phase: spec
+    details: "Spec phase complete. Transitioning to implement phase."
+  - timestamp: "2026-04-27T15:25:00Z"
+    action: implementation_complete
+    phase: implement
+    details: "ST1+ST2 landed in tests/tensorzero_integration.rs (one #[tokio::test] gated by LOKER_TZ_INTEGRATION). Skip path silent. ST3 extended docs/handoff.md with 'How to run the live integration test' subsection."
+  - timestamp: "2026-04-27T15:28:00Z"
+    action: phase_completed
+    phase: implement
+    details: "make check exit 0: rustfmt clean, clippy clean under -D warnings, all 6 test binaries pass. New tensorzero_integration test reports 1 passed; 0 ignored; 0.00s when env var unset (AC4). AC1-AC4, AC6, AC8, AC9 verified mechanically; AC5 (live stack) is manual verification deferred to operator."
+  - timestamp: "2026-04-27T15:35:00Z"
+    action: commit_created
+    phase: pr
+    details: "Commit ef22c77 on feat/clo-252-tests: 4 files, +529 -0. Includes spec, workflow YAML, test file, handoff doc snippet."
+  - timestamp: "2026-04-27T15:36:00Z"
+    action: pushed_to_remote
+    phase: pr
+    details: "Branch feat/clo-252-tests pushed to origin (new branch, tracking set)."
+  - timestamp: "2026-04-27T15:36:00Z"
+    action: pr_created
+    phase: pr
+    details: "PR #12 opened: https://github.com/maxkulish/loker/pull/12"
+  - timestamp: "2026-04-27T15:50:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 5 review comments (1 gemini high, 1 gemini medium, 3 Copilot), pushed 2629892, replied to all comments with /gemini review trailer. Fixes: (a) tests/tensorzero_integration.rs model assertion now pins effective_input contract instead of unreachable response-echo prefix; (b) gateway_url()/function_name() helpers fall back to defaults on empty/whitespace env vars; (c) docs/handoff.md /health probe parameterized with TENSORZERO_GATEWAY_URL; (d) Bearer wording clarified to avoid double-prefix confusion."
+  - timestamp: "2026-04-27T16:10:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 4 round-2 Copilot comments flagging doc/code drift introduced by the round-1 model-assertion fix. Pushed 87a4a23, replied to all 4 with /gemini review trailer. Fixes are documentation-only (no logic change): (a) tests/tensorzero_integration.rs module doc now explicitly states the test does NOT assert the gateway echo because TensorZeroBackend::query overwrites QueryOutput.model with the effective input; (b) specs AC3 bullet (4) rewritten to describe the actual assert_eq!(out.model, function) effective-input contract; (c) specs AC3 bullet (5) field names corrected (prompt_tokens/completion_tokens); (d) workflow YAML ST2 details string updated to match current test body. make check green."
+  - timestamp: "2026-04-27T16:25:00Z"
+    action: review_addressed
+    phase: pr
+    details: "Addressed 2 round-3 Copilot doc nits. Pushed 6b26449, replied to both with /gemini review trailer. Documentation-only changes (no code touched): (a) docs/handoff.md /health probe step now clarifies TENSORZERO_GATEWAY_URL must be the gateway root (no /openai/v1 suffix) - because normalize_endpoint accepts both shapes for chat-completions but /health lives at the root; (b) workflow YAML classification_reason reworded to drop ambiguous 'ignored/skipped' phrasing that implied #[ignore]/`-- --ignored` semantics, replaced with explicit 'runs, returns early as a no-op, and is reported as passed' description. make check green."
