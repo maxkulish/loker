@@ -30,7 +30,7 @@ workflow:
   current_phase: pr
   status: in_progress
   created_at: '2026-04-27T00:00:00Z'
-  updated_at: '2026-04-27T21:02:38.782Z'
+  updated_at: '2026-04-27T21:10:34.626Z'
 phases:
   discovery:
     status: skipped
@@ -68,8 +68,10 @@ phases:
     codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-260-gemini-validation.md
   pr:
-    status: pending
+    status: in_progress
     ci_passed: false
+    pr_url: https://github.com/maxkulish/loker/pull/17
+    pr_number: 17
   complete:
     status: pending
 history:
@@ -134,3 +136,10 @@ history:
     details: >-
       cargo fmt --check: clean. cargo clippy -- -D warnings: clean (after cargo clean + rebuild). cargo test: 501+ tests
       pass.
+  - timestamp: '2026-04-27T21:10:34.626Z'
+    action: pr_created
+    phase: pr
+    details: >-
+      PR #17 already opened on this branch (https://github.com/maxkulish/loker/pull/17). Posted Linear comment with PR
+      summary + validation gate results; transitioned CLO-260 to "In Review". Branch carries unrelated commit 4ad0747
+      (orchestrator phase-transition automation) flagged in PR body.
