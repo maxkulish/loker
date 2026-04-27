@@ -40,16 +40,16 @@ Phase 1 - 4.
 `src/backend/tensorzero.rs` is already scaffolded. T-005 reconciles it
 with the spike findings; the rest hardens it to the FR-2 / FR-3 contract.
 
-**Status (2026-04-26): T-005 (CLO-247) + T-007 (CLO-249) shipped via PRs #7 and #8 - T-006/T-008/T-010 unblocked; T-013 (CLO-258) gains its retryability dependency.**
+**Status (2026-04-27): T-005/T-006/T-007/T-008/T-010 all shipped. Only T-009 (opt-in integration test) remains in Phase 1; Phase 2 fully unblocked.**
 
 | ID | Linear | Task | After | Blocks | PRD |
 |----|--------|------|-------|--------|-----|
 | ~~T-005~~ | CLO-247 done | Reconcile in-flight `tensorzero.rs` with D1 findings. Confirm `genai::ServiceTargetResolver` wiring, header set, model-name mapping. | T-001 | T-006 | FR-3 |
-| T-006 | CLO-248 | Wiremock unit-test contract per M1 plan: 200, 429, 500, malformed JSON, timeout, auth fail. | T-005 | T-009, Phase 2 | FR-2 |
+| ~~T-006~~ | CLO-248 done | Wiremock unit-test contract per M1 plan: 200, 429, 500, malformed JSON, timeout, auth fail. | T-005 | T-009, Phase 2 | FR-2 |
 | ~~T-007~~ | CLO-249 done | Error mapping `genai::Error -> BackendError`. Single source of truth for retryability flags. | T-005 | T-013 | FR-2 |
-| T-008 | CLO-250 | Config schema for TensorZero in `src/config.rs` (endpoint, default model, timeout, retry policy). | T-005 | T-034 | FR-2 |
+| ~~T-008~~ | CLO-250 done | Config schema for TensorZero in `src/config.rs` (endpoint, default model, timeout, retry policy). | T-005 | T-034 | FR-2 |
 | T-009 | CLO-252 | Opt-in integration test gated by `LOKER_TZ_INTEGRATION=1`. One end-to-end round-trip against local gateway. | T-006 | - | FR-2 |
-| T-010 | CLO-251 | `BackendCapabilities` struct: tool-use, streaming, file-edit. Validation rejects backends missing required capability. | T-005 | T-029 | FR-4 |
+| ~~T-010~~ | CLO-251 done | `BackendCapabilities` struct: tool-use, streaming, file-edit. Validation rejects backends missing required capability. | T-005 | T-029 | FR-4 |
 
 ## Phase 2 - Strategy primitives (M2)
 
