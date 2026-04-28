@@ -1,0 +1,129 @@
+task_id: clo-268
+task_type: development
+classification_reason: >-
+  Title starts with 'Implement' but this appears to be feature-development work rather than pure
+  documentation/specification, so defaulting to development. No **Type:** signals or operational labels found.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by:
+    - CLO-265
+  priority: Medium
+  branch_suggested: kmamemo/clo-268-implement-aggregatorllmjudge-with-cross-family-enforcement
+  branch_actual: feat/clo-268-llm-judge
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-04-28T20:08:05.347Z'
+  updated_at: '2026-04-28T20:27:23.819Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: Extract llm_judge.rs module under src/aggregator/
+    approaches_identified: 3
+    baseline_score: 7
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-268.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-268-llm-judge.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-268-llm-judge.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions:
+      - Prompt template default clarified as mandatory
+      - Warning scope includes judge backend + candidate name
+      - Candidate truncation noted as open question
+    flagged_suggestions:
+      - id: BackendError granularity for judge
+        reason: All BackendError variants map to JudgeUnavailable in v0. Future refinement deferred to post-T-029.
+    review_completed: true
+    review_gemini: docs/reviews/clo-268-design-gemini.md
+    review_synthesis: docs/reviews/clo-268-design-synthesis.md
+    review_verdict: approve_with_changes
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-268-llm-judge.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-04-28T20:08:05.347Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-268 as development
+  - timestamp: '2026-04-28T20:08:26.746Z'
+    action: workflow_resumed
+    phase: init
+    details: >-
+      Hydrated from Linear issue CLO-268. Title: 'Implement Aggregator::LLMJudge with cross-family enforcement'.
+      Classified as development: task is implementation-focused and no explicit Type/label signal for specification or
+      operational mode.
+  - timestamp: '2026-04-28T20:08:34.345Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-28T20:19:06.163Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-268-llm-judge checked out from main
+  - timestamp: '2026-04-28T20:22:58.300Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: Extract llm_judge.rs module under src/aggregator/. Baseline 7/10. 3 approaches considered (B chosen, A
+      and C rejected).
+  - timestamp: '2026-04-28T20:23:03.964Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-04-28T20:26:20.011Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc draft at docs/designs/clo-268-llm-judge.md
+  - timestamp: '2026-04-28T20:26:25.670Z'
+    action: design_review_complete
+    phase: design
+    details: 'Review verdict: approve_with_changes. 3 applied, 1 flagged.'
+  - timestamp: '2026-04-28T20:26:33.799Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. All applied suggestions integrated: mandatory prompt_template, grep-friendly warning,
+      truncation documented as open question. Public API signatures compile mentally; test plan enumerates 9 unit + 5
+      integration tests.
+  - timestamp: '2026-04-28T20:26:36.488Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-04-28T20:27:16.447Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-268-llm-judge.md
+  - timestamp: '2026-04-28T20:27:20.851Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 6 sub-tasks queued (3xS, 3xM). Pre-merge gate: make check.'
+  - timestamp: '2026-04-28T20:27:23.819Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+task_title: Implement Aggregator::LLMJudge with cross-family enforcement
+task_url: https://linear.app/cloud-ai/issue/CLO-268/implement-aggregatorllmjudge-with-cross-family-enforcement

@@ -135,6 +135,9 @@ pub enum PhaseError {
 
     #[error("aggregator contract violation: {message}")]
     AggregatorContract { message: String },
+
+    #[error("judge unavailable: {detail}")]
+    JudgeUnavailable { detail: String },
 }
 
 /// Verify that every backend in `targets` resolves to a *different*
@@ -398,5 +401,13 @@ mod tests {
                 _ => panic!("expected FamilyOverlap, got {next:?}"),
             }
         }
+    }
+
+    #[test]
+    fn judge_unavailable_display() {
+        let err = PhaseError::JudgeUnavailable {
+            detail: "network timeout".into(),
+        };
+        assert_eq!(err.to_string(), "judge unavailable: network timeout");
     }
 }

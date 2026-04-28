@@ -26,6 +26,11 @@ pub const EMPTY_CONCAT_SENTINEL: &str =
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Aggregator {
     Concat { heading_template: String },
+    LLMJudge {
+        judge_backend: String,
+        prompt_template: String,
+        require_judge_different_family: bool,
+    },
 }
 
 impl Aggregator {
@@ -36,10 +41,24 @@ impl Aggregator {
         }
     }
 
+    /// Build an LLM judge aggregator with the provided configuration.
+    pub fn llm_judge(
+        judge_backend: impl Into<String>,
+        prompt_template: impl Into<String>,
+        require_judge_different_family: bool,
+    ) -> Self {
+        Self::LLMJudge {
+            judge_backend: judge_backend.into(),
+            prompt_template: prompt_template.into(),
+            require_judge_different_family,
+        }
+    }
+
     /// Return the schema-facing strategy aggregator label for this behavior.
     pub fn kind(&self) -> crate::strategy::Aggregator {
         match self {
             Self::Concat { .. } => crate::strategy::Aggregator::Concat,
+            Self::LLMJudge { .. } => crate::strategy::Aggregator::LLMJudge,
         }
     }
 
@@ -47,6 +66,9 @@ impl Aggregator {
     pub fn aggregate(&self, input: AggregateInput) -> Result<AggregatedArtifact, AggregatorError> {
         match self {
             Self::Concat { heading_template } => aggregate_concat(heading_template, input),
+            Self::LLMJudge { .. } => Err(AggregatorError::Unsupported(
+                "LLMJudge requires async backend access; use aggregate_llm_judge()".into(),
+            )),
         }
     }
 }
@@ -371,6 +393,14 @@ mod tests {
         assert_eq!(
             Aggregator::concat("## {backend_id}").kind(),
             crate::strategy::Aggregator::Concat
+        );
+    }
+
+    #[test]
+    fn llm_judge_kind_maps_to_strategy_label() {
+        assert_eq!(
+            Aggregator::llm_judge("judge", "template", true).kind(),
+            crate::strategy::Aggregator::LLMJudge
         );
     }
 
