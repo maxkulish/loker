@@ -21,10 +21,10 @@ linear:
   priority: Medium
   branch_actual: feat/clo-259-parallel
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-04-27T19:16:11.286Z'
-  updated_at: '2026-04-27T20:54:27.455Z'
+  updated_at: '2026-04-27T21:25:00.000Z'
 phases:
   discovery:
     status: complete
@@ -70,12 +70,23 @@ phases:
     codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-259-gemini-validation.md
   pr:
-    status: in_progress
+    status: complete
     ci_passed: true
     pr_number: 16
     pr_url: https://github.com/maxkulish/loker/pull/16
+    approved: true
+    reviews_addressed: 4
+    review_summary: >-
+      Copilot left 4 inline comments against b94e2ce. All addressed in b9955f9
+      (typed Option<Aggregator>, min_responses>0 assert in new(), tokio::time::sleep
+      in async query for both src and tests mock backends). GitHub re-anchored 2 of
+      the comments to b9955f9 after the rebase, but the underlying issues are fixed.
+      Gemini review: 'I have no feedback to provide'. CI green on b9955f9.
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_files_skipped_reason: PROJECT.md/ROADMAP.md/DEPENDENCIES.md not present in repo
+    merged_at: '2026-04-27T21:15:26Z'
 history:
   - timestamp: '2026-04-27T19:16:11.286Z'
     action: workflow_started
@@ -175,6 +186,32 @@ history:
     action: ci_passed
     phase: pr
     details: 'CI passed: clippy 38s, format 16s, test 2m5s. All green on PR #16.'
+  - timestamp: '2026-04-27T21:11:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Copilot left 4 inline comments at 20:56:54Z against b94e2ce. Pushed b9955f9 at
+      ~21:08Z addressing all 4 (typed Option<Aggregator>, assert! min_responses>0,
+      tokio::time::sleep in async query for src+tests). Gemini: no feedback. CI green
+      on b9955f9 (clippy 27s, format 14s, test 2m6s).
+  - timestamp: '2026-04-27T21:14:10.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Posted 4/4 inline replies citing b9955f9 fix locations, each ending with
+      "/gemini review" trailer to trigger Gemini re-validation. Reply IDs:
+      3150228791, 3150229083, 3150229241, 3150229391.
+  - timestamp: '2026-04-27T21:15:26.000Z'
+    action: pr_merged
+    phase: pr
+    details: 'PR #16 merged to main at 21:15:26Z.'
+  - timestamp: '2026-04-27T21:25:00.000Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-259 fully completed. Aggregation files (PROJECT/ROADMAP/DEPENDENCIES) not
+      present in repo - skipped per init-time decision. Linear status update pending
+      explicit user confirmation.
 task_title: Implement Strategy::ParallelFanOut with min_responses floor
 task_url: https://linear.app/cloud-ai/issue/CLO-259/implement-strategyparallelfanout-with-min-responses-floor
 review_notes: Design self-reviewed due to missing tooling
