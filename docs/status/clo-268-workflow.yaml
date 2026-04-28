@@ -21,10 +21,10 @@ linear:
   branch_suggested: kmamemo/clo-268-implement-aggregatorllmjudge-with-cross-family-enforcement
   branch_actual: feat/clo-268-llm-judge
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-04-28T20:08:05.347Z'
-  updated_at: '2026-04-28T20:37:29.327Z'
+  updated_at: '2026-04-28T21:32:03.812Z'
 phases:
   discovery:
     status: complete
@@ -59,10 +59,18 @@ phases:
     plan_file: docs/plans/clo-268-llm-judge.md
     approved: true
   implement:
-    status: pending
+    status: complete
     commits:
       - 1cb6b70
       - dd40343
+      - c227142
+    codex_report: docs/reviews/clo-268-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve
+    gemini_validation_report: docs/reviews/clo-268-gemini-validation.md
+    validation_synthesis_report: docs/reviews/clo-268-validation-synthesis.md
+    validation_synthesis_verdict: approve
+    validation_fix_iteration_count: 1
   pr:
     status: pending
   complete:
@@ -136,5 +144,43 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: LLMJudge family check, prompt builder, ballot parser. Commit dd40343.'
+  - timestamp: '2026-04-28T20:59:08.507Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST3 complete: added aggregate_llm_judge function + integration helpers in src/aggregator/llm_judge.rs; unit tests
+      renamed per acceptance: llm_judge_family_*, llm_judge_prompt_*, llm_judge_parse_*.
+  - timestamp: '2026-04-28T20:59:10.260Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST4 complete: wired Aggregator::LLMJudge into ParallelFanOut with branch success collection, judge call, ballot
+      parse, and phase error mapping.
+  - timestamp: '2026-04-28T20:59:12.169Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 complete: added tests/aggregator_llm_judge.rs with llm_judge_* integration cases and wire-call path coverage.'
+  - timestamp: '2026-04-28T20:59:14.951Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST6 complete: added AggregatedArtifact snapshot test (insta) and phase_result_parallel schema validation in
+      llm_judge_* integration test.
+  - timestamp: '2026-04-28T21:31:44.128Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      Fixed remaining must-fix items: removed LLMJudge min_responses short-circuit, persisted aggregate artifact to
+      aggregate_output_path, and added full-set behavior test + snapshot naming fix. `make check` green.
+  - timestamp: '2026-04-28T21:31:51.670Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex and Gemini validation reports updated. New synthesis added at docs/reviews/clo-268-validation-synthesis.md:
+      no must-fix items remain; validation_fix_iteration_count=1.
+  - timestamp: '2026-04-28T21:32:03.812Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
 task_title: Implement Aggregator::LLMJudge with cross-family enforcement
 task_url: https://linear.app/cloud-ai/issue/CLO-268/implement-aggregatorllmjudge-with-cross-family-enforcement

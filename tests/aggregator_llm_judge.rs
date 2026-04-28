@@ -23,6 +23,7 @@ struct MockBackend {
     name: String,
     calls: AtomicUsize,
     response: Box<dyn Fn(usize) -> Result<QueryOutput, BackendError> + Send + Sync>,
+    delay_ms: Option<u64>,
 }
 
 impl MockBackend {
@@ -39,6 +40,7 @@ impl MockBackend {
                     Duration::from_millis(1),
                 ))
             }),
+            delay_ms: None,
         })
     }
 
@@ -47,6 +49,24 @@ impl MockBackend {
             name: name.to_string(),
             calls: AtomicUsize::new(0),
             response: Box::new(move |_| Err(error())),
+            delay_ms: None,
+        })
+    }
+
+    fn slow(name: &str, text: &str, delay_ms: u64) -> Arc<Self> {
+        let backend_name = name.to_string();
+        let text_owned = text.to_string();
+        Arc::new(Self {
+            name: name.to_string(),
+            calls: AtomicUsize::new(0),
+            response: Box::new(move |_| {
+                Ok(QueryOutput::from_text(
+                    text_owned.clone(),
+                    backend_name.clone(),
+                    Duration::from_millis(delay_ms),
+                ))
+            }),
+            delay_ms: Some(delay_ms),
         })
     }
 
@@ -67,6 +87,10 @@ impl Backend for MockBackend {
         _cwd: &Path,
         _model: Option<&str>,
     ) -> Result<QueryOutput, BackendError> {
+        if let Some(delay_ms) = self.delay_ms {
+            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        }
+
         let n = self.calls.fetch_add(1, Ordering::SeqCst);
         (self.response)(n)
     }
@@ -77,7 +101,8 @@ impl Backend for MockBackend {
 }
 
 fn ctx() -> PhaseContext {
-    PhaseContext::new("phase-1", uuid::Uuid::new_v4())
+    let run_id = uuid::Uuid::new_v4();
+    PhaseContext::new(format!("phase-{run_id}"), run_id)
 }
 
 fn run_test<F: std::future::Future>(f: F) -> F::Output {
@@ -120,18 +145,61 @@ fn llm_judge_success() {
         Aggregator::llm_judge("reviewer", "{{ candidates | length }} candidates", false),
     );
 
-    let out = run_test(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    let ctx = ctx();
+    let out = run_test(strategy.execute(&backends, &Prompt::new(), &ctx)).unwrap();
     assert_eq!(out.strategy, StrategyKind::Parallel);
     assert!(out.verify.as_ref().is_some_and(|verify| {
         verify.status == VerifyStatus::Pass && verify.hook == Some("LLMJudge".to_string())
     }));
     validate_with_schema(&out);
 
+    let aggregate_path = out
+        .aggregate_output_path
+        .as_deref()
+        .expect("missing aggregate_output_path for llm_judge");
+    let aggregate_text = std::fs::read_to_string(aggregate_path).expect("read aggregate output");
+    assert!(aggregate_text.contains("gemini answer"));
+    assert_eq!(
+        aggregate_text,
+        "gemini answer\n\n<!-- loker: LLMJudge chose candidate 2 (gemini) -->\nGemini is better"
+    );
+
     assert_eq!(claude.calls(), 1);
     assert_eq!(gemini.calls(), 1);
     assert_eq!(judge.calls(), 1);
 }
 
+#[test]
+fn llm_judge_waits_for_full_candidate_set_even_if_min_responses_is_met() {
+    let claude = MockBackend::ok("claude", "a candidate");
+    let gemini = MockBackend::slow("gemini", "b candidate", 25);
+    let judge = MockBackend::ok("reviewer", r#"{"chosen_index": 1, "reason": "b is best"}"#);
+    let backends: Vec<Arc<dyn Backend>> = vec![claude.clone(), gemini.clone(), judge.clone()];
+
+    let strategy = ParallelFanOut::new(
+        vec![TargetSpec::new("claude"), TargetSpec::new("gemini")],
+        1,
+        "judge candidates",
+        Aggregator::llm_judge("reviewer", "{{ candidates | length }} candidates", true),
+    );
+
+    let ctx = ctx();
+    let out = run_test(strategy.execute(&backends, &Prompt::new(), &ctx)).unwrap();
+
+    let aggregate_path = out
+        .aggregate_output_path
+        .as_deref()
+        .expect("missing aggregate_output_path");
+    let aggregate_text = std::fs::read_to_string(aggregate_path).expect("read aggregate output");
+
+    assert_eq!(claude.calls(), 1);
+    assert_eq!(gemini.calls(), 1);
+    assert_eq!(judge.calls(), 1);
+    assert!(aggregate_text.starts_with("b candidate\n\n"));
+    assert!(out.verify.as_ref().is_some_and(|verify| {
+        verify.status == VerifyStatus::Pass && verify.hook == Some("LLMJudge".to_string())
+    }));
+}
 #[test]
 fn llm_judge_family_overlap_refused() {
     let loker_anthropic = MockBackend::ok("loker_review_anthropic", "judge unavailable");
@@ -148,7 +216,10 @@ fn llm_judge_family_overlap_refused() {
 
     let err = run_test(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
     match err {
-        StrategyError::Phase(PhaseError::FamilyOverlap { .. }) => {}
+        StrategyError::Phase(PhaseError::FamilyOverlap { family, count }) => {
+            assert_eq!(count, 2);
+            assert_eq!(family.as_str(), "anthropic");
+        }
         other => panic!("expected phase family overlap, got {other:?}"),
     }
 }
@@ -223,7 +294,7 @@ fn llm_judge_family_overlap_opt_out() {
 }
 
 #[test]
-fn llm_judge_aggregation_snapshot() {
+fn llm_judge_snapshot() {
     let judge = MockBackend::ok(
         "judge",
         r#"{"chosen_index": 1, "reason": "Gemini is best"}"#,

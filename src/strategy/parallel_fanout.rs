@@ -21,7 +21,9 @@ use crate::strategy::{
 use async_trait::async_trait;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use std::path::Path;
 use std::sync::Arc;
+use tokio::fs;
 
 /// Target specification for one branch of the fan-out.
 #[derive(Debug, Clone)]
@@ -119,6 +121,7 @@ impl Strategy for ParallelFanOut {
         let mut successful_candidates: Vec<crate::aggregator::BranchSuccess> =
             Vec::with_capacity(self.targets.len());
         let is_any_fail = matches!(self.aggregator, Aggregator::AnyFail);
+        let is_llm_judge = matches!(self.aggregator, Aggregator::LLMJudge { .. });
 
         while let Some((idx, result)) = futures.next().await {
             let target = &self.targets[idx];
@@ -158,7 +161,7 @@ impl Strategy for ParallelFanOut {
                                     "{}/aggregated.txt",
                                     ctx.phase_name
                                 )),
-                                verify: Some(VerifyOutcome::failed("Aggregator::any_fail()")),
+                                verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
                             };
                             return Err(StrategyError::AnyFail {
                                 backend: target.backend.clone(),
@@ -188,8 +191,11 @@ impl Strategy for ParallelFanOut {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    if !is_any_fail && successes >= self.min_responses {
-                        // Short-circuit: drop remaining futures.
+                    if !is_any_fail && !is_llm_judge && successes >= self.min_responses {
+                        // For non-LLMJudge aggregation modes, stop once enough
+                        // successes are in to meet the configured floor.
+                        // LLMJudge must inspect all candidates first and therefore
+                        // cannot short-circuit on min_responses.
                         break;
                     }
                 }
@@ -228,7 +234,7 @@ impl Strategy for ParallelFanOut {
                                 "{}/aggregated.txt",
                                 ctx.phase_name
                             )),
-                            verify: Some(VerifyOutcome::failed("Aggregator::any_fail()")),
+                            verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
                         };
                         return Err(StrategyError::AnyFail {
                             backend: target.backend.clone(),
@@ -258,7 +264,7 @@ impl Strategy for ParallelFanOut {
                 final_status: None,
                 aggregator: Some(self.aggregator.kind()),
                 aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
-                verify: Some(VerifyOutcome::passed("Aggregator::any_fail()")),
+                verify: Some(VerifyOutcome::passed("Aggregator::AnyFail")),
             });
         }
 
@@ -281,7 +287,7 @@ impl Strategy for ParallelFanOut {
             });
         }
 
-        let aggregated_output_path = Some(format!("{}/aggregated.txt", ctx.phase_name));
+        let aggregated_output_path = format!("{}/aggregated.txt", ctx.phase_name);
         let mut output = StrategyOutput {
             schema_version: SCHEMA_VERSION,
             strategy: StrategyKind::Parallel,
@@ -290,7 +296,7 @@ impl Strategy for ParallelFanOut {
             attempts,
             final_status: None,
             aggregator: Some(self.aggregator.kind()),
-            aggregate_output_path: aggregated_output_path,
+            aggregate_output_path: Some(aggregated_output_path.clone()),
             verify: Some(VerifyOutcome::skipped()),
         };
 
@@ -300,7 +306,7 @@ impl Strategy for ParallelFanOut {
             require_judge_different_family,
         } = &self.aggregator
         {
-            aggregate_llm_judge(
+            let aggregate = aggregate_llm_judge(
                 &successful_candidates,
                 judge_backend,
                 prompt_template,
@@ -312,11 +318,11 @@ impl Strategy for ParallelFanOut {
             .map_err(|err| {
                 use crate::aggregator::LLMJudgeError;
                 match err {
-                    LLMJudgeError::FamilyOverlap { family, .. } => {
-                        let fam = family_of(&family);
+                    LLMJudgeError::FamilyOverlap { candidate, .. } => {
+                        let fam = family_of(&candidate);
                         let count = successful_candidates
                             .iter()
-                            .filter(|candidate| family_of(&candidate.backend_id) == fam)
+                            .filter(|c| family_of(&c.backend_id) == fam)
                             .count()
                             + 1;
                         StrategyError::Phase(crate::family::PhaseError::FamilyOverlap {
@@ -338,9 +344,36 @@ impl Strategy for ParallelFanOut {
                 }
             })?;
 
+            let aggregate_output_path = aggregated_output_path.clone();
+
+            if let Some(parent) = Path::new(&aggregate_output_path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent).await.map_err(|err| {
+                        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                            message: format!(
+                                "failed to create aggregate output parent {}: {err}",
+                                parent.display()
+                            ),
+                            exit_code: None,
+                        })
+                    })?;
+                }
+            }
+
+            let aggregate_output_path = aggregate_output_path.clone();
+            let aggregate_output_path_ref = aggregate_output_path.as_str();
+            fs::write(&aggregate_output_path, aggregate.text)
+                .await
+                .map_err(|err| {
+                    StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                        message: format!(
+                            "failed to write aggregate output to {aggregate_output_path_ref}: {err}"
+                        ),
+                        exit_code: None,
+                    })
+                })?;
+
             output.verify = Some(VerifyOutcome::passed("LLMJudge"));
-            // The aggregate text is written by the caller to
-            // `aggregate_output_path`; expose pass/fail state only in the schema.
         }
 
         Ok(output)

@@ -73,15 +73,20 @@ pub fn check_cross_family(
     let judge_family = family_of(judge_backend);
     for c in candidates {
         let c_family = family_of(&c.backend_id);
-        if c_family == judge_family && require_different {
-            return Err(LLMJudgeError::FamilyOverlap {
-                judge: judge_backend.into(),
-                candidate: c.backend_id.clone(),
-                family: judge_family.to_string(),
-            });
+        if c_family == judge_family {
+            if require_different {
+                return Err(LLMJudgeError::FamilyOverlap {
+                    judge: judge_backend.into(),
+                    candidate: c.backend_id.clone(),
+                    family: judge_family.to_string(),
+                });
+            }
+
+            eprintln!(
+                "warning: judge backend '{}' shares family '{}' with candidate '{}'",
+                judge_backend, judge_family, c.backend_id
+            );
         }
-        // When opted out, we silently continue. The caller may log
-        // a warning if observability is required.
     }
     Ok(())
 }
@@ -119,8 +124,30 @@ pub fn render_ballot_prompt(
 /// Missing or malformed `chosen_index` / `reason` is a contract violation.
 pub fn parse_ballot(text: &str) -> Result<Ballot, LLMJudgeError> {
     let stripped = strip_markdown_fences(text.trim());
-    let value: serde_json::Value =
-        serde_json::from_str(stripped).map_err(|e| LLMJudgeError::Contract {
+    let value: serde_json::Value = serde_json::from_str(stripped)
+        .or_else(|_| {
+            let start = stripped.find('{').ok_or_else(|| {
+                serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid JSON payload",
+                ))
+            })?;
+            let end = stripped.rfind('}').ok_or_else(|| {
+                serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid JSON payload",
+                ))
+            })?;
+            if start < end {
+                serde_json::from_str(&stripped[start..=end])
+            } else {
+                Err(serde_json::Error::io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid JSON payload",
+                )))
+            }
+        })
+        .map_err(|e| LLMJudgeError::Contract {
             message: format!("JSON parse error: {e}"),
         })?;
 
@@ -155,20 +182,17 @@ pub async fn aggregate_llm_judge(
     backends: &[Arc<dyn Backend>],
     ctx: &PhaseContext,
 ) -> Result<AggregatedArtifact, LLMJudgeError> {
-    let judge_family = family_of(judge_backend);
-    let overlapping_candidates: Vec<&BranchSuccess> = candidates
-        .iter()
-        .filter(|candidate| family_of(&candidate.backend_id) == judge_family)
-        .collect();
-
-    if !overlapping_candidates.is_empty() && require_judge_different_family {
-        let candidate = overlapping_candidates[0];
-        return Err(LLMJudgeError::FamilyOverlap {
-            judge: judge_backend.to_string(),
-            candidate: candidate.backend_id.clone(),
-            family: judge_family.to_string(),
+    if candidates.is_empty() {
+        return Err(LLMJudgeError::Contract {
+            message: "no candidates available for judge decision".into(),
         });
     }
+
+    let judge_family = family_of(judge_backend);
+    let overlapping_candidate = candidates
+        .iter()
+        .find(|candidate| family_of(&candidate.backend_id) == judge_family);
+    check_cross_family(judge_backend, candidates, require_judge_different_family)?;
 
     let ballot_prompt = render_ballot_prompt(prompt_template, candidates, ctx)?;
 
@@ -180,12 +204,6 @@ pub async fn aggregate_llm_judge(
     let judge_output = judge.query(&ballot_prompt, &ctx.cwd, None).await?;
     let ballot = parse_ballot(&judge_output.stdout)?;
 
-    if candidates.is_empty() {
-        return Err(LLMJudgeError::Contract {
-            message: "no candidates available for judge decision".into(),
-        });
-    }
-
     let index = clamp_chosen_index(ballot.chosen_index, candidates.len());
     let chosen = &candidates[index];
 
@@ -194,12 +212,14 @@ pub async fn aggregate_llm_judge(
         chosen.output, chosen.index, chosen.backend_id, ballot.reason,
     );
 
-    if !overlapping_candidates.is_empty() && !require_judge_different_family {
-        text.push_str(&format!(
-            "\n<!-- loker: warning judge family '{}' shares family with candidate '{}' but require_judge_different_family=false -->",
-            judge_family,
-            overlapping_candidates[0].backend_id,
-        ));
+    if let Some(candidate) = overlapping_candidate {
+        if !require_judge_different_family {
+            text.push_str(&format!(
+                "\n<!-- loker: warning judge family '{}' shares family with candidate '{}' but require_judge_different_family=false -->",
+                judge_family,
+                candidate.backend_id,
+            ));
+        }
     }
 
     Ok(AggregatedArtifact {
