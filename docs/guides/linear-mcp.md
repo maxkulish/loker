@@ -29,18 +29,21 @@ user-visible behavior change, and anything already tracked in
 
 ## Tool reference
 
-| Action | Tool |
-|---|---|
-| List projects | `mcp__linear__list_projects` |
-| List issues | `mcp__linear__list_issues` |
-| Get issue | `mcp__linear__get_issue` |
-| Create issue | `mcp__linear__save_issue` |
-| Update issue | `mcp__linear__save_issue` (with `id`) |
-| Comment | `mcp__linear__save_comment` |
-| List comments | `mcp__linear__list_comments` |
-| List statuses | `mcp__linear__list_issue_statuses` |
-| List labels | `mcp__linear__list_issue_labels` |
-| Search docs | `mcp__linear__search_documentation` |
+Canonical adapter: [`linear-mcp-adapter.md`](./linear-mcp-adapter.md) —
+defines the approved 7-tool subset, API contract, caching, and
+phase-action matrix.
+
+| Action | Tool | Approved |
+|---|---|---|
+| List projects | `mcp__linear__list_projects` | ✅ |
+| List issues | `mcp__linear__list_issues` | ✅ |
+| Get issue | `mcp__linear__get_issue` | ✅ |
+| Create/update issue | `mcp__linear__save_issue` | ✅ |
+| Comment | `mcp__linear__save_comment` | ✅ |
+| List comments | `mcp__linear__list_comments` | ✅ |
+| List statuses | `mcp__linear__list_issue_statuses` | ✅ |
+| List labels | `mcp__linear__list_issue_labels` | ❌ (escalate) |
+| Search docs | `mcp__linear__search_documentation` | ❌ (escalate) |
 
 `save_issue` / `save_comment` are upsert-style: omit `id` to create,
 include `id` to update.

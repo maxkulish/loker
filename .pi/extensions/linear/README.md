@@ -29,6 +29,12 @@ Optional:
 # default: http (Streamable HTTP). SSE kept as fallback because the
 # MCP SDK has deprecated SSE in favour of Streamable HTTP.
 export LINEAR_MCP_TRANSPORT=http   # or 'sse'
+
+# default: filtered to the approved 7-tool subset
+# (see docs/guides/linear-mcp-adapter.md §2). Set to "1" to register
+# every tool Linear's MCP exposes — escape hatch for one-off tasks
+# that need an excluded tool. Prefer escalating to the user instead.
+export LINEAR_MCP_FULL_SURFACE=0   # or '1'
 ```
 
 If `LINEAR_API_KEY` is missing, the extension prints a follow-up
@@ -50,16 +56,33 @@ ln -s $(pwd)/.pi/extensions/linear ~/.pi/agent/extensions/loker-linear
 
 ## Tool surface
 
-Whatever Linear's MCP exposes, prefixed with `mcp__linear__`. The
-orchestrator currently uses:
+By default the bridge registers only the 7-tool approved subset defined
+in `docs/guides/linear-mcp-adapter.md` §2, plus `get_team` as a
+conditional. Linear's hosted MCP exposes ~30 tools; filtering keeps
+the agent prompt small and prevents accidental selection of the wrong
+tool.
 
+Approved (registered):
+
+- `mcp__linear__list_issues`
 - `mcp__linear__get_issue`
 - `mcp__linear__save_issue`
-- `mcp__linear__save_comment`
-- `mcp__linear__list_issues`
 - `mcp__linear__list_comments`
+- `mcp__linear__save_comment`
+- `mcp__linear__list_issue_statuses`
+- `mcp__linear__list_projects`
+- `mcp__linear__get_team` (conditional)
 
-If Linear ships new tools, they show up automatically on next pi start.
+Excluded by default: everything else (cycles, documents, milestones,
+labels, attachments, users, project mutators, …). If a task genuinely
+needs an excluded tool, escalate to the user. The
+`LINEAR_MCP_FULL_SURFACE=1` env var is an escape hatch that registers
+every tool Linear exposes — use sparingly, since it grows the agent
+prompt and weakens the contract.
+
+When Linear ships new tools, they only appear if their name is added
+to `APPROVED_TOOLS` in `index.ts` (or `LINEAR_MCP_FULL_SURFACE=1` is
+set). Update the adapter doc when adding a tool.
 
 ## Auth notes
 
@@ -73,3 +96,5 @@ with the OAuth token flow.
 - `../orchestrate/README.md` - extension-level docs for the orchestrator
 - `../../IMPLEMENTATION_SUMMARY.md` - high-level pi flow overview
 - `../../../docs/guides/linear-mcp.md` - tool reference and team context
+- `../../../docs/guides/linear-mcp-adapter.md` - approved-subset contract,
+  per-tool API, cache rules, phase-action matrix

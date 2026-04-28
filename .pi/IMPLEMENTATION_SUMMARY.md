@@ -142,8 +142,15 @@ Pi does NOT inherit Claude's MCP server configuration. Each pi
 extension that needs MCP must establish its own client connection. So
 the loker pi setup ships a thin bridge extension at
 `.pi/extensions/linear/` that connects to Linear's hosted MCP and
-re-registers every Linear tool under the `mcp__linear__` prefix - the
-exact names Claude already uses.
+re-registers the approved 7-tool subset under the `mcp__linear__`
+prefix - the exact names Claude already uses.
+
+The approved subset is defined in `docs/guides/linear-mcp-adapter.md`
+§2: `list_issues`, `get_issue`, `save_issue`, `list_comments`,
+`save_comment`, `list_issue_statuses`, `list_projects`, plus
+`get_team` as a conditional. Linear's MCP exposes ~30 tools total;
+filtering keeps the agent prompt small and the tool surface
+predictable. `LINEAR_MCP_FULL_SURFACE=1` is an escape hatch.
 
 This keeps phase scripts identical across Claude and pi:
 
@@ -152,18 +159,21 @@ This keeps phase scripts identical across Claude and pi:
   In Review -> Done`).
 - `mcp__linear__save_comment` at every phase transition.
 
-The bridge is a 70-line MCP-client wrapper modelled on
+The bridge is an MCP-client wrapper modelled on
 `~/Code/mentis/.pi/extensions/plane/`. It:
 
 - Reads `LINEAR_API_KEY` from env.
 - Connects to `https://mcp.linear.app/mcp` via Streamable HTTP
   (or `https://mcp.linear.app/sse` if `LINEAR_MCP_TRANSPORT=sse`).
-- Lists Linear's tools, prefixes each with `mcp__linear__`, and
-  registers them with pi.
+- Lists Linear's tools, filters to the approved subset (unless
+  `LINEAR_MCP_FULL_SURFACE=1`), prefixes each with `mcp__linear__`,
+  and registers them with pi.
 
-See `extensions/linear/README.md` for setup and
+See `extensions/linear/README.md` for setup,
 `docs/guides/linear-mcp.md` for the project context (team
-`Cloud-ai`, project `Loker`, identifier `CLO`) and full tool reference.
+`Cloud-ai`, project `Loker`, identifier `CLO`), and
+`docs/guides/linear-mcp-adapter.md` for the per-tool API contract
+and phase-action matrix.
 
 ## Installation
 
@@ -215,5 +225,6 @@ pi -e .pi/extensions/orchestrate/index.ts -e .pi/extensions/linear/index.ts
 - `.claude/commands/task/orchestrate.md` - canonical Claude flow
 - `docs/handoff.md` - project WHY/Intent/HOW
 - `docs/guides/linear-mcp.md` - Linear MCP usage
+- `docs/guides/linear-mcp-adapter.md` - approved-subset contract
 - `/Users/mk/Work/investigations/sakana-fugu/loker-design.md` -
   canonical loker design
