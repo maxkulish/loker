@@ -76,9 +76,12 @@ phases:
       - ca2e9c8
       - daec457
   pr:
-    status: pending
-    ci_passed: false
+    status: in_progress
+    ci_passed: true
     pre_flight_passed: true
+    pr_url: https://github.com/maxkulish/loker/pull/20
+    pr_number: 20
+    ci_run_id: 25061229514
   complete:
     status: pending
 history:
@@ -176,3 +179,15 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: make check green (fmt + clippy + test). Ready to create PR.
+  - timestamp: '2026-04-28T14:31:00.000Z'
+    action: pr_created
+    phase: pr
+    details: PR #20 created at https://github.com/maxkulish/loker/pull/20. Branch contains aggregator::concat feature plus bundled orchestrate extension optimization scope.
+  - timestamp: '2026-04-28T14:33:00.000Z'
+    action: linear_status_updated
+    phase: pr
+    details: Linear CLO-266 status set to In Review with PR #20 link attached.
+  - timestamp: '2026-04-28T14:35:00.000Z'
+    action: ci_passed
+    phase: pr
+    details: 'CI run 25061229514 green: tests + format jobs both passed.'
