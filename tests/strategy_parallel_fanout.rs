@@ -277,6 +277,8 @@ fn phase_result_validates_against_parallel_schema() {
 
     let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
     let json = serde_json::to_value(&out).expect("serialize");
+    assert_eq!(json["aggregator"], "concat");
+    assert!(json["aggregate_output_path"].as_str().is_some_and(|p| !p.is_empty()));
 
     let schema = load_schema();
     if let Err(e) = schema.validate(&json) {
