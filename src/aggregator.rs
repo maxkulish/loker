@@ -153,7 +153,12 @@ fn render_success(heading_template: &str, success: BranchSuccess) -> String {
         &success.family,
         success.index,
     );
-    format!("{}\n\n{}", heading, success.output.trim())
+    let output = success.output.trim();
+    if output.is_empty() {
+        heading
+    } else {
+        format!("{}\n\n{}", heading, output)
+    }
 }
 
 fn render_heading(template: &str, backend_id: &str, family: &str, index: usize) -> String {
@@ -317,6 +322,20 @@ mod tests {
 
         assert!(artifact.text.contains("reason: line1\\nline2\\nline3"));
         assert!(!artifact.text.contains('\r'));
+    }
+
+    #[test]
+    fn concat_whitespace_only_success_output_keeps_newline_invariants() {
+        let artifact = Aggregator::concat("## {backend_id}")
+            .aggregate(AggregateInput {
+                branches: vec![
+                    success("claude", "anthropic", 1, "   \n"),
+                    success("gemini", "google", 2, "ok"),
+                ],
+            })
+            .unwrap();
+
+        assert_eq!(artifact.text, "## claude\n\n## gemini\n\nok\n");
     }
 
     #[test]
