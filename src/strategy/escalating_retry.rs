@@ -465,7 +465,7 @@ impl Strategy for EscalatingRetry {
                     });
 
                     previous_failure = self.pass_failure_context.then(|| {
-                        FailureContext::from_backend_error(rung.tier, &rung.backend, &err)
+                        FailureContext::from_backend_error(rung.tier, backend.name(), &err)
                     });
                 }
             }
