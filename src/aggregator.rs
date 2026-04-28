@@ -173,9 +173,12 @@ fn render_heading(template: &str, backend_id: &str, family: &str, index: usize) 
         } else if rest.starts_with("{index}") {
             rendered.push_str(&index.to_string());
             rest = &rest["{index}".len()..];
+        } else if let Some(end) = rest.find('}') {
+            rendered.push_str(&rest[..=end]);
+            rest = &rest[end + '}'.len_utf8()..];
         } else {
-            rendered.push('{');
-            rest = &rest['{'.len_utf8()..];
+            rendered.push_str(rest);
+            rest = "";
         }
     }
 
@@ -199,7 +202,11 @@ fn render_errors(failures: &[BranchFailure]) -> String {
 }
 
 fn render_reason(reason: &str) -> String {
-    reason.trim().replace('\n', "\\n")
+    reason
+        .trim()
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .replace('\n', "\\n")
 }
 
 #[cfg(test)]
@@ -255,6 +262,20 @@ mod tests {
     }
 
     #[test]
+    fn concat_preserves_braced_unknown_expressions_containing_known_tokens() {
+        let artifact = Aggregator::concat("## {{backend_id}} {unknown {family}}")
+            .aggregate(AggregateInput {
+                branches: vec![success("claude", "anthropic", 1, "text")],
+            })
+            .unwrap();
+
+        assert_eq!(
+            artifact.text,
+            "## {{backend_id}} {unknown {family}}\n\ntext\n"
+        );
+    }
+
+    #[test]
     fn concat_does_not_reexpand_placeholders_inside_metadata() {
         let artifact = Aggregator::concat("## {backend_id} ({family})")
             .aggregate(AggregateInput {
@@ -284,6 +305,18 @@ mod tests {
         assert!(artifact
             .text
             .contains("reason: network: timeout\\nretry exhausted"));
+    }
+
+    #[test]
+    fn concat_normalizes_crlf_failure_reason() {
+        let artifact = Aggregator::concat("## {backend_id}")
+            .aggregate(AggregateInput {
+                branches: vec![failure("codex", "openai", 1, "line1\r\nline2\rline3")],
+            })
+            .unwrap();
+
+        assert!(artifact.text.contains("reason: line1\\nline2\\nline3"));
+        assert!(!artifact.text.contains('\r'));
     }
 
     #[test]
