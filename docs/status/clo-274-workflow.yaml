@@ -61,6 +61,13 @@ phases:
     title: 'fix(CLO-274): address CLO-265 PR #18 review comments'
     branch: fix/clo-274-fix
     base: main
+    reviews_addressed: 1
+    review_commits:
+      - sha: c3f6538
+        addresses:
+          - copilot:3154216870 (test brittleness)
+          - copilot:3154216938 (spec count)
+        replies_posted: 2/2
   complete:
     status: pending
 history:
@@ -88,3 +95,11 @@ history:
     action: pr_created
     phase: pr
     details: 'PR #19 opened: https://github.com/maxkulish/loker/pull/19'
+  - timestamp: '2026-04-28T12:51:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Addressed 2 Copilot inline comments on PR #19 in commit c3f6538:
+      determinism test now pattern-matches PhaseError::FamilyOverlap fields
+      instead of asserting on Display; spec problem-statement count corrected
+      from "Five" to "Four". Replied to both threads with /gemini review.
