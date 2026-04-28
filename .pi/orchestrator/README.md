@@ -23,9 +23,10 @@ sides:
 - Expose Linear under the `mcp__linear__*` tool surface. In Claude
   this comes from the global MCP config. In pi the same names are
   served by the sibling bridge extension at `.pi/extensions/linear/`,
-  which connects to Linear's hosted MCP and re-registers every tool
-  with the `mcp__linear__` prefix. Phase scripts call the same tool
-  names on either side.
+  which connects to Linear's hosted MCP and re-registers the approved
+  7-tool subset (see `docs/guides/linear-mcp-adapter.md`) under the
+  `mcp__linear__` prefix. Phase scripts call the same tool names on
+  either side.
 
 When you change a phase script, mirror the change on the Claude side
 (`.claude/commands/task/phases/<phase>.md`). Otherwise the two sides
@@ -92,4 +93,5 @@ complete    -> (terminal)
 - `../IMPLEMENTATION_SUMMARY.md` - high-level overview
 - `docs/handoff.md` - project WHY/Intent/HOW
 - `docs/guides/linear-mcp.md` - Linear MCP usage
+- `docs/guides/linear-mcp-adapter.md` - approved-subset contract
 - `.claude/commands/task/orchestrate.md` - Claude-side flow

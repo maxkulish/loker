@@ -9,6 +9,20 @@ const LINEAR_MCP_SSE_URL = "https://mcp.linear.app/sse";
 const LINEAR_MCP_HTTP_URL = "https://mcp.linear.app/mcp";
 const TOOL_PREFIX = "mcp__linear__";
 
+// Approved tool subset — see docs/guides/linear-mcp-adapter.md §2.
+const APPROVED_TOOLS = new Set<string>([
+  "list_issues",
+  "get_issue",
+  "save_issue",
+  "list_comments",
+  "save_comment",
+  "list_issue_statuses",
+  "list_projects",
+]);
+
+// Conditional tools registered alongside the core 7. See adapter §2.2.
+const CONDITIONAL_TOOLS = new Set<string>(["get_team"]);
+
 const registeredLinearTools = new Set<string>();
 
 type MCPTool = {
@@ -134,9 +148,13 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
     return false;
   }
 
-  const toolCount = Array.isArray(tools) ? tools.length : 0;
+  const discoveredCount = Array.isArray(tools) ? tools.length : 0;
+  const fullSurface = process.env.LINEAR_MCP_FULL_SURFACE === "1";
+  const candidates = fullSurface
+    ? (tools as MCPTool[])
+    : (tools as MCPTool[]).filter((t) => APPROVED_TOOLS.has(t.name) || CONDITIONAL_TOOLS.has(t.name));
 
-  for (const tool of tools as MCPTool[]) {
+  for (const tool of candidates) {
     const toolName = `${TOOL_PREFIX}${tool.name}`;
     if (registeredLinearTools.has(toolName)) {
       continue;
@@ -194,6 +212,10 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
     });
   }
 
-  pi.sendUserMessage(`Linear MCP: registered ${registeredLinearTools.size}/${toolCount} discovered tools.`, { deliverAs: "followUp" });
+  const surfaceMode = fullSurface ? "full" : "approved-subset";
+  pi.sendUserMessage(
+    `Linear MCP: registered ${registeredLinearTools.size}/${discoveredCount} tools (${surfaceMode}).`,
+    { deliverAs: "followUp" },
+  );
   return true;
 }
