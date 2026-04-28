@@ -106,7 +106,7 @@ fn aggregate_concat(
 ) -> Result<AggregatedArtifact, AggregatorError> {
     if input.branches.is_empty() {
         return Ok(AggregatedArtifact {
-            text: format!("{EMPTY_CONCAT_SENTINEL}\n"),
+            text: EMPTY_CONCAT_SENTINEL.to_string(),
             successful: 0,
             failed: 0,
         });
@@ -325,7 +325,7 @@ mod tests {
             .aggregate(AggregateInput::default())
             .unwrap();
 
-        assert_eq!(artifact.text, format!("{EMPTY_CONCAT_SENTINEL}\n"));
+        assert_eq!(artifact.text, EMPTY_CONCAT_SENTINEL);
         assert_eq!(artifact.successful, 0);
         assert_eq!(artifact.failed, 0);
     }

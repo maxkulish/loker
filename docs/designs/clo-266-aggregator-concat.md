@@ -116,7 +116,7 @@ Only concat is implemented in CLO-266. The enum shape allows future aggregator b
 
 ### Rendering rules
 
-1. Empty `branches` returns `AggregatedArtifact { text: EMPTY_CONCAT_SENTINEL.into(), successful: 0, failed: 0 }`.
+1. Empty `branches` returns `AggregatedArtifact { text: EMPTY_CONCAT_SENTINEL.into(), successful: 0, failed: 0 }` exactly, with no trailing newline, so callers can compare directly against the public sentinel.
 2. Successful branches are rendered in input order.
 3. A heading is rendered by literal placeholder replacement only:
    - `{backend_id}` → `BranchSuccess.backend_id`
@@ -145,7 +145,7 @@ Only concat is implemented in CLO-266. The enum shape allows future aggregator b
    ```
 
 7. Failure entries are ordered by input order, not by backend name, preserving the same arrival-order semantics as successes.
-8. The returned string ends with exactly one trailing newline for stable snapshots.
+8. For non-empty inputs, the returned string ends with exactly one trailing newline for stable snapshots.
 
 ### Schema compatibility
 
