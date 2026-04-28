@@ -13,11 +13,11 @@ use async_trait::async_trait;
 use jsonschema::Validator;
 use serde_json::Value;
 
+use loker::aggregator::Aggregator;
 use loker::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use loker::strategy::parallel_fanout::{ParallelFanOut, TargetSpec};
 use loker::strategy::{
-    Aggregator, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
-    SCHEMA_VERSION,
+    FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind, SCHEMA_VERSION,
 };
 
 const SCHEMA_PATH: &str = "docs/schemas/phase_result_parallel.schema.json";
@@ -126,7 +126,7 @@ fn happy_path_all_targets_succeed() {
         vec![TargetSpec::new("a"), TargetSpec::new("b")],
         2,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -153,7 +153,7 @@ fn one_fails_min_responses_still_satisfied() {
         vec![TargetSpec::new("a"), TargetSpec::new("b")],
         1,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -191,7 +191,7 @@ fn too_many_failures_returns_floor_violation() {
         ],
         3,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -225,7 +225,7 @@ fn fast_targets_cancel_slow() {
         ],
         2,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let start = std::time::Instant::now();
@@ -252,7 +252,7 @@ fn outcomes_contain_all_backends() {
         vec![TargetSpec::new("slow"), TargetSpec::new("fast")],
         2,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -272,7 +272,7 @@ fn phase_result_validates_against_parallel_schema() {
         vec![TargetSpec::new("a"), TargetSpec::new("b")],
         2,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -303,7 +303,7 @@ fn floor_violation_payload_validates_against_schema() {
         vec![TargetSpec::new("a"), TargetSpec::new("b")],
         2,
         "render-me",
-        Aggregator::Concat,
+        Aggregator::concat("## {backend_id}"),
     );
 
     let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();

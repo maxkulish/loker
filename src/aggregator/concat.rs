@@ -1,8 +1,13 @@
-//! Aggregator implementations for folding multiple branch outputs into one artefact.
-//!
-//! This module contains behavioral aggregator config and pure aggregation logic.
-//! It is intentionally separate from [`crate::strategy::Aggregator`], which is
-//! the schema-facing label serialized into phase-result JSON.
+use std::sync::Arc;
+
+use crate::backend::Backend;
+use crate::strategy::PhaseContext;
+
+// Aggregator implementations for folding multiple branch outputs into one artefact.
+//
+// This module contains behavioral aggregator config and pure aggregation logic.
+// It is intentionally separate from [`crate::strategy::Aggregator`], which is
+// the schema-facing label serialized into phase-result JSON.
 
 /// Sentinel emitted when concat aggregation receives no branch outcomes.
 ///
@@ -25,7 +30,10 @@ pub const EMPTY_CONCAT_SENTINEL: &str =
 /// Unknown placeholders are preserved literally.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Aggregator {
-    Concat { heading_template: String },
+    Concat {
+        heading_template: String,
+    },
+    AnyFail,
     LLMJudge {
         judge_backend: String,
         prompt_template: String,
@@ -54,18 +62,32 @@ impl Aggregator {
         }
     }
 
+    /// Build an AnyFail aggregator (no configuration needed).
+    pub fn any_fail() -> Self {
+        Self::AnyFail
+    }
+
     /// Return the schema-facing strategy aggregator label for this behavior.
     pub fn kind(&self) -> crate::strategy::Aggregator {
         match self {
             Self::Concat { .. } => crate::strategy::Aggregator::Concat,
+            Self::AnyFail => crate::strategy::Aggregator::AnyFail,
             Self::LLMJudge { .. } => crate::strategy::Aggregator::LLMJudge,
         }
     }
 
     /// Aggregate ordered branch outcomes into one string artefact.
-    pub fn aggregate(&self, input: AggregateInput) -> Result<AggregatedArtifact, AggregatorError> {
+    pub fn aggregate(
+        &self,
+        input: AggregateInput,
+        _backends: &[Arc<dyn Backend>],
+        _ctx: &PhaseContext,
+    ) -> Result<AggregatedArtifact, AggregatorError> {
         match self {
             Self::Concat { heading_template } => aggregate_concat(heading_template, input),
+            Self::AnyFail => Err(AggregatorError::Unsupported(
+                "AnyFail is evaluated inline by ParallelFanOut, not via aggregate()".into(),
+            )),
             Self::LLMJudge { .. } => Err(AggregatorError::Unsupported(
                 "LLMJudge requires async backend access; use aggregate_llm_judge()".into(),
             )),
@@ -261,12 +283,16 @@ mod tests {
     #[test]
     fn concat_renders_success_sections_in_input_order() {
         let artifact = Aggregator::concat("## {index}. {backend_id} ({family})")
-            .aggregate(AggregateInput {
-                branches: vec![
-                    success("claude", "anthropic", 1, " first "),
-                    success("gemini", "google", 2, "second\n"),
-                ],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![
+                        success("claude", "anthropic", 1, " first "),
+                        success("gemini", "google", 2, "second\n"),
+                    ],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(
@@ -280,9 +306,13 @@ mod tests {
     #[test]
     fn concat_preserves_unknown_placeholders() {
         let artifact = Aggregator::concat("## {backend_id} {unknown}")
-            .aggregate(AggregateInput {
-                branches: vec![success("claude", "anthropic", 1, "text")],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![success("claude", "anthropic", 1, "text")],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(artifact.text, "## claude {unknown}\n\ntext\n");
@@ -291,9 +321,13 @@ mod tests {
     #[test]
     fn concat_preserves_braced_unknown_expressions_containing_known_tokens() {
         let artifact = Aggregator::concat("## {{backend_id}} {unknown {family}}")
-            .aggregate(AggregateInput {
-                branches: vec![success("claude", "anthropic", 1, "text")],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![success("claude", "anthropic", 1, "text")],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(
@@ -305,9 +339,13 @@ mod tests {
     #[test]
     fn concat_does_not_reexpand_placeholders_inside_metadata() {
         let artifact = Aggregator::concat("## {backend_id} ({family})")
-            .aggregate(AggregateInput {
-                branches: vec![success("review-{index}", "other-{backend_id}", 3, "text")],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![success("review-{index}", "other-{backend_id}", 3, "text")],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(
@@ -319,14 +357,18 @@ mod tests {
     #[test]
     fn concat_escapes_multiline_failure_reason() {
         let artifact = Aggregator::concat("## {backend_id}")
-            .aggregate(AggregateInput {
-                branches: vec![failure(
-                    "codex",
-                    "openai",
-                    1,
-                    "network: timeout\nretry exhausted",
-                )],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![failure(
+                        "codex",
+                        "openai",
+                        1,
+                        "network: timeout\nretry exhausted",
+                    )],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert!(artifact
@@ -337,9 +379,13 @@ mod tests {
     #[test]
     fn concat_normalizes_crlf_failure_reason() {
         let artifact = Aggregator::concat("## {backend_id}")
-            .aggregate(AggregateInput {
-                branches: vec![failure("codex", "openai", 1, "line1\r\nline2\rline3")],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![failure("codex", "openai", 1, "line1\r\nline2\rline3")],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert!(artifact.text.contains("reason: line1\\nline2\\nline3"));
@@ -349,12 +395,16 @@ mod tests {
     #[test]
     fn concat_whitespace_only_success_output_keeps_newline_invariants() {
         let artifact = Aggregator::concat("## {backend_id}")
-            .aggregate(AggregateInput {
-                branches: vec![
-                    success("claude", "anthropic", 1, "   \n"),
-                    success("gemini", "google", 2, "ok"),
-                ],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![
+                        success("claude", "anthropic", 1, "   \n"),
+                        success("gemini", "google", 2, "ok"),
+                    ],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(artifact.text, "## claude\n\n## gemini\n\nok\n");
@@ -363,7 +413,11 @@ mod tests {
     #[test]
     fn concat_empty_input_returns_sentinel() {
         let artifact = Aggregator::concat("## {backend_id}")
-            .aggregate(AggregateInput::default())
+            .aggregate(
+                AggregateInput::default(),
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(artifact.text, EMPTY_CONCAT_SENTINEL);
@@ -374,12 +428,16 @@ mod tests {
     #[test]
     fn concat_counts_success_and_failure() {
         let artifact = Aggregator::concat("## {backend_id}")
-            .aggregate(AggregateInput {
-                branches: vec![
-                    success("claude", "anthropic", 1, "ok"),
-                    failure("codex", "openai", 2, "network: timeout"),
-                ],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![
+                        success("claude", "anthropic", 1, "ok"),
+                        failure("codex", "openai", 2, "network: timeout"),
+                    ],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         assert_eq!(artifact.successful, 1);
@@ -407,13 +465,17 @@ mod tests {
     #[test]
     fn concat_mixed_success_failure_snapshot() {
         let artifact = Aggregator::concat("## {index}. {backend_id} ({family})")
-            .aggregate(AggregateInput {
-                branches: vec![
-                    success("claude", "anthropic", 1, "Claude review text."),
-                    failure("codex", "openai", 2, "network: timeout"),
-                    success("gemini", "google", 3, "Gemini review text."),
-                ],
-            })
+            .aggregate(
+                AggregateInput {
+                    branches: vec![
+                        success("claude", "anthropic", 1, "Claude review text."),
+                        failure("codex", "openai", 2, "network: timeout"),
+                        success("gemini", "google", 3, "Gemini review text."),
+                    ],
+                },
+                &[],
+                &crate::strategy::PhaseContext::new("test", uuid::Uuid::new_v4()),
+            )
             .unwrap();
 
         insta::assert_snapshot!(artifact.text);

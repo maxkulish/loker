@@ -11,10 +11,11 @@
 //! settles, a structured `StrategyError::FloorViolation` is returned so
 //! callers can still persist the schema-shaped JSON.
 
+use crate::aggregator::{aggregate_llm_judge, Aggregator, BranchSuccess};
 use crate::backend::{Backend, QueryOutput};
 use crate::family::family_of;
 use crate::strategy::{
-    Aggregator, Attempt, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
+    Attempt, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
     StrategyOutput, TokenUsageReport, VerifyOutcome, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
@@ -115,7 +116,9 @@ impl Strategy for ParallelFanOut {
 
         let mut attempts: Vec<Attempt> = Vec::with_capacity(self.targets.len());
         let mut successes = 0;
-        let is_any_fail = self.aggregator == Aggregator::AnyFail;
+        let mut successful_candidates: Vec<crate::aggregator::BranchSuccess> =
+            Vec::with_capacity(self.targets.len());
+        let is_any_fail = matches!(self.aggregator, Aggregator::AnyFail);
 
         while let Some((idx, result)) = futures.next().await {
             let target = &self.targets[idx];
@@ -150,12 +153,12 @@ impl Strategy for ParallelFanOut {
                                 run_id: ctx.run_id,
                                 attempts,
                                 final_status: None,
-                                aggregator: Some(self.aggregator),
+                                aggregator: Some(self.aggregator.kind()),
                                 aggregate_output_path: Some(format!(
                                     "{}/aggregated.txt",
                                     ctx.phase_name
                                 )),
-                                verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
+                                verify: Some(VerifyOutcome::failed("Aggregator::any_fail()")),
                             };
                             return Err(StrategyError::AnyFail {
                                 backend: target.backend.clone(),
@@ -167,6 +170,13 @@ impl Strategy for ParallelFanOut {
                     }
 
                     successes += 1;
+                    successful_candidates.push(BranchSuccess {
+                        backend_id: target.backend.clone(),
+                        family: family_of(&target.backend).to_string(),
+                        index: successful_candidates.len() + 1,
+                        output: query.stdout.clone(),
+                    });
+
                     attempts.push(Attempt {
                         tier: None,
                         family: Some(family_of(&target.backend).to_string()),
@@ -213,12 +223,12 @@ impl Strategy for ParallelFanOut {
                             run_id: ctx.run_id,
                             attempts,
                             final_status: None,
-                            aggregator: Some(self.aggregator),
+                            aggregator: Some(self.aggregator.kind()),
                             aggregate_output_path: Some(format!(
                                 "{}/aggregated.txt",
                                 ctx.phase_name
                             )),
-                            verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
+                            verify: Some(VerifyOutcome::failed("Aggregator::any_fail()")),
                         };
                         return Err(StrategyError::AnyFail {
                             backend: target.backend.clone(),
@@ -246,9 +256,9 @@ impl Strategy for ParallelFanOut {
                 run_id: ctx.run_id,
                 attempts,
                 final_status: None,
-                aggregator: Some(self.aggregator),
+                aggregator: Some(self.aggregator.kind()),
                 aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
-                verify: Some(VerifyOutcome::passed("Aggregator::AnyFail")),
+                verify: Some(VerifyOutcome::passed("Aggregator::any_fail()")),
             });
         }
 
@@ -260,7 +270,7 @@ impl Strategy for ParallelFanOut {
                 run_id: ctx.run_id,
                 attempts,
                 final_status: None,
-                aggregator: Some(self.aggregator),
+                aggregator: Some(self.aggregator.kind()),
                 aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
                 verify: Some(VerifyOutcome::skipped()),
             };
@@ -271,17 +281,69 @@ impl Strategy for ParallelFanOut {
             });
         }
 
-        Ok(StrategyOutput {
+        let aggregated_output_path = Some(format!("{}/aggregated.txt", ctx.phase_name));
+        let mut output = StrategyOutput {
             schema_version: SCHEMA_VERSION,
             strategy: StrategyKind::Parallel,
             phase: ctx.phase_name.clone(),
             run_id: ctx.run_id,
             attempts,
             final_status: None,
-            aggregator: Some(self.aggregator),
-            aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
+            aggregator: Some(self.aggregator.kind()),
+            aggregate_output_path: aggregated_output_path,
             verify: Some(VerifyOutcome::skipped()),
-        })
+        };
+
+        if let Aggregator::LLMJudge {
+            judge_backend,
+            prompt_template,
+            require_judge_different_family,
+        } = &self.aggregator
+        {
+            aggregate_llm_judge(
+                &successful_candidates,
+                judge_backend,
+                prompt_template,
+                *require_judge_different_family,
+                backends,
+                ctx,
+            )
+            .await
+            .map_err(|err| {
+                use crate::aggregator::LLMJudgeError;
+                match err {
+                    LLMJudgeError::FamilyOverlap { family, .. } => {
+                        let fam = family_of(&family);
+                        let count = successful_candidates
+                            .iter()
+                            .filter(|candidate| family_of(&candidate.backend_id) == fam)
+                            .count()
+                            + 1;
+                        StrategyError::Phase(crate::family::PhaseError::FamilyOverlap {
+                            family: fam,
+                            count,
+                        })
+                    }
+                    LLMJudgeError::Contract { message } => {
+                        StrategyError::Phase(crate::family::PhaseError::AggregatorContract {
+                            message,
+                        })
+                    }
+                    LLMJudgeError::JudgeCall(err) => {
+                        StrategyError::Phase(crate::family::PhaseError::JudgeUnavailable {
+                            detail: err.to_string(),
+                        })
+                    }
+                    LLMJudgeError::BackendNotFound(name) => StrategyError::BackendNotFound { name },
+                }
+            })?;
+
+            output.verify = Some(VerifyOutcome::passed("LLMJudge"));
+            // The aggregate text is written by the caller to
+            // `aggregate_output_path`; expose pass/fail state only in the schema.
+        }
+
+        Ok(output)
     }
 }
 
@@ -303,7 +365,6 @@ mod tests {
     use super::*;
     use crate::aggregator::AnyFailReason;
     use crate::backend::BackendError;
-    use crate::strategy::Aggregator;
     use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
@@ -424,7 +485,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             2,
             "render-me",
-            Aggregator::Concat,
+            Aggregator::concat("## {backend_id}"),
         );
 
         let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -447,7 +508,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::Concat,
+            Aggregator::concat("## {backend_id}"),
         );
 
         let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -487,7 +548,7 @@ mod tests {
             ],
             3,
             "render-me",
-            Aggregator::Concat,
+            Aggregator::concat("## {backend_id}"),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -509,7 +570,7 @@ mod tests {
     #[test]
     fn empty_targets_yields_no_backends() {
         let backends: Vec<Arc<dyn Backend>> = vec![MockBackend::ok("a", "x")];
-        let strategy = ParallelFanOut::new(vec![], 1, "x", Aggregator::Concat);
+        let strategy = ParallelFanOut::new(vec![], 1, "x", Aggregator::concat("## {backend_id}"));
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
         assert!(matches!(err, StrategyError::NoBackends));
@@ -523,7 +584,7 @@ mod tests {
             vec![TargetSpec::new("a")],
             1,
             "{{ steps.missing.output }}",
-            Aggregator::Concat,
+            Aggregator::concat("## {backend_id}"),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -535,8 +596,12 @@ mod tests {
     fn backend_not_found() {
         let present = MockBackend::ok("present", "x");
         let backends: Vec<Arc<dyn Backend>> = vec![present.clone()];
-        let strategy =
-            ParallelFanOut::new(vec![TargetSpec::new("absent")], 1, "x", Aggregator::Concat);
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("absent")],
+            1,
+            "x",
+            Aggregator::concat("## {backend_id}"),
+        );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
         assert!(matches!(err, StrategyError::BackendNotFound { name } if name == "absent"));
@@ -552,7 +617,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -578,7 +643,7 @@ mod tests {
             ],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -607,7 +672,7 @@ mod tests {
             ],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -631,7 +696,7 @@ mod tests {
             vec![TargetSpec::new("b0"), TargetSpec::new("b1")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -662,7 +727,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -686,7 +751,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -710,7 +775,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -734,7 +799,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -758,7 +823,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -778,7 +843,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
@@ -802,7 +867,7 @@ mod tests {
             vec![TargetSpec::new("a"), TargetSpec::new("b")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
@@ -822,7 +887,7 @@ mod tests {
             vec![TargetSpec::new("b0"), TargetSpec::new("b1")],
             1,
             "render-me",
-            Aggregator::AnyFail,
+            Aggregator::any_fail(),
         );
 
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();

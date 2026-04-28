@@ -94,7 +94,8 @@ impl TemplateEngine {
     ///
     /// Used by aggregators (e.g. LLMJudge) that need to inject arbitrary
     /// data structures without going through the full `TemplateContext` builder.
-    pub fn render_serde(&self,
+    pub fn render_serde(
+        &self,
         template: &str,
         ctx: &impl serde::Serialize,
     ) -> Result<String, TemplateError> {

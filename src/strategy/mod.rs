@@ -405,6 +405,9 @@ pub enum StrategyError {
     #[error("backend not found: {name}")]
     BackendNotFound { name: String },
 
+    #[error("phase error: {0}")]
+    Phase(#[from] crate::family::PhaseError),
+
     #[error("no backends available")]
     NoBackends,
 

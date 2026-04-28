@@ -15,8 +15,8 @@ pub use concat::{
 };
 
 pub use llm_judge::{
-    check_cross_family, render_ballot_prompt, parse_ballot, clamp_chosen_index,
-    Ballot, Candidate, LLMJudgeError,
+    aggregate_llm_judge, check_cross_family, clamp_chosen_index, parse_ballot,
+    render_ballot_prompt, Ballot, Candidate, LLMJudgeError,
 };
 
 use serde_json::Value;
