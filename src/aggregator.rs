@@ -117,7 +117,9 @@ fn aggregate_concat(
 
     for branch in input.branches {
         match branch {
-            BranchOutcome::Success(success) => sections.push(render_success(heading_template, success)),
+            BranchOutcome::Success(success) => {
+                sections.push(render_success(heading_template, success))
+            }
             BranchOutcome::Failure(failure) => failures.push(failure),
         }
     }
@@ -155,10 +157,30 @@ fn render_success(heading_template: &str, success: BranchSuccess) -> String {
 }
 
 fn render_heading(template: &str, backend_id: &str, family: &str, index: usize) -> String {
-    template
-        .replace("{backend_id}", backend_id)
-        .replace("{family}", family)
-        .replace("{index}", &index.to_string())
+    let mut rendered = String::with_capacity(template.len());
+    let mut rest = template;
+
+    while let Some(start) = rest.find('{') {
+        rendered.push_str(&rest[..start]);
+        rest = &rest[start..];
+
+        if rest.starts_with("{backend_id}") {
+            rendered.push_str(backend_id);
+            rest = &rest["{backend_id}".len()..];
+        } else if rest.starts_with("{family}") {
+            rendered.push_str(family);
+            rest = &rest["{family}".len()..];
+        } else if rest.starts_with("{index}") {
+            rendered.push_str(&index.to_string());
+            rest = &rest["{index}".len()..];
+        } else {
+            rendered.push('{');
+            rest = &rest['{'.len_utf8()..];
+        }
+    }
+
+    rendered.push_str(rest);
+    rendered
 }
 
 fn render_errors(failures: &[BranchFailure]) -> String {
@@ -170,10 +192,14 @@ fn render_errors(failures: &[BranchFailure]) -> String {
             failure.backend_id,
             failure.family,
             failure.index,
-            failure.reason.trim()
+            render_reason(&failure.reason)
         ));
     }
     out
+}
+
+fn render_reason(reason: &str) -> String {
+    reason.trim().replace('\n', "\\n")
 }
 
 #[cfg(test)]
@@ -226,6 +252,38 @@ mod tests {
             .unwrap();
 
         assert_eq!(artifact.text, "## claude {unknown}\n\ntext\n");
+    }
+
+    #[test]
+    fn concat_does_not_reexpand_placeholders_inside_metadata() {
+        let artifact = Aggregator::concat("## {backend_id} ({family})")
+            .aggregate(AggregateInput {
+                branches: vec![success("review-{index}", "other-{backend_id}", 3, "text")],
+            })
+            .unwrap();
+
+        assert_eq!(
+            artifact.text,
+            "## review-{index} (other-{backend_id})\n\ntext\n"
+        );
+    }
+
+    #[test]
+    fn concat_escapes_multiline_failure_reason() {
+        let artifact = Aggregator::concat("## {backend_id}")
+            .aggregate(AggregateInput {
+                branches: vec![failure(
+                    "codex",
+                    "openai",
+                    1,
+                    "network: timeout\nretry exhausted",
+                )],
+            })
+            .unwrap();
+
+        assert!(artifact
+            .text
+            .contains("reason: network: timeout\\nretry exhausted"));
     }
 
     #[test]
