@@ -90,6 +90,22 @@ impl TemplateEngine {
             .map_err(TemplateError::from_minijinja)
     }
 
+    /// Render a template string with any serializable context.
+    ///
+    /// Used by aggregators (e.g. LLMJudge) that need to inject arbitrary
+    /// data structures without going through the full `TemplateContext` builder.
+    pub fn render_serde(&self,
+        template: &str,
+        ctx: &impl serde::Serialize,
+    ) -> Result<String, TemplateError> {
+        let tmpl = self
+            .env
+            .template_from_str(template)
+            .map_err(TemplateError::from_minijinja)?;
+        let value = minijinja::Value::from_serialize(ctx);
+        tmpl.render(value).map_err(TemplateError::from_minijinja)
+    }
+
     /// Evaluate a Jinja expression string against the context and coerce to bool.
     ///
     /// Used for step `when` conditions. Returns the truthiness of the evaluated

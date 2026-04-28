@@ -24,7 +24,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-04-28T20:08:05.347Z'
-  updated_at: '2026-04-28T20:27:23.819Z'
+  updated_at: '2026-04-28T20:31:15.888Z'
 phases:
   discovery:
     status: complete
@@ -60,6 +60,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - 1cb6b70
   pr:
     status: pending
   complete:
@@ -125,5 +127,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-04-28T20:31:15.888Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: Expand Aggregator enum and PhaseError. Commit 1cb6b70.'
 task_title: Implement Aggregator::LLMJudge with cross-family enforcement
 task_url: https://linear.app/cloud-ai/issue/CLO-268/implement-aggregatorllmjudge-with-cross-family-enforcement
