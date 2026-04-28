@@ -1,15 +1,22 @@
 //! Aggregator primitives.
 //!
-//! Two aggregator behaviors live here:
+//! Three aggregator behaviors live here:
 //! - [`concat`]: fold multiple branch outputs into one Markdown artefact.
 //! - [`any_fail_evaluate`] / [`AnyFailReason`]: short-circuit on the first
-//!   rejected verdict (T-017 LLMJudge will introduce a proper trait).
+//!   rejected verdict.
+//! - [`llm_judge`]: use a separate-family LLM to pick the best candidate.
 
 mod concat;
+mod llm_judge;
 
 pub use concat::{
     AggregateInput, AggregatedArtifact, Aggregator, AggregatorError, BranchFailure, BranchOutcome,
     BranchSuccess, EMPTY_CONCAT_SENTINEL,
+};
+
+pub use llm_judge::{
+    aggregate_llm_judge, check_cross_family, clamp_chosen_index, parse_ballot,
+    render_ballot_prompt, Ballot, Candidate, LLMJudgeError,
 };
 
 use serde_json::Value;
@@ -53,7 +60,7 @@ pub fn any_fail_evaluate(text: &str) -> Result<(), AnyFailReason> {
 }
 
 /// Strip leading/trailing markdown fences if present.
-fn strip_markdown_fences(text: &str) -> &str {
+pub(crate) fn strip_markdown_fences(text: &str) -> &str {
     let text = text.strip_prefix("```json").unwrap_or(text);
     let text = text.strip_prefix("```").unwrap_or(text);
     let text = text.strip_suffix("```").unwrap_or(text);
