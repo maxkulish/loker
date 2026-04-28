@@ -199,7 +199,11 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
       parameters: params,
 
       async execute(_toolCallId: string, params: Record<string, unknown>) {
-        const result = await client.callTool({ name: tool.name, arguments: params });
+        const liveClient = activeLinearClient;
+        if (!liveClient) {
+          throw new Error(`Linear tool ${tool.name} unavailable: MCP client not connected`);
+        }
+        const result = await liveClient.callTool({ name: tool.name, arguments: params });
         const resultText =
           (result.content as Array<{ type: string; text?: string }> | undefined)
             ?.map((chunk) => (chunk.type === "text" && chunk.text != null ? chunk.text : JSON.stringify(chunk)))
