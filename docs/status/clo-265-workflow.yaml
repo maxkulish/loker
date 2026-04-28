@@ -24,7 +24,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-04-28T10:35:05.591Z'
-  updated_at: '2026-04-28T10:52:27.605Z'
+  updated_at: '2026-04-28T10:52:47.104Z'
 phases:
   discovery:
     status: pending
@@ -41,7 +41,7 @@ phases:
     codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-265-gemini-validation.md
   pr:
-    status: pending
+    status: in_progress
   complete:
     status: pending
   spec:
@@ -122,5 +122,9 @@ history:
     action: phase_transition
     phase: implement
     details: Transitioned from implement to pr
+  - timestamp: '2026-04-28T10:52:47.104Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy -D warnings + 31 lib tests + 7 integration tests + schema validation all pass.'
 task_title: Add family_of() lookup and cross-family runtime check
 task_url: https://linear.app/cloud-ai/issue/clo-265/add-family-of-lookup-and-cross-family-runtime-check
