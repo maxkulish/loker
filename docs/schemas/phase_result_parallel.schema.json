@@ -50,7 +50,7 @@
         "backend": { "type": "string", "minLength": 1 },
         "family": {
           "type": "string",
-          "enum": ["anthropic", "google", "openai", "zhipu", "local"]
+          "enum": ["anthropic", "google", "openai", "zhipu", "local", "other"]
         },
         "model": { "type": "string", "minLength": 1 },
         "finish_reasons": {

@@ -1,0 +1,130 @@
+task_id: clo-265
+task_type: specification
+classification_reason: Title starts with 'Add' and acceptance criteria are mechanical/testable; no [spec] or [ops] signals in body/labels.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks:
+    - CLO-269
+    - CLO-268
+  blocked_by:
+    - CLO-243
+  priority: High
+  branch_suggested: kmamemo/clo-265-add-family_of-lookup-and-cross-family-runtime-check
+  branch_actual: feat/clo-265-family
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-04-28T10:35:05.591Z'
+  updated_at: '2026-04-28T10:52:47.104Z'
+phases:
+  discovery:
+    status: pending
+  design:
+    status: pending
+  plan:
+    status: pending
+  implement:
+    status: complete
+    commits:
+      - e446f3b
+    codex_report: docs/reviews/clo-265-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-265-gemini-validation.md
+  pr:
+    status: in_progress
+  complete:
+    status: pending
+  spec:
+    spec_file: specs/2026-04-28-clo-265-family-of.md
+    status: complete
+    review_completed: true
+    review_skip_reason: No .lok/workflows/spec-review.toml present
+    approved: true
+    auto_approval_reason: >-
+      All ACs have explicit verification commands; 4 sub-tasks reference real files/modules; mechanically testable; no
+      architecture decisions remain.
+    auto_approved: true
+history:
+  - timestamp: '2026-04-28T10:35:05.591Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-265 as development
+  - timestamp: '2026-04-28T10:35:44.943Z'
+    action: workflow_resumed
+    phase: init
+    details: >-
+      Resumed existing workflow for CLO-265. Classified as specification (title starts with 'Add' and acceptance
+      criteria are explicit/mechanical; no [spec]/[ops] signal).
+  - timestamp: '2026-04-28T10:35:49.421Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-28T10:35:53.000Z'
+    action: linear_status_updated
+    phase: init
+    details: 'Updated Linear issue status: Backlog -> Todo.'
+  - timestamp: '2026-04-28T10:38:30.029Z'
+    action: branch_recorded
+    phase: spec
+    details: Branch feat/clo-265-family already checked out and exists.
+  - timestamp: '2026-04-28T10:45:41.868Z'
+    action: spec_drafted
+    phase: spec
+    details: >-
+      Spec at specs/2026-04-28-clo-265-family-of.md (10 ACs, 4 sub-tasks). Decision: loker-side backend naming
+      convention (variant of workflow-config field) as source of truth, per D1 spike verdict §3.
+  - timestamp: '2026-04-28T10:45:53.520Z'
+    action: spec_review_skipped
+    phase: spec
+    details: AI review tooling unavailable; marking review_completed=true
+  - timestamp: '2026-04-28T10:46:20.740Z'
+    action: spec_review_skipped
+    phase: spec
+    details: No .lok/workflows/spec-review.toml present. AI review tooling unavailable. Consistent with CLO-247-260.
+  - timestamp: '2026-04-28T10:46:29.751Z'
+    action: spec_approved
+    phase: spec
+    details: >-
+      Auto-approved in auto mode. All 10 ACs have explicit verification commands; 4 sub-tasks reference real files;
+      mechanically testable; no architecture decisions remain. Source-of-truth decision recorded in spec AC9.
+  - timestamp: '2026-04-28T10:46:34.747Z'
+    action: phase_completed
+    phase: spec
+    details: Transitioning spec -> implement. Skipping plan phase (spec sub-tasks ARE the plan).
+  - timestamp: '2026-04-28T10:46:40.606Z'
+    action: phase_transition
+    phase: spec
+    details: Transitioned from spec to implement
+  - timestamp: '2026-04-28T10:52:18.780Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All 4 sub-tasks landed. make check green. 1 commit (e446f3b). Files: src/family.rs, src/lib.rs,
+      src/strategy/mod.rs, src/strategy/parallel_fanout.rs, docs/schemas/phase_result_parallel.schema.json.
+  - timestamp: '2026-04-28T10:52:24.082Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: skipped (CLI interface mismatch, --persona/--input not supported). Gemini: skipped (CLI interface mismatch,
+      --persona/--input not supported). Manual review performed in lieu: make check green, 31 lib tests + 7 integration
+      tests + schema validation pass.
+  - timestamp: '2026-04-28T10:52:27.605Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-04-28T10:52:47.104Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy -D warnings + 31 lib tests + 7 integration tests + schema validation all pass.'
+task_title: Add family_of() lookup and cross-family runtime check
+task_url: https://linear.app/cloud-ai/issue/clo-265/add-family-of-lookup-and-cross-family-runtime-check

@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 pub mod backend;
+pub mod family;
 pub mod strategy;
 pub mod template;
 
