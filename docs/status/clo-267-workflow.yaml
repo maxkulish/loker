@@ -1,0 +1,195 @@
+task_id: CLO-267
+task_type: development
+classification_reason: >-
+  Title starts with 'Implement' and scope describes concrete code changes (new enum variant, walker logic, error
+  handling) with mechanical acceptance criteria. Preceded by existing PRD FR-11 and roadmap T-018.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-267-implement-aggregatoranyfail-first-failure-wins
+  priority: Medium
+  branch_actual: feat/clo-267-anyfail
+workflow:
+  current_phase: pr
+  status: complete
+  created_at: '2026-04-28T14:17:21.070Z'
+  updated_at: '2026-04-28T15:48:20.428Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: inline_streaming_evaluation
+    approaches_identified: 3
+    approved: true
+    baseline_score: 7
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-267.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-267-anyfail.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-267-anyfail.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions:
+      - Create src/aggregator/mod.rs thin module per handoff rule
+      - Fix arrival-order test determinism via MockBackend::delayed_ok/delayed_fail
+      - Add markdown-fence stripping to any_fail_evaluate
+      - Simplify any_fail_evaluate return type to Result<(), AnyFailReason>
+      - Add empty query.text test case
+      - Add docs/schemas/verdict.schema.json
+      - Add AnyFail > FloorViolation priority rule
+    flagged_suggestions:
+      - id: CLAUDE.md stale milestone
+        reason: Out of scope for CLO-267; CLAUDE.md is maintained separately.
+      - id: trace.jsonl events for AnyFail
+        reason: T-029 boundary concern; deferred to T-029 implementation.
+      - id: per-branch VerifyOutcome to passed
+        reason: Nice-to-have observability improvement; deferred to follow-up.
+    review_completed: true
+    review_gemini: docs/reviews/CLO-267-review-gemini.md
+    review_synthesis: docs/reviews/CLO-267-review-synthesis.md
+    review_verdict: approve_with_changes
+    finalized: true
+  plan:
+    status: complete
+    approved: true
+    plan_file: docs/plans/clo-267-anyfail.md
+  implement:
+    status: complete
+    commits:
+      - 65776a9
+    codex_report: docs/reviews/clo-267-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-267-gemini-validation.md
+  pr:
+    status: in_progress
+    pr_number: 21
+    pr_url: https://github.com/maxkulish/loker/pull/21
+    ci_passed: true
+    reviews_addressed: true
+  complete:
+    status: complete
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
+history:
+  - timestamp: '2026-04-28T14:17:21.070Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-267 as development
+  - timestamp: '2026-04-28T14:19:14.059Z'
+    action: workflow_resumed
+    phase: init
+    details: >-
+      Hydrated from Linear issue CLO-267. Title: 'Implement Aggregator::AnyFail (first failure wins)'. Classified as
+      development: scope describes concrete code changes (new enum variant, walker logic, error handling) with
+      mechanical acceptance criteria. Preceded by existing PRD FR-11 and roadmap T-018.
+  - timestamp: '2026-04-28T14:19:26.047Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-28T14:20:23.187Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-267-anyfail checked out from main
+  - timestamp: '2026-04-28T14:31:41.676Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: inline streaming evaluation in ParallelFanOut. Baseline 7/10. 3 approaches considered (A chosen, B and C
+      rejected).
+  - timestamp: '2026-04-28T14:31:48.390Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-04-28T14:36:00.000Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc draft at docs/designs/clo-267-anyfail.md
+  - timestamp: '2026-04-28T14:49:10.006Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_suggestions. 1 reviewer succeeded (Ollama), 1 failed (Gemini CLI unreachable). 12
+      suggestions: 3 high (all applied), 5 medium (4 applied, 1 deferred to implement), 4 low (1 applied, 3 deferred).
+  - timestamp: '2026-04-28T14:49:21.069Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. All 3 high-severity review suggestions applied: src/aggregator/mod.rs module,
+      deterministic test delays, markdown-fence stripping. Public API signatures compile mentally; test plan specifies
+      12 concrete cases; open questions resolved or deferred with rationale.
+  - timestamp: '2026-04-28T14:49:24.078Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-04-28T14:50:47.060Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 6 sub-tasks queued (2xS, 2xM, 2xS). Pre-merge gate: make check.'
+  - timestamp: '2026-04-28T14:51:36.183Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-267-anyfail.md
+  - timestamp: '2026-04-28T14:52:03.961Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 6 sub-tasks queued (2xS, 2xM, 2xS). Pre-merge gate: make check.'
+  - timestamp: '2026-04-28T14:52:19.498Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-04-28T15:19:54.759Z'
+    action: implementation_complete
+    phase: implement
+    details: 'All 6 sub-tasks landed. make check green (560 tests). Commit: 65776a9.'
+  - timestamp: '2026-04-28T15:20:10.643Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: skipped (CLI flag incompatibility). Gemini: skipped (CLI flag incompatibility). make check + design review
+      + 12 unit tests serve as validation.
+  - timestamp: '2026-04-28T15:20:21.106Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-04-28T15:21:11.620Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (560 tests).'
+  - timestamp: '2026-04-28T15:22:16.975Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #21 opened: https://github.com/maxkulish/loker/pull/21'
+  - timestamp: '2026-04-28T15:24:43.748Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format, clippy, test.'
+  - timestamp: '2026-04-28T15:24:54.279Z'
+    action: review_addressed
+    phase: pr
+    details: 0 review threads. No reviewers required on solo project.
+  - timestamp: '2026-04-28T15:47:56.858Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
+  - timestamp: '2026-04-28T15:48:20.428Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-267 fully completed. PR #21 merged (e7ea6b73). 20 files changed, +1,496 lines. Unblocks T-029 (phase
+      runner).
+task_title: Implement Aggregator::AnyFail (first failure wins)
+task_url: https://linear.app/cloud-ai/issue/CLO-267/implement-aggregatoranyfail-first-failure-wins

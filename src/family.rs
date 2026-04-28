@@ -132,6 +132,9 @@ fn family_of_suffix(token: &str) -> Family {
 pub enum PhaseError {
     #[error("family overlap: found {family} on {count} backends")]
     FamilyOverlap { family: Family, count: usize },
+
+    #[error("aggregator contract violation: {message}")]
+    AggregatorContract { message: String },
 }
 
 /// Verify that every backend in `targets` resolves to a *different*
@@ -376,6 +379,7 @@ mod tests {
         let first = enforce_cross_family(targets).unwrap_err();
         let (first_family, first_count) = match first {
             PhaseError::FamilyOverlap { family, count } => (family, count),
+            _ => panic!("expected FamilyOverlap, got {first:?}"),
         };
 
         for _ in 0..100 {
@@ -391,6 +395,7 @@ mod tests {
                         "FamilyOverlap count must be deterministic"
                     );
                 }
+                _ => panic!("expected FamilyOverlap, got {next:?}"),
             }
         }
     }
