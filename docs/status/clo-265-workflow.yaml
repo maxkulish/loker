@@ -22,9 +22,9 @@ linear:
   branch_actual: feat/clo-265-family
 workflow:
   current_phase: complete
-  status: active
+  status: complete
   created_at: '2026-04-28T10:35:05.591Z'
-  updated_at: '2026-04-28T10:56:13.770Z'
+  updated_at: '2026-04-28T10:56:47.661Z'
 phases:
   discovery:
     status: pending
@@ -51,7 +51,11 @@ phases:
     linear_completion_comment_id: 6199c07d-f622-45e5-b9a4-c8c3f1abf878
     linear_status: Done
   complete:
-    status: pending
+    status: complete
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
+    merge_commit: 7c82ef13151a60825a3ddda632ab8cc92c4698a3
+    merged_at: '2026-04-28T10:55:43Z'
   spec:
     spec_file: specs/2026-04-28-clo-265-family-of.md
     status: complete
@@ -156,5 +160,15 @@ history:
     action: phase_transition
     phase: pr
     details: Transitioned from pr to complete
+  - timestamp: '2026-04-28T10:56:43.058Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-28T10:56:47.661Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-265 fully completed. PR #18 merged (7c82ef1). Unblocks T-017 (LLMJudge family-overlap test), T-019 (Vote
+      tie-breaker ClosestToFamily). No aggregation files in repo.
 task_title: Add family_of() lookup and cross-family runtime check
 task_url: https://linear.app/cloud-ai/issue/clo-265/add-family-of-lookup-and-cross-family-runtime-check
