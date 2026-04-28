@@ -425,23 +425,7 @@ pub enum StrategyError {
     },
 }
 
-/// Errors that can surface at phase-runner level, **above** individual
-/// strategy execution. These are distinct from `StrategyError` because
-/// they describe invariants the phase runner enforces (e.g. cross-family
-/// diversity) rather than runtime backend or rendering failures inside a
-/// single strategy.
-///
-/// `#[non_exhaustive]` so new phase-level invariants can be added without
-/// breaking downstream consumers.
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum PhaseError {
-    #[error("family overlap: found {family} on {count} backends")]
-    FamilyOverlap {
-        family: crate::family::Family,
-        count: usize,
-    },
-}
+pub use crate::family::PhaseError;
 
 /// Build the `model` field that lands in `Attempt`, applying the v0
 /// priority rule: prefer the value the backend reports, fall back to the

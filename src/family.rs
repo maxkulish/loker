@@ -30,7 +30,7 @@ use std::fmt;
 /// `#[non_exhaustive]` so a new closed variant can be added without
 /// breaking downstream `match` arms that handle `Other` as a fallback.
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Family {
     Anthropic,
@@ -100,6 +100,7 @@ pub fn family_of(backend_id: &str) -> Family {
         "claude" => Family::Anthropic,
         "gemini" => Family::Google,
         "openai" | "codex" => Family::OpenAI,
+        "zhipu" => Family::Zhipu,
         "ollama" => Family::Local,
         "bedrock" => Family::Other("bedrock".into()),
         "tensorzero" => Family::Other("tensorzero".into()),
@@ -112,6 +113,7 @@ fn family_of_suffix(token: &str) -> Family {
         "openai" => Family::OpenAI,
         "anthropic" => Family::Anthropic,
         "google" | "gemini" => Family::Google,
+        "zhipu" => Family::Zhipu,
         "local" | "ollama" => Family::Local,
         other => Family::Other(other.into()),
     }
@@ -140,9 +142,12 @@ pub enum PhaseError {
 /// considered different families; two backends with `Family::Other("x")`
 /// and `Family::Other("x")` are considered the same family.
 pub fn enforce_cross_family(targets: &[&str]) -> Result<(), PhaseError> {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
-    let mut counts: HashMap<Family, usize> = HashMap::new();
+    // BTreeMap (not HashMap) so iteration order is deterministic by `Family`
+    // sort order. With multiple overlapping families, the first one by sort
+    // order is reported, making error messages reproducible across runs.
+    let mut counts: BTreeMap<Family, usize> = BTreeMap::new();
     for t in targets {
         let family = family_of(t);
         *counts.entry(family).or_insert(0) += 1;
@@ -250,6 +255,21 @@ mod tests {
     }
 
     #[test]
+    fn family_of_zhipu() {
+        assert_eq!(family_of("zhipu"), Family::Zhipu);
+    }
+
+    #[test]
+    fn family_of_loker_zhipu_suffix() {
+        assert_eq!(family_of("loker_d1_zhipu"), Family::Zhipu);
+    }
+
+    #[test]
+    fn family_of_tensorzero_zhipu_suffix() {
+        assert_eq!(family_of("tensorzero/loker_review_zhipu"), Family::Zhipu);
+    }
+
+    #[test]
     fn family_of_empty_string() {
         assert_eq!(family_of(""), Family::Other("".into()));
     }
@@ -340,5 +360,23 @@ mod tests {
     #[test]
     fn enforce_two_distinct_others_ok() {
         assert!(enforce_cross_family(&["bedrock", "tensorzero"]).is_ok());
+    }
+
+    #[test]
+    fn enforce_cross_family_deterministic() {
+        // Two Anthropic + two OpenAI overlap. The reported family must be
+        // identical across repeated calls (BTreeMap iteration is sorted by
+        // key, so the first-by-sort-order overlapping family wins every run).
+        let targets = &[
+            "claude",
+            "loker_review_anthropic",
+            "openai",
+            "loker_d1_openai",
+        ];
+        let first = enforce_cross_family(targets).unwrap_err().to_string();
+        for _ in 0..100 {
+            let next = enforce_cross_family(targets).unwrap_err().to_string();
+            assert_eq!(first, next, "FamilyOverlap message must be deterministic");
+        }
     }
 }
