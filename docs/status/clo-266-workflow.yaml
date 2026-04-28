@@ -22,10 +22,10 @@ linear:
   blocks: []
   blocked_by: []
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-04-28T13:31:08.302Z'
-  updated_at: '2026-04-28T14:01:38.572Z'
+  updated_at: '2026-04-28T14:30:00.000Z'
 phases:
   discovery:
     status: complete
@@ -69,8 +69,16 @@ phases:
       - 99c15c9
       - 2c1a35f
       - b855076
+      - 85099d4
+      - 201ab23
+      - 8977b5c
+      - 649351d
+      - ca2e9c8
+      - daec457
   pr:
     status: pending
+    ci_passed: false
+    pre_flight_passed: true
   complete:
     status: pending
 history:
@@ -160,3 +168,11 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 5 commits.
+  - timestamp: '2026-04-28T14:30:00.000Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr. 11 commits ahead of main (6 additional follow-up fixes after initial 5 sub-tasks).
+  - timestamp: '2026-04-28T14:30:30.000Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: make check green (fmt + clippy + test). Ready to create PR.
