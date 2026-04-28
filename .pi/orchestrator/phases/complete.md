@@ -66,8 +66,8 @@ git branch -D feat/clo-XX-<slug>     # only if it still exists locally
 
 ## Step 3 - Project sync complete
 
-If `PROJECT.md` / `ROADMAP.md` / `DEPENDENCIES.md` exist, run
-`/project:sync --complete CLO-XX`. Otherwise:
+Pi has no `/project:sync` slash command, and the loker repo currently has
+no `PROJECT.md` / `ROADMAP.md` / `DEPENDENCIES.md`. Record the skip:
 
 ```ts
 update_workflow_state({
@@ -82,17 +82,9 @@ update_workflow_state({
 })
 ```
 
-If the sync ran:
-
-```ts
-update_workflow_state({
-  task_id: "CLO-XX",
-  phase: "complete",
-  action: "project_sync_complete",
-  details: "Updated PROJECT.md and DEPENDENCIES.md",
-  phase_updates: { aggregation_files_updated: true }
-})
-```
+If those aggregation files are added later, update the equivalent Claude
+flow at `.claude/commands/task/phases/complete.md` first - this pi
+script mirrors it.
 
 ## Step 4 - Linear
 
@@ -104,12 +96,7 @@ mcp__linear__save_comment(
 )
 ```
 
-## Step 5 - Optional /pr:finalize
-
-If the slash command is available locally, run `/pr:finalize CLO-XX` to
-post follow-up summaries. Otherwise skip.
-
-## Step 6 - Mark workflow complete
+## Step 5 - Mark workflow complete
 
 ```ts
 update_workflow_state({
@@ -125,7 +112,7 @@ update_workflow_state({
 The orchestrator runtime treats `complete` as terminal - no further
 `transition_phase` call is allowed.
 
-## Step 7 - Commit the workflow YAML
+## Step 6 - Commit the workflow YAML
 
 ```bash
 git checkout main && git pull

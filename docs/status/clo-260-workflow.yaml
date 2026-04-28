@@ -1,0 +1,183 @@
+task_id: CLO-260
+task_title: Add pass_failure_context flag on Strategy::EscalatingRetry
+task_url: https://linear.app/cloud-ai/issue/CLO-260/add-pass-failure-context-flag-on-strategyescalatingretry
+task_type: specification
+classification_reason: |
+  Single-concept feature flag addition on top of merged CLO-258 walker.
+  Architecture decisions already made: PRD FR-8 specifies failure
+  context propagation; design doc §6 covers escalating retry shape;
+  §11 covers redaction. Scaffold field `pass_failure_context: bool`
+  was already added to the EscalatingRetry stage in CLO-258
+  (defaulting false). This task wires it through: build a
+  FailureContext payload, plumb into next stage's prompt envelope,
+  reuse existing redaction filter, document byte budget, lock
+  injection location. Acceptance criteria are mechanically
+  testable (config round-trip, snapshot of off-state, four
+  wiremock cases for on-state). No architecture decisions
+  remain. Mirrors approved approach for CLO-247/248/249/251/257.
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_actual: feat/clo-260-pas-failure
+  blocks: []
+  blocked_by:
+    - 'CLO-258 (Strategy::EscalatingRetry walker) - merged 2026-04-27 in PR #15 (Done)'
+  soft_depends_on:
+    - T-020 VerifyHook trait (Phase 4) - until landed, fall back to verifier stdout/stderr strings
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: '2026-04-27T00:00:00Z'
+  updated_at: '2026-04-27T22:30:00.000Z'
+phases:
+  discovery:
+    status: skipped
+    skip_reason: >-
+      Specification task - PRD FR-8 specifies failure context propagation behaviour; design doc §6/§11 cover escalating
+      retry and redaction. No discovery needed.
+    approved: true
+  design:
+    status: skipped
+    skip_reason: >-
+      Specification task - using /spec instead of full design doc. Behaviour pre-specified by PRD FR-8 + design doc
+      §6/§11; no architecture decisions to make.
+  spec:
+    status: complete
+    spec_file: specs/2026-04-27-clo-260-pass-failure-context.md
+    approved: true
+    review_completed: false
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_applied: false
+    applied_suggestions: []
+    flagged_suggestions: []
+    review_skip_reason: >-
+      .lok/workflows/spec-review.toml does not exist in this repo (consistent with CLO-247-257). AI review skipped; spec
+      auto-approved on the same grounds as prior specification tasks: mechanically testable ACs, no architecture
+      decisions, mirrors approved CLO-257 pattern, scaffold (`pass_failure_context: bool`) already in tree from CLO-258.
+  implement:
+    status: complete
+    commits:
+      - ca887fe
+    codex_report: docs/reviews/clo-260-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-260-gemini-validation.md
+  pr:
+    status: in_progress
+    ci_passed: false
+    pr_url: https://github.com/maxkulish/loker/pull/17
+    pr_number: 17
+    reviews_addressed: 14
+    review_commits:
+      - 9e470b5
+      - ce3d697
+      - 873b4fe
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-04-27T00:00:00Z'
+    action: workflow_started
+    phase: spec
+    details: >-
+      CLO-260 workflow initialized as specification task. Branch feat/clo-260-pas-failure already checked out
+      (worktree). Blocker CLO-258 merged.
+  - timestamp: '2026-04-27T00:00:00Z'
+    action: project_sync_skipped
+    phase: spec
+    details: >-
+      No PROJECT.md/ROADMAP.md/DEPENDENCIES.md aggregation files in repo (consistent with CLO-247-257). project:sync
+      step skipped.
+  - timestamp: '2026-04-27T00:00:00Z'
+    action: spec_written
+    phase: spec
+    details: >-
+      Wrote 5-section spec at specs/2026-04-27-clo-260-pass-failure-context.md. Scope: S (~4 sub-tasks). Resolved
+      redaction-scope ambiguity by landing a module-local helper in strategy/escalating_retry.rs (no project-wide filter
+      exists yet); deferred design-doc-tdd workflow file landing (no such file exists in src/workflows/) by documenting
+      the on-default in rustdoc instead.
+  - timestamp: '2026-04-27T00:00:00Z'
+    action: spec_review_skipped
+    phase: spec
+    details: .lok/workflows/spec-review.toml does not exist in repo. AI review skipped; consistent with CLO-247-257.
+  - timestamp: '2026-04-27T00:00:00Z'
+    action: spec_approved
+    phase: spec
+    details: >-
+      Auto-approved in auto mode. Spec mirrors validated CLO-257 pattern, ACs are mechanically testable, scope is S, no
+      architecture decisions remain.
+  - timestamp: '2026-04-27T20:51:34.296Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST1-T4 landed: FailureContext type, redact_secrets, truncate_excerpt, build_failure_envelope helpers;
+      EscalatingRetry::execute() wired; integration tests + config round-trip; 15 new unit tests, 6 new integration
+      tests green. Commit ca887fe
+  - timestamp: '2026-04-27T21:00:20.575Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All sub-tasks landed. cargo test full suite green (501+ tests). make check blocked by pre-existing
+      clippy::overly_complex_bool_expr in src/workflow.rs (line 5616, unrelated to this change). No new warnings
+      introduced by changed files. fmt clean.
+  - timestamp: '2026-04-27T21:00:27.490Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: approve_with_changes (no --persona/--input flags in installed build). Gemini: approve_with_changes (timed
+      out before structured verdict; manual fallback used). Both reports at
+      docs/reviews/clo-260-{codex,gemini}-validation.md.
+  - timestamp: '2026-04-27T21:00:30.240Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-04-27T21:02:38.782Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: >-
+      cargo fmt --check: clean. cargo clippy -- -D warnings: clean (after cargo clean + rebuild). cargo test: 501+ tests
+      pass.
+  - timestamp: '2026-04-27T21:10:34.626Z'
+    action: pr_created
+    phase: pr
+    details: >-
+      PR #17 already opened on this branch (https://github.com/maxkulish/loker/pull/17). Posted Linear comment with PR
+      summary + validation gate results; transitioned CLO-260 to "In Review". Branch carries unrelated commit 4ad0747
+      (orchestrator phase-transition automation) flagged in PR body.
+  - timestamp: '2026-04-27T22:30:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Addressed 12 PR review comments (2 from gemini-code-assist, 10 from Copilot) across 2 commits. 9e470b5 batched
+      eight fixes - cached redaction regex via LazyLock; pub(crate) for build_failure_envelope and EscalatingRetryConfig;
+      pi-init Makefile glob safety; flag-off short-circuit so previous_failure stays None when pass_failure_context is
+      false; envelope hard-cap fix in truncate_excerpt with regression test; FailureContext::from_verify_fail now takes
+      Option<&str> to avoid stdout clone. ce3d697 dropped unused insta dev-dep and switched the backend-error path to
+      backend.name() for consistency with verify-fail/error paths. Comment 3150231866 (Pi orchestrator scope)
+      acknowledged - flagged as already documented in PR body. All 12 replies posted with /gemini review trailer.
+      cargo fmt + clippy --lib -D warnings + full test suite green (524 lib tests + integration suites).
+  - timestamp: '2026-04-27T22:30:00.000Z'
+    action: pushed_to_remote
+    phase: pr
+    details: 9e470b5..ce3d697 pushed to feat/clo-260-pas-failure.
+  - timestamp: '2026-04-28T07:21:00.000Z'
+    action: rebased_on_main
+    phase: pr
+    details: >-
+      Rebased feat/clo-260-pas-failure on origin/main (e9caf2f) after CLO-259 ParallelFanOut merged in PR #16.
+      Resolved Pi orchestrator conflict (kept HEAD's "phase and dispatched instructions" wording with dispatched:true)
+      and Makefile pi-init conflict (kept npm-ci-when-lockfile variant with [ -f "$$ext" ] || continue safety).
+      Force-pushed ce3d697...873b4fe with --force-with-lease. cargo build + cargo test green post-rebase.
+  - timestamp: '2026-04-28T07:22:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Addressed 2 new top-level Copilot comments at 07:17 UTC (3152224573 on Pi orchestrator dispatched:true behavior,
+      3152224618 on Makefile pi-init being orthogonal to CLO-260). Both replied with acknowledgement that Pi orchestrator
+      changes are out-of-scope and already called out in PR body's "Out of scope (bundled but tracked separately)"
+      section, as previously acknowledged in thread 3150231866. dispatchPhase error-path improvement deferred to
+      follow-up Pi orchestrator task. Reviews posted with /gemini review trailer (3152246448, 3152246572).

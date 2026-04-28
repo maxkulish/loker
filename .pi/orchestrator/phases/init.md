@@ -105,9 +105,9 @@ First phase by task type:
 
 ### 2.5 Project sync start
 
-If `PROJECT.md`, `ROADMAP.md`, or `DEPENDENCIES.md` exist at repo root,
-run `/project:sync --start CLO-42`. If none exist (current state of the
-loker repo), record the skip:
+Pi has no `/project:sync` slash command, and the loker repo currently has
+no `PROJECT.md` / `ROADMAP.md` / `DEPENDENCIES.md` at the root. Record the
+skip and move on:
 
 ```ts
 update_workflow_state({
@@ -118,13 +118,32 @@ update_workflow_state({
 })
 ```
 
+If those aggregation files are added later, update the equivalent Claude
+flow at `.claude/commands/task/phases/init.md` first - this pi script
+mirrors it.
+
 ## Step 3 - Dispatch first phase
 
-Call `transition_phase` only if you need to leave `init`. The orchestrator
-runtime treats `init` as a virtual phase: after the workflow file is
-created with `current_phase` set, dispatch the named phase file directly.
+The `task:orchestrate` slash command auto-dispatches the phase named in
+`workflow.current_phase`. Once `update_workflow_state` set it correctly
+in 2.4, no extra step is needed - the runtime sends the matching
+`.pi/orchestrator/phases/<phase>.md` as a follow-up prompt.
 
-Loader path: `.pi/orchestrator/phases/<phase>.md`.
+Do NOT call `transition_phase` from `init`: there is no `init` entry in
+`ALLOWED_TRANSITIONS`. Init is a virtual phase that ends the moment the
+workflow file is written.
+
+## Runtime contract for every later phase
+
+After this point, the loop is:
+
+1. The agent runs the dispatched phase file's steps.
+2. The phase file ends with a `transition_phase({...})` call.
+3. The runtime auto-dispatches the next phase's file as a follow-up.
+
+If `transition_phase` does not auto-dispatch (older builds of the
+orchestrator extension), re-run `/task:orchestrate CLO-XX` to resume from
+the new `current_phase`.
 
 ## Notes
 

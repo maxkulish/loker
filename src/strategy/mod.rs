@@ -18,7 +18,7 @@
 use crate::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use crate::template::{TemplateContext, TemplateEngine, TemplateError};
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -134,7 +134,7 @@ pub enum StrategyKind {
 /// which tier produced it; `SingleModel` attempts omit the field via
 /// `#[serde(skip_serializing_if = "Option::is_none")]` on `Attempt::tier`.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tier {
     Cheap,
