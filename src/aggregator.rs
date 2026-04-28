@@ -263,4 +263,19 @@ mod tests {
             crate::strategy::Aggregator::Concat
         );
     }
+
+    #[test]
+    fn concat_mixed_success_failure_snapshot() {
+        let artifact = Aggregator::concat("## {index}. {backend_id} ({family})")
+            .aggregate(AggregateInput {
+                branches: vec![
+                    success("claude", "anthropic", 1, "Claude review text."),
+                    failure("codex", "openai", 2, "network: timeout"),
+                    success("gemini", "google", 3, "Gemini review text."),
+                ],
+            })
+            .unwrap();
+
+        insta::assert_snapshot!(artifact.text);
+    }
 }
