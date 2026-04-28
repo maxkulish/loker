@@ -27,10 +27,10 @@ linear:
   soft_depends_on:
     - T-020 VerifyHook trait (Phase 4) - until landed, fall back to verifier stdout/stderr strings
 workflow:
-  current_phase: pr
-  status: in_progress
+  current_phase: complete
+  status: complete
   created_at: '2026-04-27T00:00:00Z'
-  updated_at: '2026-04-27T22:30:00.000Z'
+  updated_at: '2026-04-28T07:37:00.000Z'
 phases:
   discovery:
     status: skipped
@@ -68,17 +68,25 @@ phases:
     codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-260-gemini-validation.md
   pr:
-    status: in_progress
-    ci_passed: false
+    status: complete
+    ci_passed: true
     pr_url: https://github.com/maxkulish/loker/pull/17
     pr_number: 17
+    pr_merged_at: '2026-04-28T07:34:51Z'
     reviews_addressed: 14
     review_commits:
       - 9e470b5
       - ce3d697
       - 873b4fe
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_skip_reason: >-
+      No PROJECT.md/ROADMAP.md/DEPENDENCIES.md aggregation files in repo (consistent with CLO-247-259).
+      Special Case 1 applied; skip with note.
+    linear_status: Done
+    linear_completion_comment_id: e40b741b-e629-4cd9-85fd-953342ef934e
+    merged_at: '2026-04-28T07:34:51Z'
 history:
   - timestamp: '2026-04-27T00:00:00Z'
     action: workflow_started
@@ -181,3 +189,26 @@ history:
       changes are out-of-scope and already called out in PR body's "Out of scope (bundled but tracked separately)"
       section, as previously acknowledged in thread 3150231866. dispatchPhase error-path improvement deferred to
       follow-up Pi orchestrator task. Reviews posted with /gemini review trailer (3152246448, 3152246572).
+  - timestamp: '2026-04-28T07:34:51Z'
+    action: pr_merged
+    phase: pr
+    details: >-
+      PR #17 merged to main at 2026-04-28T07:34:51Z. Branch feat/clo-260-pas-failure now in main.
+  - timestamp: '2026-04-28T07:37:00.000Z'
+    action: project_sync_skipped
+    phase: complete
+    details: >-
+      No PROJECT.md/ROADMAP.md/DEPENDENCIES.md aggregation files in repo. Special Case 1 from /pr:finalize applied;
+      skip aggregation updates with note. Consistent with CLO-247-259 finalization pattern.
+  - timestamp: '2026-04-28T07:37:00.000Z'
+    action: linear_status_updated
+    phase: complete
+    details: >-
+      CLO-260 transitioned to Done in Linear. Final completion comment posted (id e40b741b-e629-4cd9-85fd-953342ef934e)
+      with implementation summary, review cycle recap, and document references.
+  - timestamp: '2026-04-28T07:37:00.000Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-260 fully completed. Worktree mode - user runs `gd` after exiting Claude to delete worktree
+      and feat/clo-260-pas-failure branch.
