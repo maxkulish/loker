@@ -1,4 +1,5 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, MessageRenderer } from "@mariozechner/pi-coding-agent";
+import type { AutocompleteItem } from "@mariozechner/pi-tui";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Text } from "@mariozechner/pi-tui";
 import { Type, type Static } from "typebox";
@@ -519,6 +520,25 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
   }
 }
 
+function notifyCtx(
+  pi: ExtensionAPI,
+  ctx: Pick<ExtensionContext, "ui" | "hasUI"> | undefined,
+  message: string,
+  level: "info" | "warning" | "error" = "info",
+): void {
+  if (ctx?.hasUI) {
+    ctx.ui.notify(message, level);
+    return;
+  }
+  pi.sendUserMessage(message, { deliverAs: "followUp" });
+}
+
+function buildSessionName(summary: OrchestratorRuntimeSummary): string | undefined {
+  if (!summary.task_id) return undefined;
+  const phase = summary.phase || "init";
+  return `${summary.task_id} • ${phase}`;
+}
+
 function updateRuntimeUi(ctx: Pick<ExtensionContext, "ui" | "hasUI"> | undefined, summary: OrchestratorRuntimeSummary): void {
   if (!ctx?.hasUI) return;
 
@@ -579,6 +599,11 @@ function persistRuntimeState(taskId: string, state: WorkflowState): void {
   };
 
   runtime.api.appendEntry(ORCHESTRATOR_ENTRY_TYPE, runtime.summary);
+
+  const desiredName = buildSessionName(runtime.summary);
+  if (desiredName && runtime.api.getSessionName() !== desiredName) {
+    runtime.api.setSessionName(desiredName);
+  }
 }
 
 function cachePersistedState(summary: OrchestratorRuntimeSummary): void {
@@ -648,8 +673,68 @@ function parseArgs(args: string): { taskId?: string; flags: Set<string> } {
   return { taskId, flags: new Set(argsList.filter((arg) => arg.startsWith("--"))) };
 }
 
+const FLAG_COMPLETIONS: AutocompleteItem[] = [
+  { value: "--status", label: "--status", description: "Show current status without dispatching phase" },
+  { value: "--ops", label: "--ops", description: "Treat task as operational workflow" },
+  { value: "--spec", label: "--spec", description: "Treat task as specification workflow" },
+  { value: "--skip-discovery", label: "--skip-discovery", description: "Skip discovery phase (jump to design)" },
+];
+
+function listWorkflowCompletions(workspaceRoot: string, prefix: string): AutocompleteItem[] {
+  const dir = path.join(workspaceRoot, "docs/status");
+  if (!fs.existsSync(dir)) return [];
+
+  const lowered = prefix.toLowerCase();
+  const items: AutocompleteItem[] = [];
+
+  for (const file of fs.readdirSync(dir)) {
+    const match = /^clo-(\d+)-workflow\.yaml$/i.exec(file);
+    if (!match) continue;
+    const taskId = `CLO-${match[1]}`;
+    if (lowered && !taskId.toLowerCase().startsWith(lowered)) continue;
+
+    let description: string | undefined;
+    try {
+      const state = readWorkflowState(path.join(dir, file));
+      const phase = state.workflow?.current_phase || "?";
+      const status = state.workflow?.status || "?";
+      const title = state.task_title ? ` — ${state.task_title}` : "";
+      description = `${phase} • ${status}${title}`;
+    } catch {
+      // skip malformed state file silently — completion is best-effort
+    }
+
+    items.push({ value: taskId, label: taskId, description });
+  }
+
+  items.sort((a, b) => {
+    const an = parseInt(a.value.replace(/^CLO-/i, ""), 10);
+    const bn = parseInt(b.value.replace(/^CLO-/i, ""), 10);
+    return bn - an;
+  });
+  return items;
+}
+
+const orchestratorMessageRenderer: MessageRenderer<OrchestratorRuntimeSummary> = (message, _options, theme) => {
+  const summary = (message.details ?? {}) as OrchestratorRuntimeSummary;
+  if (!summary.task_id) return undefined;
+
+  const phase = summary.phase || "unknown";
+  const status = summary.workflow_status || "unknown";
+  const taskType = summary.task_type || "unknown";
+
+  let line = theme.fg("toolTitle", theme.bold(`Orchestrator ${summary.task_id}`));
+  line += " ";
+  line += theme.fg("accent", `${phase}`);
+  line += theme.fg("muted", ` • ${status}`);
+  line += theme.fg("dim", ` (${taskType})`);
+  return new Text(line, 0, 0);
+};
+
 export default function (pi: ExtensionAPI) {
   runtime.api = pi;
+
+  pi.registerMessageRenderer<OrchestratorRuntimeSummary>(ORCHESTRATOR_ENTRY_TYPE, orchestratorMessageRenderer);
 
   pi.on("session_start", async (_event, ctx: ExtensionContext) => {
     const restored = restoreRuntimeFromSession(ctx);
@@ -686,16 +771,23 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("task:orchestrate", {
     description: "Complete Task Lifecycle Management - Orchestrate CLO-XX workflows (Loker / Linear)",
+    getArgumentCompletions: (argumentPrefix: string) => {
+      const trimmed = argumentPrefix.trimStart();
+      if (trimmed.startsWith("--")) {
+        return FLAG_COMPLETIONS.filter((item) => item.value.startsWith(trimmed));
+      }
+      return listWorkflowCompletions(process.cwd(), trimmed);
+    },
     handler: async (args: string, ctx: ExtensionContext) => {
       const { taskId, flags } = parseArgs(args);
 
       if (flags.has("--status")) {
         if (!taskId) {
-          ctx.ui.notify("Please provide a task ID for status check", "error");
+          notifyCtx(pi, ctx, "Please provide a task ID for status check", "error");
           return;
         }
         if (!validateTaskId(taskId)) {
-          ctx.ui.notify(`Invalid task ID format: ${taskId}. Must match CLO-XX pattern.`, "error");
+          notifyCtx(pi, ctx, `Invalid task ID format: ${taskId}. Must match CLO-XX pattern.`, "error");
           return;
         }
         await showStatus(pi, taskId, ctx);
@@ -703,12 +795,12 @@ export default function (pi: ExtensionAPI) {
       }
 
       if (!taskId) {
-        ctx.ui.notify("Usage: /task:orchestrate CLO-XX [--status] [--ops] [--spec] [--skip-discovery]", "error");
+        notifyCtx(pi, ctx, "Usage: /task:orchestrate CLO-XX [--status] [--ops] [--spec] [--skip-discovery]", "error");
         return;
       }
 
       if (!validateTaskId(taskId)) {
-        ctx.ui.notify(`Invalid task ID format: ${taskId}. Must match CLO-XX pattern.`, "error");
+        notifyCtx(pi, ctx, `Invalid task ID format: ${taskId}. Must match CLO-XX pattern.`, "error");
         return;
       }
 
@@ -763,7 +855,7 @@ export default function (pi: ExtensionAPI) {
 
       const validation = validatePhase(state);
       if (!validation.valid) {
-        ctx.ui.notify(`Validation Failed: ${validation.errors.join(", ")}`, "error");
+        notifyCtx(pi, ctx, `Validation Failed: ${validation.errors.join(", ")}`, "error");
       }
 
       updateRuntimeUi(ctx, {
@@ -979,14 +1071,14 @@ export default function (pi: ExtensionAPI) {
 
 async function showStatus(pi: ExtensionAPI, taskId: string, ctx: ExtensionContext) {
   if (!validateTaskId(taskId)) {
-    ctx.ui.notify(`Invalid task ID format: ${taskId}`, "error");
+    notifyCtx(pi, ctx, `Invalid task ID format: ${taskId}`, "error");
     return;
   }
 
   const workspaceRoot = process.cwd();
   const statePath = getWorkflowPath(workspaceRoot, taskId);
   if (!fs.existsSync(statePath)) {
-    ctx.ui.notify(`No workflow file found for ${taskId}`, "warning");
+    notifyCtx(pi, ctx, `No workflow file found for ${taskId}`, "warning");
     return;
   }
 
