@@ -23,7 +23,22 @@ const APPROVED_TOOLS = new Set<string>([
 // Conditional tools registered alongside the core 7. See adapter §2.2.
 const CONDITIONAL_TOOLS = new Set<string>(["get_team"]);
 
-const registeredLinearTools = new Set<string>();
+const registeredLinearTools = new Map<string, string>();
+let activeLinearClient: Client | null = null;
+
+async function closeActiveLinearClient(): Promise<void> {
+  if (!activeLinearClient) return;
+  try {
+    await activeLinearClient.close();
+  } catch {
+    // best-effort: swallow shutdown errors so refresh can proceed
+  }
+  activeLinearClient = null;
+}
+
+function toolFingerprint(tool: MCPTool): string {
+  return JSON.stringify({ d: tool.description ?? "", s: tool.inputSchema ?? null });
+}
 
 type MCPTool = {
   name: string;
@@ -133,7 +148,9 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
           requestInit: { headers },
         });
 
+  await closeActiveLinearClient();
   const client = new Client({ name: "pi-linear", version: "1.0.0" });
+  activeLinearClient = client;
 
   await Promise.race([
     client.connect(transport),
@@ -154,12 +171,21 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
     ? (tools as MCPTool[])
     : (tools as MCPTool[]).filter((t) => APPROVED_TOOLS.has(t.name) || CONDITIONAL_TOOLS.has(t.name));
 
+  let registeredCount = 0;
+  let refreshedCount = 0;
   for (const tool of candidates) {
     const toolName = `${TOOL_PREFIX}${tool.name}`;
-    if (registeredLinearTools.has(toolName)) {
+    const fingerprint = toolFingerprint(tool);
+    const previous = registeredLinearTools.get(toolName);
+    if (previous === fingerprint) {
       continue;
     }
-    registeredLinearTools.add(toolName);
+    if (previous !== undefined) {
+      refreshedCount += 1;
+    } else {
+      registeredCount += 1;
+    }
+    registeredLinearTools.set(toolName, fingerprint);
 
     const params = tool.inputSchema ? schemaToTypeBox(tool.inputSchema) : Type.Object({});
     const description = tool.description || `Linear: ${tool.name}`;
@@ -213,8 +239,9 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
   }
 
   const surfaceMode = fullSurface ? "full" : "approved-subset";
+  const refreshedSuffix = refreshedCount > 0 ? `, ${refreshedCount} refreshed` : "";
   pi.sendUserMessage(
-    `Linear MCP: registered ${registeredLinearTools.size}/${discoveredCount} tools (${surfaceMode}).`,
+    `Linear MCP: registered ${registeredCount}${refreshedSuffix} (${registeredLinearTools.size} tracked / ${discoveredCount} discovered, ${surfaceMode}).`,
     { deliverAs: "followUp" },
   );
   return true;

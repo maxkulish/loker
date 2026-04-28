@@ -268,8 +268,13 @@ const PHASE_CONFIG: Record<string, { requiredFields: string[]; historyEvents: st
   },
 };
 
-let runtimeSummary: OrchestratorRuntimeSummary = {};
-let extensionApi: ExtensionAPI | null = null;
+const runtime: {
+  summary: OrchestratorRuntimeSummary;
+  api: ExtensionAPI | null;
+} = {
+  summary: {},
+  api: null,
+};
 
 function validateTaskId(taskId: string): boolean {
   return TASK_ID_REGEX.test(taskId);
@@ -317,7 +322,12 @@ async function mutateWorkflowState(
 ): Promise<WorkflowState> {
   return withFileMutationQueue(statePath, async () => {
     const state = readWorkflowState(statePath);
-    await mutator(state);
+    try {
+      await mutator(state);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Workflow mutator failed for ${statePath}: ${message}`);
+    }
     writeWorkflowState(statePath, state);
     return state;
   });
@@ -558,9 +568,9 @@ function restoreRuntimeFromSession(ctx: ExtensionContext): OrchestratorRuntimeSu
 }
 
 function persistRuntimeState(taskId: string, state: WorkflowState): void {
-  if (!extensionApi) return;
+  if (!runtime.api) return;
 
-  runtimeSummary = {
+  runtime.summary = {
     task_id: taskId,
     phase: state.workflow?.current_phase,
     task_type: state.task_type,
@@ -568,11 +578,11 @@ function persistRuntimeState(taskId: string, state: WorkflowState): void {
     last_seen: new Date().toISOString(),
   };
 
-  extensionApi.appendEntry(ORCHESTRATOR_ENTRY_TYPE, runtimeSummary);
+  runtime.api.appendEntry(ORCHESTRATOR_ENTRY_TYPE, runtime.summary);
 }
 
 function cachePersistedState(summary: OrchestratorRuntimeSummary): void {
-  runtimeSummary = summary;
+  runtime.summary = summary;
 }
 
 function savePhaseOutputForDebug(fullOutput: string): string {
@@ -639,12 +649,12 @@ function parseArgs(args: string): { taskId?: string; flags: Set<string> } {
 }
 
 export default function (pi: ExtensionAPI) {
-  extensionApi = pi;
+  runtime.api = pi;
 
   pi.on("session_start", async (_event, ctx: ExtensionContext) => {
     const restored = restoreRuntimeFromSession(ctx);
     cachePersistedState(restored || {});
-    updateRuntimeUi(ctx, runtimeSummary);
+    updateRuntimeUi(ctx, runtime.summary);
   });
 
   pi.on("resources_discover", async (_event, ctx: ExtensionContext) => {
@@ -656,13 +666,13 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, _ctx) => {
-    if (!runtimeSummary.task_id) {
+    if (!runtime.summary.task_id) {
       return;
     }
 
-    const contextLine = `Orchestrator context: ${runtimeSummary.task_id} • ${
-      runtimeSummary.phase || "unknown"
-    } • ${runtimeSummary.workflow_status || "unknown"}`;
+    const contextLine = `Orchestrator context: ${runtime.summary.task_id} • ${
+      runtime.summary.phase || "unknown"
+    } • ${runtime.summary.workflow_status || "unknown"}`;
 
     return {
       systemPrompt: `${event.systemPrompt}\n\n${contextLine}`,
