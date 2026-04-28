@@ -70,14 +70,14 @@ Phase 3 and 4. Internal order is sequential.
 Parallel with Phase 2 and 4. T-015 is the load-bearing one - cross-family
 enforcement is the loker thesis.
 
-**Status (2026-04-27): all five Phase 3 issues opened in Linear.**
+**Status (2026-04-28): T-015, T-016, T-018 shipped. T-017 and T-019 unblocked.**
 
 | ID | Linear | Task | After | Blocks | PRD |
 |----|--------|------|-------|--------|-----|
-| T-015 | CLO-265 | `family_of(backend_id)` lookup + cross-family runtime check (FR-13). Refusal raises `PhaseError::FamilyOverlap`. Source of truth for family resolution decided here (open question §8). | T-001 | T-017, T-019 | FR-13 |
-| T-016 | CLO-266 | `Aggregator::Concat`: per-source headings, snapshot test. | - | T-029 | FR-9 |
+| ~~T-015~~ | CLO-265 done | `family_of(backend_id)` lookup + cross-family runtime check (FR-13). Refusal raises `PhaseError::FamilyOverlap`. Source of truth for family resolution decided here (open question §8). | T-001 | T-017, T-019 | FR-13 |
+| ~~T-016~~ | CLO-266 done | `Aggregator::Concat`: per-source headings, snapshot test. | - | T-029 | FR-9 |
 | T-017 | CLO-268 | `Aggregator::LLMJudge`: judge prompt construction, family-overlap test, opt-out via `require_judge_different_family = false`. | T-015 | T-029 | FR-10 |
-| T-018 | CLO-267 | `Aggregator::AnyFail`: first failure wins on JSON verdict fixtures. | - | T-029 | FR-11 |
+| ~~T-018~~ | CLO-267 done | `Aggregator::AnyFail`: first failure wins on JSON verdict fixtures. | - | T-029 | FR-11 |
 | T-019 | CLO-269 | `Aggregator::Vote` (Should). Ballot schema + abstentions + tie-breakers (`ClosestToFamily`, `Random`, `FirstResponder`) decided in TDD doc before code. Demote to post-v0 if no concrete first use case lands by M3 start. | T-015 | - | FR-12 |
 
 ## Phase 4 - Verify hooks (M4)

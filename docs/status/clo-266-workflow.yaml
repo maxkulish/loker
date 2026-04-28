@@ -22,10 +22,10 @@ linear:
   blocks: []
   blocked_by: []
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-04-28T13:31:08.302Z'
-  updated_at: '2026-04-28T14:30:00.000Z'
+  updated_at: '2026-04-28T19:50:00.000Z'
 phases:
   discovery:
     status: complete
@@ -76,14 +76,20 @@ phases:
       - ca2e9c8
       - daec457
   pr:
-    status: in_progress
+    status: complete
     ci_passed: true
     pre_flight_passed: true
     pr_url: https://github.com/maxkulish/loker/pull/20
     pr_number: 20
     ci_run_id: 25061229514
+    merged_at: '2026-04-28T19:43:22Z'
+    merge_commit: d3e6938
+    review_rounds: 2
+    review_comments_addressed: 6
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: true
+    merged_at: '2026-04-28T19:43:22Z'
 history:
   - timestamp: '2026-04-28T13:31:08.302Z'
     action: workflow_started
@@ -191,3 +197,25 @@ history:
     action: ci_passed
     phase: pr
     details: 'CI run 25061229514 green: tests + format jobs both passed.'
+  - timestamp: '2026-04-28T19:30:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Round 1 review feedback addressed (extension hardening + Linear test script). Pushed a59ecfd, replied to all
+      comments with /gemini review trailer.
+  - timestamp: '2026-04-28T19:35:00.000Z'
+    action: ci_collision_fixed
+    phase: pr
+    details: >-
+      Resolved E0761 module ambiguity vs main (PR #21 added src/aggregator/mod.rs). Restructured src/aggregator.rs
+      into directory module with concat submodule. Snapshot relocated. Commit ab0c41d, CI green.
+  - timestamp: '2026-04-28T19:43:22Z'
+    action: pr_merged
+    phase: pr
+    details: >-
+      PR #20 squash-merged into main as d3e6938. 2 follow-up nit fixes (concat dead branch + test-connection finally
+      block) landed on branch as 558dc86 after merge - orphaned, not in main.
+  - timestamp: '2026-04-28T19:55:00.000Z'
+    action: workflow_complete
+    phase: complete
+    details: Task CLO-266 fully completed. Roadmap and workflow yaml updated.
