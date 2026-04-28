@@ -20,10 +20,10 @@ linear:
   priority: Medium
   branch_actual: feat/clo-267-anyfail
 workflow:
-  current_phase: pr
+  current_phase: complete
   status: complete
   created_at: '2026-04-28T14:17:21.070Z'
-  updated_at: '2026-04-28T15:48:20.428Z'
+  updated_at: '2026-04-28T15:50:13.074Z'
 phases:
   discovery:
     status: complete
@@ -186,6 +186,12 @@ history:
     phase: complete
     details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
   - timestamp: '2026-04-28T15:48:20.428Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-267 fully completed. PR #21 merged (e7ea6b73). 20 files changed, +1,496 lines. Unblocks T-029 (phase
+      runner).
+  - timestamp: '2026-04-28T15:50:13.074Z'
     action: workflow_complete
     phase: complete
     details: >-
