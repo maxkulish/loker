@@ -1,5 +1,5 @@
 ---
-source: src/aggregator.rs
+source: src/aggregator/concat.rs
 expression: artifact.text
 ---
 ## 1. claude (anthropic)

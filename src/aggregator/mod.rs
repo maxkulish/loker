@@ -1,5 +1,16 @@
-//! Aggregator primitives. Currently a single-function module for
-//! `AnyFail`; T-017 (LLMJudge) will introduce a proper `Aggregator` trait.
+//! Aggregator primitives.
+//!
+//! Two aggregator behaviors live here:
+//! - [`concat`]: fold multiple branch outputs into one Markdown artefact.
+//! - [`any_fail_evaluate`] / [`AnyFailReason`]: short-circuit on the first
+//!   rejected verdict (T-017 LLMJudge will introduce a proper trait).
+
+mod concat;
+
+pub use concat::{
+    AggregateInput, AggregatedArtifact, Aggregator, AggregatorError, BranchFailure, BranchOutcome,
+    BranchSuccess, EMPTY_CONCAT_SENTINEL,
+};
 
 use serde_json::Value;
 
