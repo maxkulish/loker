@@ -132,11 +132,11 @@ fn aggregate_concat(
         parts.push(render_errors(&failures));
     }
 
-    let mut text = if parts.is_empty() {
-        String::new()
-    } else {
-        parts.join("\n\n")
-    };
+    debug_assert!(
+        !parts.is_empty(),
+        "parts should be non-empty when aggregate_concat receives non-empty input"
+    );
+    let mut text = parts.join("\n\n");
     text.push('\n');
 
     Ok(AggregatedArtifact {

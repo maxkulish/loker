@@ -22,9 +22,15 @@ async function testTransport(name, transport) {
     ]);
     const { tools } = await client.listTools();
     console.log(`${name}: SUCCESS - ${tools.length} tools discovered`);
-    await client.close();
   } catch (err) {
-    console.error(`${name}: FAILED - ${err.message}`);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`${name}: FAILED - ${message}`);
+  } finally {
+    try {
+      await client.close();
+    } catch {
+      // best-effort: swallow close errors so subsequent transports still run
+    }
   }
 }
 
