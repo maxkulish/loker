@@ -56,15 +56,11 @@ export default function (pi: ExtensionAPI) {
     return;
   }
 
-  // Register once at startup.
-  registerLinearTools(pi, apiKey).catch((err: Error) => {
-    pi.sendUserMessage(`Linear MCP connection failed: ${err.message}`, { deliverAs: "followUp" });
-  });
-
-  // Re-run discovery on session start / reload to catch new/changed tools.
+  // pi fires session_start on first start and on reload — single entry point avoids
+  // racing two concurrent registrations against the same activeLinearClient.
   pi.on("session_start", async () => {
     const connected = await registerLinearTools(pi, apiKey).catch((err: Error) => {
-      pi.sendUserMessage(`Linear MCP refresh failed: ${err.message}`, { deliverAs: "followUp" });
+      pi.sendUserMessage(`Linear MCP connection failed: ${err.message}`, { deliverAs: "followUp" });
       return false;
     });
 
