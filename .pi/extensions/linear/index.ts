@@ -1,7 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import {
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
+  formatSize,
+  truncateHead,
+  type ExtensionAPI,
+} from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { Text } from "@mariozechner/pi-tui";
 
@@ -68,6 +74,39 @@ export default function (pi: ExtensionAPI) {
       pi.sendUserMessage("Linear MCP unavailable. Keeping previously registered tools.", { deliverAs: "followUp" });
     }
   });
+
+  pi.on("session_shutdown", async () => {
+    await closeActiveLinearClient();
+  });
+}
+
+function buildLinearTransport(apiKey: string) {
+  const transportMode = (process.env.LINEAR_MCP_TRANSPORT || "http").toLowerCase();
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  return transportMode === "sse"
+    ? new SSEClientTransport(new URL(LINEAR_MCP_SSE_URL), {
+        requestInit: { headers },
+        eventSourceInit: {
+          fetch: (url: string | URL, init?: RequestInit) =>
+            fetch(url, { ...(init || {}), headers: { ...(init?.headers || {}), ...headers } }),
+        },
+      })
+    : new StreamableHTTPClientTransport(new URL(LINEAR_MCP_HTTP_URL), {
+        requestInit: { headers },
+      });
+}
+
+async function ensureLinearClient(apiKey: string): Promise<Client> {
+  if (activeLinearClient) return activeLinearClient;
+  const client = new Client({ name: "pi-linear", version: "1.0.0" });
+  await Promise.race([
+    client.connect(buildLinearTransport(apiKey)),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Linear MCP connection timed out after 10s")), 10_000),
+    ),
+  ]);
+  activeLinearClient = client;
+  return client;
 }
 
 
@@ -128,33 +167,8 @@ function schemaToTypeBox(schema: unknown): unknown {
 }
 
 async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<boolean> {
-  const transportMode = (process.env.LINEAR_MCP_TRANSPORT || "http").toLowerCase();
-  const headers = { Authorization: `Bearer ${apiKey}` };
-
-  const transport =
-    transportMode === "sse"
-      ? new SSEClientTransport(new URL(LINEAR_MCP_SSE_URL), {
-          requestInit: { headers },
-          eventSourceInit: {
-            fetch: (url: string | URL, init?: RequestInit) =>
-              fetch(url, { ...(init || {}), headers: { ...(init?.headers || {}), ...headers } }),
-          },
-        })
-      : new StreamableHTTPClientTransport(new URL(LINEAR_MCP_HTTP_URL), {
-          requestInit: { headers },
-        });
-
   await closeActiveLinearClient();
-  const client = new Client({ name: "pi-linear", version: "1.0.0" });
-  activeLinearClient = client;
-
-  await Promise.race([
-    client.connect(transport),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Linear MCP connection timed out after 10s")), 10_000),
-    ),
-  ]);
-
+  const client = await ensureLinearClient(apiKey);
   const { tools } = await client.listTools();
   if (!tools || tools.length === 0) {
     pi.sendUserMessage("Linear MCP: connected but no tools discovered.", { deliverAs: "followUp" });
@@ -195,27 +209,57 @@ async function registerLinearTools(pi: ExtensionAPI, apiKey: string): Promise<bo
       parameters: params,
 
       async execute(_toolCallId: string, params: Record<string, unknown>) {
-        const liveClient = activeLinearClient;
-        if (!liveClient) {
-          throw new Error(`Linear tool ${tool.name} unavailable: MCP client not connected`);
-        }
-        const result = await liveClient.callTool({ name: tool.name, arguments: params });
-        const resultText =
-          (result.content as Array<{ type: string; text?: string }> | undefined)
-            ?.map((chunk) => (chunk.type === "text" && chunk.text != null ? chunk.text : JSON.stringify(chunk)))
-            .join("\n") || JSON.stringify(result);
+        let lastTransportError: unknown;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          let liveClient: Client;
+          try {
+            liveClient = await ensureLinearClient(apiKey);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new Error(`Linear tool ${tool.name} unavailable: ${message}`);
+          }
 
-        if (result.isError) {
-          throw new Error(`Linear tool ${tool.name} failed: ${resultText}`);
+          let result: Awaited<ReturnType<Client["callTool"]>>;
+          try {
+            result = await liveClient.callTool({ name: tool.name, arguments: params });
+          } catch (err) {
+            // Transport-level failure (connection drop, timeout). Drop the client so
+            // the next attempt re-establishes; tool-level errors come back via isError.
+            lastTransportError = err;
+            await closeActiveLinearClient();
+            continue;
+          }
+
+          const resultText =
+            (result.content as Array<{ type: string; text?: string }> | undefined)
+              ?.map((chunk) => (chunk.type === "text" && chunk.text != null ? chunk.text : JSON.stringify(chunk)))
+              .join("\n") || JSON.stringify(result);
+
+          if (result.isError) {
+            throw new Error(`Linear tool ${tool.name} failed: ${resultText}`);
+          }
+
+          const truncation = truncateHead(resultText, {
+            maxLines: DEFAULT_MAX_LINES,
+            maxBytes: DEFAULT_MAX_BYTES,
+          });
+          const finalText = truncation.truncated
+            ? `${truncation.content}\n\n[Linear MCP output truncated: ${truncation.outputLines}/${truncation.totalLines} lines, ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}]`
+            : truncation.content;
+
+          return {
+            content: [{ type: "text", text: finalText }],
+            details: {
+              linear_tool: tool.name,
+              result_count: Array.isArray(result.content) ? result.content.length : 0,
+              truncated: truncation.truncated,
+              attempts: attempt,
+            },
+          };
         }
 
-        return {
-          content: [{ type: "text", text: resultText }],
-          details: {
-            linear_tool: tool.name,
-            result_count: Array.isArray(result.content) ? result.content.length : 0,
-          },
-        };
+        const message = lastTransportError instanceof Error ? lastTransportError.message : String(lastTransportError);
+        throw new Error(`Linear tool ${tool.name} failed after reconnect: ${message}`);
       },
 
       renderCall(args: Record<string, unknown>, theme: any, _ctx: any) {
