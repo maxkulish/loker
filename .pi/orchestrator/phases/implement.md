@@ -17,6 +17,9 @@ phases:
     codex_verdict: "approve" | "approve_with_changes" | "rework"
     codex_report: "docs/reviews/clo-XX-codex-validation.md"
     gemini_validation_report: "docs/reviews/clo-XX-gemini-validation.md"
+    validation_synthesis_report: "docs/reviews/clo-XX-validation-synthesis.md"
+    validation_synthesis_verdict: "approve" | "approve_with_changes" | "pivot" | "rework"
+    validation_fix_iteration_count: 0 | 1
 ```
 
 History events required: `implementation_complete`,
@@ -69,68 +72,150 @@ update_workflow_state({
 
 Note: do NOT `transition_phase` yet. Run the validation gate first.
 
-## Step 4 - Codex + Gemini validation gate (MANDATORY)
+## Step 4 - Two-reviewer validation + synthesis gate (MANDATORY)
 
-This is the loker equivalent of the mentis `review` phase. Run BOTH
-validators in parallel against the implementation. Outputs go to
-`docs/reviews/`.
+This is the loker equivalent of the mentis `review` phase. It is a
+**bounded** gate:
 
-### 4.1 Run Codex
+1. Run Codex and Gemini concurrently as independent raw reviewers.
+2. Save both raw reports.
+3. Run a third model to synthesize the two reports, classify scope, and
+   decide what (if anything) must be fixed.
+4. Apply at most **one** synthesis-approved fix iteration.
+5. If the synthesis recommends a pivot or fundamental rework, stop and ask
+   the user instead of auto-fixing.
+
+Never loop indefinitely on reviewer suggestions. Raw reviewer reports are
+inputs; only the synthesis report drives fixes.
+
+### 4.1 Build validation prompt
+
+Use the same prompt for Codex and Gemini:
+
+```text
+You are a senior code reviewer. Review all changes on this branch against
+this task's design document and implementation plan.
+
+Inputs:
+- Branch: feat/clo-XX-...
+- Design: docs/designs/clo-XX-<slug>.md
+- Plan: docs/plans/clo-XX-<slug>.md
+- Diff: git diff main...HEAD
+
+Check for correctness, completeness, regressions, code quality, security,
+schema/API compatibility, and scope creep.
+
+Output markdown with findings grouped by severity. End with:
+## Verdict
+approve | approve_with_changes | rework
+```
+
+### 4.2 Run Codex and Gemini concurrently
 
 ```bash
+# Codex validation (background)
 codex exec -m gpt-5.4 \
   --persona .pi/agents/codex-pre-pr.md \
   --input "branch: feat/clo-XX-...; design: docs/designs/clo-XX-<slug>.md; plan: docs/plans/clo-XX-<slug>.md" \
-  > docs/reviews/clo-XX-codex-validation.md
-```
+  > docs/reviews/clo-XX-codex-validation.md &
+PID_CODEX=$!
 
-### 4.2 Run Gemini
-
-```bash
+# Gemini validation (background)
 gemini --model gemini-3.1-pro-preview \
   --persona .pi/agents/gemini-architect.md \
   --input "branch: feat/clo-XX-...; design: docs/designs/clo-XX-<slug>.md; plan: docs/plans/clo-XX-<slug>.md" \
-  > docs/reviews/clo-XX-gemini-validation.md
+  > docs/reviews/clo-XX-gemini-validation.md &
+PID_GEMINI=$!
+
+wait $PID_CODEX; CODEX_EXIT=$?
+wait $PID_GEMINI; GEMINI_EXIT=$?
 ```
 
-Run them in parallel (the orchestrator should background one and wait on
-both). If either binary is unavailable in this environment, document the
-skip with an explicit reason in `phases.implement.codex_report` /
-`gemini_validation_report` (e.g. `"skipped: codex not installed"`).
+If either binary is unavailable or fails due tooling/sandbox limitations,
+write a concrete skip/failure reason into that report file. Do not treat a
+tooling failure as a code finding; the synthesis must account for it.
 
-### 4.3 Parse verdicts
+### 4.3 Run synthesis reviewer
 
-Each report ends with a `## Verdict` line: `approve`, `approve_with_changes`,
-or `rework`.
+Run a third model after both raw reports exist. It reads the design, plan,
+diff, and both raw reports, then writes:
 
-| Codex | Gemini | Action |
-|---|---|---|
-| approve | approve | proceed |
-| approve_with_changes | approve | apply suggested fixes |
-| approve | approve_with_changes | apply suggested fixes |
-| approve_with_changes | approve_with_changes | apply union of fixes |
-| rework | * | re-enter Step 1 with fixes |
-| * | rework | re-enter Step 1 with fixes |
+`docs/reviews/clo-XX-validation-synthesis.md`
 
-After applying fixes, re-run `make check` and update the same review
-files (or append a `## Re-validation` section).
+Synthesis prompt:
 
-### 4.4 Record verdict
+```text
+You are the validation synthesis reviewer. Combine the Codex and Gemini
+reports for CLO-XX.
+
+Read:
+- Design: docs/designs/clo-XX-<slug>.md
+- Plan: docs/plans/clo-XX-<slug>.md
+- Codex report: docs/reviews/clo-XX-codex-validation.md
+- Gemini report: docs/reviews/clo-XX-gemini-validation.md
+- Diff: git diff main...HEAD
+
+Decide which findings are:
+- Must fix before PR (in-scope correctness/regression/security/schema issue)
+- Nice-to-have / out of scope
+- False positive / tooling artifact
+- Pivot/fundamental scope issue requiring user decision
+
+Output:
+## Verdict
+approve | approve_with_changes | pivot | rework
+
+## Must Fix Before PR
+- ...
+
+## Out of Scope / Deferred
+- ...
+
+## False Positives / Tooling Artifacts
+- ...
+
+## Recommendation
+Proceed, apply one fix iteration, or stop for user decision.
+```
+
+Use an available third model/provider. If no third model is available,
+synthesize manually from the two reports and clearly state that in the
+synthesis report.
+
+### 4.4 Act on synthesis verdict
+
+| Synthesis verdict | Action |
+|---|---|
+| `approve` | Proceed to Step 5. |
+| `approve_with_changes` | Apply only `Must Fix Before PR` items, once. Run `make check`, commit fixes, update synthesis with `## Re-validation`, then proceed. Do not rerun a new unbounded review loop. |
+| `pivot` | Stop. Set workflow blocked/pending human action and ask the user with synthesis recommendations. Do not transition to PR. |
+| `rework` | Stop or ask the user before returning to implementation/design. Do not auto-loop. |
+
+Maximum validation fix iterations: **1**. If fixes reveal more issues,
+record them in the synthesis report and ask the user whether to continue.
+
+### 4.5 Record validation result
 
 ```ts
 update_workflow_state({
   task_id: "CLO-XX",
   phase: "implement",
   action: "codex_validation_complete",
-  details: "Codex: <verdict>. Gemini: <verdict>. <fixes> applied.",
+  details: "Codex: <verdict>. Gemini: <verdict>. Synthesis: <verdict>. <fixes> applied.",
   phase_updates: {
     codex_validated: true,
     codex_verdict: "<approve|approve_with_changes|rework>",
     codex_report: "docs/reviews/clo-XX-codex-validation.md",
-    gemini_validation_report: "docs/reviews/clo-XX-gemini-validation.md"
+    gemini_validation_report: "docs/reviews/clo-XX-gemini-validation.md",
+    validation_synthesis_report: "docs/reviews/clo-XX-validation-synthesis.md",
+    validation_synthesis_verdict: "<approve|approve_with_changes|pivot|rework>",
+    validation_fix_iteration_count: 0 | 1
   }
 })
 ```
+
+`codex_verdict` remains for backward compatibility. Use the synthesis
+verdict as the decision source for PR transition.
 
 ## Step 5 - Transition to PR
 
