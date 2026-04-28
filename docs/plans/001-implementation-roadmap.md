@@ -56,38 +56,42 @@ with the spike findings; the rest hardens it to the FR-2 / FR-3 contract.
 Depends on Phase 1 (`Backend` trait + at least one impl). Parallel with
 Phase 3 and 4. Internal order is sequential.
 
-**Status (2026-04-27): T-011 (CLO-257) + T-013 (CLO-258) shipped. T-012 and T-014 unblocked.**
+**Status (2026-04-28): all four Phase 2 tasks shipped. M2 done.**
 
 | ID | Linear | Task | After | Blocks | PRD |
 |----|--------|------|-------|--------|-----|
 | ~~T-011~~ | CLO-257 done | `Strategy::SingleModel`: one backend, one prompt, one response. Mock-backend unit test. | T-006 | T-029 | FR-5 |
-| T-012 | CLO-259 | `Strategy::ParallelFanOut` with `min_responses` floor. Surplus failures tolerated. | T-011 | T-029 | FR-6 |
+| ~~T-012~~ | CLO-259 done | `Strategy::ParallelFanOut` with `min_responses` floor. Surplus failures tolerated. | T-011 | T-029 | FR-6 |
 | ~~T-013~~ | CLO-258 done | `Strategy::EscalatingRetry` walker. Stops at first verify pass; exhausts list with structured error. | T-007, T-020 | T-014, T-029 | FR-7 |
-| T-014 | CLO-260 | `pass_failure_context` flag on `EscalatingRetry`. Off in v0 default; on in design-doc-tdd. | T-013 | T-035 | FR-8 |
+| ~~T-014~~ | CLO-260 done | `pass_failure_context` flag on `EscalatingRetry`. Off in v0 default; on in design-doc-tdd. | T-013 | T-035 | FR-8 |
 
 ## Phase 3 - Aggregator vocabulary (M3)
 
 Parallel with Phase 2 and 4. T-015 is the load-bearing one - cross-family
 enforcement is the loker thesis.
 
-| ID | Task | After | Blocks | PRD |
-|----|------|-------|--------|-----|
-| T-015 | `family_of(backend_id)` lookup + cross-family runtime check (FR-13). Refusal raises `PhaseError::FamilyOverlap`. Source of truth for family resolution decided here (open question §8). | T-001 | T-017, T-019 | FR-13 |
-| T-016 | `Aggregator::Concat`: per-source headings, snapshot test. | - | T-029 | FR-9 |
-| T-017 | `Aggregator::LLMJudge`: judge prompt construction, family-overlap test, opt-out via `require_judge_different_family = false`. | T-015 | T-029 | FR-10 |
-| T-018 | `Aggregator::AnyFail`: first failure wins on JSON verdict fixtures. | - | T-029 | FR-11 |
-| T-019 | `Aggregator::Vote` (Should). Ballot schema + abstentions + tie-breakers (`ClosestToFamily`, `Random`, `FirstResponder`) decided in TDD doc before code. Demote to post-v0 if no concrete first use case lands by M3 start. | T-015 | - | FR-12 |
+**Status (2026-04-27): all five Phase 3 issues opened in Linear.**
+
+| ID | Linear | Task | After | Blocks | PRD |
+|----|--------|------|-------|--------|-----|
+| T-015 | CLO-265 | `family_of(backend_id)` lookup + cross-family runtime check (FR-13). Refusal raises `PhaseError::FamilyOverlap`. Source of truth for family resolution decided here (open question §8). | T-001 | T-017, T-019 | FR-13 |
+| T-016 | CLO-266 | `Aggregator::Concat`: per-source headings, snapshot test. | - | T-029 | FR-9 |
+| T-017 | CLO-268 | `Aggregator::LLMJudge`: judge prompt construction, family-overlap test, opt-out via `require_judge_different_family = false`. | T-015 | T-029 | FR-10 |
+| T-018 | CLO-267 | `Aggregator::AnyFail`: first failure wins on JSON verdict fixtures. | - | T-029 | FR-11 |
+| T-019 | CLO-269 | `Aggregator::Vote` (Should). Ballot schema + abstentions + tie-breakers (`ClosestToFamily`, `Random`, `FirstResponder`) decided in TDD doc before code. Demote to post-v0 if no concrete first use case lands by M3 start. | T-015 | - | FR-12 |
 
 ## Phase 4 - Verify hooks (M4)
 
 Parallel with Phase 2 and 3. T-020 (trait + enum) gates the rest.
 
-| ID | Task | After | Blocks | PRD |
-|----|------|-------|--------|-----|
-| T-020 | `VerifyHook` trait + `VerifyResult` enum (Pass / Fail concrete; `Repair { suggestion }` and `Score(f32)` reserved variants compile but unused). | - | T-013, T-021, T-022, T-023, T-050 | FR-18 |
-| T-021 | `RunCommand` hook with the full sandboxing NFR row (cwd, env allowlist default-deny, wall+cpu timeouts, stdout/stderr byte caps, signal cleanup, network policy, file-mutation expectations, secret redaction). | T-020 | T-029 | FR-14, §5 Security |
-| T-022 | `LLMVerifier` hook: yes/no prompt template, mock-backend fixture. | T-020 | T-029 | FR-15 |
-| T-023 | `TestRunner` hook: parses `cargo test --message-format=json` and `pytest` JSON output. | T-020, T-021 | T-029 | FR-16 |
+**Status (2026-04-27): all four Phase 4 issues opened in Linear.**
+
+| ID | Linear | Task | After | Blocks | PRD |
+|----|--------|------|-------|--------|-----|
+| T-020 | CLO-270 | `VerifyHook` trait + `VerifyResult` enum (Pass / Fail concrete; `Repair { suggestion }` and `Score(f32)` reserved variants compile but unused). | - | T-013, T-021, T-022, T-023, T-050 | FR-18 |
+| T-021 | CLO-271 | `RunCommand` hook with the full sandboxing NFR row (cwd, env allowlist default-deny, wall+cpu timeouts, stdout/stderr byte caps, signal cleanup, network policy, file-mutation expectations, secret redaction). | T-020 | T-029 | FR-14, §5 Security |
+| T-022 | CLO-272 | `LLMVerifier` hook: yes/no prompt template, mock-backend fixture. | T-020 | T-029 | FR-15 |
+| T-023 | CLO-273 | `TestRunner` hook: parses `cargo test --message-format=json` and `pytest` JSON output. | T-020, T-021 | T-029 | FR-16 |
 
 ## Phase 5 - Run state & artefact manifest
 
