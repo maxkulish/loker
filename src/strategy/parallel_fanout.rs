@@ -12,6 +12,7 @@
 //! callers can still persist the schema-shaped JSON.
 
 use crate::backend::{Backend, QueryOutput};
+use crate::family::family_of;
 use crate::strategy::{
     Aggregator, Attempt, FinishReason, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind,
     StrategyOutput, TokenUsageReport, VerifyOutcome, SCHEMA_VERSION,
@@ -131,7 +132,7 @@ impl Strategy for ParallelFanOut {
 
                     attempts.push(Attempt {
                         tier: None,
-                        family: Some("local".to_string()),
+                        family: Some(family_of(&target.backend).to_string()),
                         backend: target.backend.clone(),
                         model,
                         finish_reasons: vec![FinishReason::Stop],
@@ -159,7 +160,7 @@ impl Strategy for ParallelFanOut {
 
                     attempts.push(Attempt {
                         tier: None,
-                        family: Some("local".to_string()),
+                        family: Some(family_of(&target.backend).to_string()),
                         backend: target.backend.clone(),
                         model,
                         finish_reasons: vec![FinishReason::Error],
