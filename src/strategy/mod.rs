@@ -423,6 +423,14 @@ pub enum StrategyError {
         min_responses: usize,
         output: Box<StrategyOutput>,
     },
+
+    #[error("aggregator any_fail: first failure from backend {backend}: {reason}")]
+    AnyFail {
+        backend: String,
+        reason: crate::aggregator::AnyFailReason,
+        offender: Box<Attempt>,
+        output: Box<StrategyOutput>,
+    },
 }
 
 pub use crate::family::PhaseError;

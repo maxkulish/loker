@@ -5,6 +5,7 @@
 // satisfy the lib-side compile and expose the integration-test surface.
 #![allow(dead_code)]
 
+pub mod aggregator;
 pub mod backend;
 pub mod family;
 pub mod strategy;

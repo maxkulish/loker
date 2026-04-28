@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/verdict.schema.json",
+  "title": "AnyFail Verdict",
+  "description": "JSON payload expected by Aggregator::AnyFail",
+  "type": "object",
+  "required": ["pass"],
+  "properties": {
+    "pass": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

@@ -115,13 +115,13 @@ impl Strategy for ParallelFanOut {
 
         let mut attempts: Vec<Attempt> = Vec::with_capacity(self.targets.len());
         let mut successes = 0;
+        let is_any_fail = self.aggregator == Aggregator::AnyFail;
 
         while let Some((idx, result)) = futures.next().await {
             let target = &self.targets[idx];
 
             match result {
                 Ok(query) => {
-                    successes += 1;
                     let usage = query
                         .usage
                         .as_ref()
@@ -130,6 +130,43 @@ impl Strategy for ParallelFanOut {
                     let model = pick_model_override(&query, prompt, target);
                     let output_path = format!("{}/attempts/{}-parallel.txt", ctx.phase_name, idx);
 
+                    if is_any_fail {
+                        if let Err(reason) = crate::aggregator::any_fail_evaluate(&query.stdout) {
+                            let offender = Attempt {
+                                tier: None,
+                                family: Some(family_of(&target.backend).to_string()),
+                                backend: target.backend.clone(),
+                                model,
+                                finish_reasons: vec![FinishReason::Stop],
+                                usage,
+                                output_path,
+                                verify: VerifyOutcome::skipped(),
+                            };
+                            attempts.push(offender.clone());
+                            let output = StrategyOutput {
+                                schema_version: SCHEMA_VERSION,
+                                strategy: StrategyKind::Parallel,
+                                phase: ctx.phase_name.clone(),
+                                run_id: ctx.run_id,
+                                attempts,
+                                final_status: None,
+                                aggregator: Some(self.aggregator),
+                                aggregate_output_path: Some(format!(
+                                    "{}/aggregated.txt",
+                                    ctx.phase_name
+                                )),
+                                verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
+                            };
+                            return Err(StrategyError::AnyFail {
+                                backend: target.backend.clone(),
+                                reason,
+                                offender: Box::new(offender),
+                                output: Box::new(output),
+                            });
+                        }
+                    }
+
+                    successes += 1;
                     attempts.push(Attempt {
                         tier: None,
                         family: Some(family_of(&target.backend).to_string()),
@@ -141,14 +178,12 @@ impl Strategy for ParallelFanOut {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    if successes >= self.min_responses {
+                    if !is_any_fail && successes >= self.min_responses {
                         // Short-circuit: drop remaining futures.
                         break;
                     }
                 }
-                Err(_err) => {
-                    // Record the error as a failed attempt but keep polling
-                    // remaining futures so long as the floor has not been met.
+                Err(err) => {
                     let model = target
                         .model
                         .as_ref()
@@ -158,7 +193,7 @@ impl Strategy for ParallelFanOut {
                         .unwrap_or_else(|| "default".to_string());
                     let output_path = format!("{}/attempts/{}-parallel.txt", ctx.phase_name, idx);
 
-                    attempts.push(Attempt {
+                    let attempt = Attempt {
                         tier: None,
                         family: Some(family_of(&target.backend).to_string()),
                         backend: target.backend.clone(),
@@ -167,13 +202,55 @@ impl Strategy for ParallelFanOut {
                         usage: TokenUsageReport::default(),
                         output_path,
                         verify: VerifyOutcome::skipped(),
-                    });
+                    };
+
+                    if is_any_fail {
+                        attempts.push(attempt.clone());
+                        let output = StrategyOutput {
+                            schema_version: SCHEMA_VERSION,
+                            strategy: StrategyKind::Parallel,
+                            phase: ctx.phase_name.clone(),
+                            run_id: ctx.run_id,
+                            attempts,
+                            final_status: None,
+                            aggregator: Some(self.aggregator),
+                            aggregate_output_path: Some(format!(
+                                "{}/aggregated.txt",
+                                ctx.phase_name
+                            )),
+                            verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
+                        };
+                        return Err(StrategyError::AnyFail {
+                            backend: target.backend.clone(),
+                            reason: crate::aggregator::AnyFailReason::BackendError {
+                                detail: err.to_string(),
+                            },
+                            offender: Box::new(attempt),
+                            output: Box::new(output),
+                        });
+                    }
+
+                    attempts.push(attempt);
                 }
             }
         }
 
         // Dropped futures are cancelled (cooperatively) when `futures` falls
         // out of scope here.
+
+        if is_any_fail {
+            return Ok(StrategyOutput {
+                schema_version: SCHEMA_VERSION,
+                strategy: StrategyKind::Parallel,
+                phase: ctx.phase_name.clone(),
+                run_id: ctx.run_id,
+                attempts,
+                final_status: None,
+                aggregator: Some(self.aggregator),
+                aggregate_output_path: Some(format!("{}/aggregated.txt", ctx.phase_name)),
+                verify: Some(VerifyOutcome::passed("Aggregator::AnyFail")),
+            });
+        }
 
         if successes < self.min_responses {
             let output = StrategyOutput {
@@ -224,6 +301,7 @@ fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::aggregator::AnyFailReason;
     use crate::backend::BackendError;
     use crate::strategy::Aggregator;
     use std::path::Path;
@@ -279,6 +357,23 @@ mod tests {
                     )
                     .with_model(Some("mock-1")))
                 }),
+                delay_ms: Some(delay_ms),
+            })
+        }
+
+        fn delayed_ok(name: &str, text: &str, delay_ms: u64) -> Arc<Self> {
+            Self::slow(name, text, delay_ms)
+        }
+
+        fn delayed_fail(
+            name: &str,
+            err: impl Fn() -> BackendError + Send + Sync + 'static,
+            delay_ms: u64,
+        ) -> Arc<Self> {
+            Arc::new(Self {
+                name: name.to_string(),
+                calls: AtomicUsize::new(0),
+                response: Box::new(move |_| Err(err())),
                 delay_ms: Some(delay_ms),
             })
         }
@@ -446,5 +541,302 @@ mod tests {
         let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
         assert!(matches!(err, StrategyError::BackendNotFound { name } if name == "absent"));
         assert_eq!(present.calls(), 0);
+    }
+
+    #[test]
+    fn any_fail_all_pass() {
+        let a = MockBackend::ok("a", r#"{"pass": true}"#);
+        let b = MockBackend::ok("b", r#"{"pass": true}"#);
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+        assert_eq!(out.strategy, StrategyKind::Parallel);
+        assert_eq!(out.attempts.len(), 2);
+        assert_eq!(
+            out.verify.as_ref().unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+    }
+
+    #[test]
+    fn any_fail_first_fails() {
+        let b0 = MockBackend::delayed_ok("b0", r#"{"pass": false}"#, 1);
+        let b1 = MockBackend::delayed_ok("b1", r#"{"pass": true}"#, 10);
+        let b2 = MockBackend::delayed_ok("b2", r#"{"pass": true}"#, 10);
+        let backends: Vec<Arc<dyn Backend>> = vec![b0.clone(), b1.clone(), b2.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![
+                TargetSpec::new("b0"),
+                TargetSpec::new("b1"),
+                TargetSpec::new("b2"),
+            ],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "b0");
+                assert!(matches!(reason, AnyFailReason::VerdictRejected { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_mid_list_fails() {
+        let b0 = MockBackend::delayed_ok("b0", r#"{"pass": true}"#, 1);
+        let b1 = MockBackend::delayed_ok("b1", r#"{"pass": false}"#, 5);
+        let b2 = MockBackend::delayed_ok("b2", r#"{"pass": true}"#, 10);
+        let backends: Vec<Arc<dyn Backend>> = vec![b0.clone(), b1.clone(), b2.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![
+                TargetSpec::new("b0"),
+                TargetSpec::new("b1"),
+                TargetSpec::new("b2"),
+            ],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "b1");
+                assert!(matches!(reason, AnyFailReason::VerdictRejected { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_all_fail() {
+        let b0 = MockBackend::delayed_ok("b0", r#"{"pass": false}"#, 1);
+        let b1 = MockBackend::delayed_ok("b1", r#"{"pass": false}"#, 5);
+        let backends: Vec<Arc<dyn Backend>> = vec![b0.clone(), b1.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("b0"), TargetSpec::new("b1")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                // b0 has shorter delay, so it arrives first
+                assert_eq!(backend, "b0");
+                assert!(matches!(reason, AnyFailReason::VerdictRejected { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_backend_error_treated_as_failure() {
+        let a = MockBackend::ok("a", r#"{"pass": true}"#);
+        let b = MockBackend::delayed_fail(
+            "b",
+            || BackendError::Network {
+                message: "boom".into(),
+            },
+            1,
+        );
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "b");
+                assert!(matches!(reason, AnyFailReason::BackendError { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_missing_pass_field() {
+        let a = MockBackend::delayed_ok("a", r#"{"status": "ok"}"#, 1);
+        let b = MockBackend::delayed_ok("b", r#"{"pass": true}"#, 10);
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "a");
+                assert!(matches!(reason, AnyFailReason::VerdictContract { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_wrong_pass_type() {
+        let a = MockBackend::delayed_ok("a", r#"{"pass": "yes"}"#, 1);
+        let b = MockBackend::delayed_ok("b", r#"{"pass": true}"#, 10);
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "a");
+                assert!(matches!(reason, AnyFailReason::VerdictContract { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_empty_query_text() {
+        let a = MockBackend::delayed_ok("a", "", 1);
+        let b = MockBackend::delayed_ok("b", r#"{"pass": true}"#, 10);
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "a");
+                assert!(matches!(reason, AnyFailReason::VerdictContract { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_markdown_fenced_json() {
+        let a = MockBackend::ok("a", "```json\n{\"pass\": true}\n```");
+        let b = MockBackend::ok("b", "```json\n{\"pass\": true}\n```");
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+        assert_eq!(out.attempts.len(), 2);
+        assert_eq!(
+            out.verify.as_ref().unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+    }
+
+    #[test]
+    fn any_fail_markdown_fenced_fail() {
+        let a = MockBackend::ok("a", "```json\n{\"pass\": false}\n```");
+        let b = MockBackend::ok("b", r#"{"pass": true}"#);
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert_eq!(backend, "a");
+                assert!(matches!(reason, AnyFailReason::VerdictRejected { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn any_fail_valid_json_extra_keys() {
+        let a = MockBackend::ok("a", r#"{"pass": true, "note": "lgtm"}"#);
+        let b = MockBackend::ok("b", r#"{"pass": true}"#);
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+        assert_eq!(out.attempts.len(), 2);
+        assert_eq!(
+            out.verify.as_ref().unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+    }
+
+    #[test]
+    fn any_fail_non_deterministic_offender() {
+        let b0 = MockBackend::delayed_ok("b0", r#"{"pass": false}"#, 1);
+        let b1 = MockBackend::delayed_ok("b1", r#"{"pass": false}"#, 1);
+        let backends: Vec<Arc<dyn Backend>> = vec![b0.clone(), b1.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("b0"), TargetSpec::new("b1")],
+            1,
+            "render-me",
+            Aggregator::AnyFail,
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::AnyFail {
+                backend, reason, ..
+            } => {
+                assert!(
+                    matches!(&backend as &str, "b0" | "b1"),
+                    "expected b0 or b1, got {backend}"
+                );
+                assert!(matches!(reason, AnyFailReason::VerdictRejected { .. }));
+            }
+            other => panic!("expected AnyFail, got {other:?}"),
+        }
     }
 }
