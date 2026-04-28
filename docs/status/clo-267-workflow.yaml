@@ -23,7 +23,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-04-28T14:17:21.070Z'
-  updated_at: '2026-04-28T15:20:21.106Z'
+  updated_at: '2026-04-28T15:24:54.279Z'
 phases:
   discovery:
     status: complete
@@ -75,7 +75,11 @@ phases:
     codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-267-gemini-validation.md
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 21
+    pr_url: https://github.com/maxkulish/loker/pull/21
+    ci_passed: true
+    reviews_addressed: true
   complete:
     status: pending
 history:
@@ -159,5 +163,21 @@ history:
     action: phase_transition
     phase: implement
     details: Transitioned from implement to pr
+  - timestamp: '2026-04-28T15:21:11.620Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (560 tests).'
+  - timestamp: '2026-04-28T15:22:16.975Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #21 opened: https://github.com/maxkulish/loker/pull/21'
+  - timestamp: '2026-04-28T15:24:43.748Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format, clippy, test.'
+  - timestamp: '2026-04-28T15:24:54.279Z'
+    action: review_addressed
+    phase: pr
+    details: 0 review threads. No reviewers required on solo project.
 task_title: Implement Aggregator::AnyFail (first failure wins)
 task_url: https://linear.app/cloud-ai/issue/CLO-267/implement-aggregatoranyfail-first-failure-wins

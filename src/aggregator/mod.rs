@@ -4,11 +4,14 @@
 use serde_json::Value;
 
 #[non_exhaustive]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AnyFailReason {
+    #[error("verdict rejected")]
     VerdictRejected { payload: String },
+    #[error("verdict contract violation: {message}")]
     VerdictContract { message: String },
-    BackendError { source: String },
+    #[error("backend error: {detail}")]
+    BackendError { detail: String },
 }
 
 /// Parse a backend response text as a JSON verdict and check `pass`.

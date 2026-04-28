@@ -155,7 +155,7 @@ impl Strategy for ParallelFanOut {
                                     "{}/aggregated.txt",
                                     ctx.phase_name
                                 )),
-                                verify: Some(VerifyOutcome::skipped()),
+                                verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
                             };
                             return Err(StrategyError::AnyFail {
                                 backend: target.backend.clone(),
@@ -183,7 +183,7 @@ impl Strategy for ParallelFanOut {
                         break;
                     }
                 }
-                Err(_err) => {
+                Err(err) => {
                     let model = target
                         .model
                         .as_ref()
@@ -218,12 +218,12 @@ impl Strategy for ParallelFanOut {
                                 "{}/aggregated.txt",
                                 ctx.phase_name
                             )),
-                            verify: Some(VerifyOutcome::skipped()),
+                            verify: Some(VerifyOutcome::failed("Aggregator::AnyFail")),
                         };
                         return Err(StrategyError::AnyFail {
                             backend: target.backend.clone(),
                             reason: crate::aggregator::AnyFailReason::BackendError {
-                                source: _err.to_string(),
+                                detail: err.to_string(),
                             },
                             offender: Box::new(attempt),
                             output: Box::new(output),

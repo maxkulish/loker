@@ -424,7 +424,7 @@ pub enum StrategyError {
         output: Box<StrategyOutput>,
     },
 
-    #[error("aggregator any_fail: first failure from backend {backend}: {reason:?}")]
+    #[error("aggregator any_fail: first failure from backend {backend}: {reason}")]
     AnyFail {
         backend: String,
         reason: crate::aggregator::AnyFailReason,
