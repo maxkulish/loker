@@ -72,6 +72,7 @@ clean:
 
 pi-init:
 	@for ext in .pi/extensions/*/package.json; do \
+		[ -f "$$ext" ] || continue; \
 		dir=$$(dirname $$ext); \
 		echo "Installing deps in $$dir..."; \
 		if [ -f "$$dir/package-lock.json" ]; then \

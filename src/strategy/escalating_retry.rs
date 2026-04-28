@@ -21,7 +21,7 @@ use crate::strategy::{
 use async_trait::async_trait;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// 4 KiB excerpt fits inside an 8 KiB envelope while leaving headroom for
 /// verifier reason and backend error class.
@@ -50,8 +50,12 @@ impl Rung {
 
 /// Wire-serializable subset of `EscalatingRetry` used for config round-trip
 /// tests. Does *not* carry the `VerifyHook` trait object.
+///
+/// `pub(crate)` because the only current consumers are this module's tests;
+/// promote to `pub` once the workflow loader (T-029) needs to deserialize
+/// it from TOML.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EscalatingRetryConfig {
+pub(crate) struct EscalatingRetryConfig {
     pub rungs: Vec<Rung>,
     pub prompt_template: String,
     #[serde(default)]
@@ -74,17 +78,18 @@ pub struct FailureContext {
 }
 
 impl FailureContext {
-    /// Build from a verify-fail outcome. `response` is the raw backend output
-    /// (redaction + truncation applied internally).
+    /// Build from a verify-fail outcome. `response` is borrowed - the raw
+    /// backend output (redaction + truncation applied internally produces
+    /// the owned excerpt, so the caller does not need to clone first).
     pub fn from_verify_fail(
         tier: Tier,
         backend: impl Into<String>,
         reason: impl Into<String>,
-        response: Option<impl Into<String>>,
+        response: Option<&str>,
     ) -> Self {
         let reason = redact_secrets(&reason.into());
-        let response_excerpt = response
-            .map(|r| truncate_excerpt(&redact_secrets(&r.into()), MAX_RESPONSE_EXCERPT_BYTES));
+        let response_excerpt =
+            response.map(|r| truncate_excerpt(&redact_secrets(r), MAX_RESPONSE_EXCERPT_BYTES));
         Self {
             previous_tier: tier,
             previous_backend: backend.into(),
@@ -128,6 +133,25 @@ fn backend_error_class(err: &BackendError) -> String {
     .to_string()
 }
 
+/// AWS access keys.
+static AWS_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"AKIA[0-9A-Z]{16}").expect("valid regex"));
+
+/// Generic `key=value` shapes (case-insensitive; redacts only the value side).
+static KEY_VALUE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)((?:api[_-]?key|secret|token|password)\s*[=:]\s*)[^\s'\"]+"#)
+        .expect("valid regex")
+});
+
+/// Bearer tokens in `Authorization` headers.
+static BEARER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)Bearer\s+[A-Za-z0-9._\-~+/=]+").expect("valid regex"));
+
+/// Heuristic: long base64-ish blob preceded by key/secret/token.
+static SECRET_HEURISTIC_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(key|secret|token)[\s:=]+([A-Za-z0-9+/=_\-]{32,})").expect("valid regex")
+});
+
 /// Redact common secret shapes from text before they reach the next rung's
 /// prompt envelope. Applied to *every* byte of `FailureContext` text
 /// (verify_reason, response_excerpt, and the final assembled header).
@@ -135,37 +159,41 @@ fn backend_error_class(err: &BackendError) -> String {
 /// This is the module-local helper scoped to `escalating_retry.rs`. A
 /// future centralised secret-scrubbing service should absorb this function
 /// rather than invent a second one.
-pub fn redact_secrets(input: &str) -> String {
-    let mut result = input.to_string();
-
-    // Pattern 1: AWS access keys
-    let aws = Regex::new(r"AKIA[0-9A-Z]{16}").expect("valid regex");
-    result = aws.replace_all(&result, "[REDACTED]").to_string();
-
-    // Pattern 2: generic key=value (case-insensitive; redacts only the value side)
-    let key_val = Regex::new(r#"(?i)((?:api[_-]?key|secret|token|password)\s*[=:]\s*)[^\s'\"]+"#)
-        .expect("valid regex");
-    result = key_val.replace_all(&result, "${1}[REDACTED]").to_string();
-
-    // Pattern 3: Bearer tokens
-    let bearer = Regex::new(r"(?i)Bearer\s+[A-Za-z0-9._\-~+/=]+").expect("valid regex");
-    result = bearer.replace_all(&result, "[REDACTED]").to_string();
-
-    // Pattern 4: heuristic – long base64-ish blob preceded by key/secret/token
-    let heuristic = Regex::new(r"(?i)\b(key|secret|token)[\s:=]+([A-Za-z0-9+/=_\-]{32,})")
-        .expect("valid regex");
-    result = heuristic.replace_all(&result, "$1 [REDACTED]").to_string();
-
+pub(crate) fn redact_secrets(input: &str) -> String {
+    let mut result = AWS_KEY_RE.replace_all(input, "[REDACTED]").into_owned();
+    result = KEY_VALUE_RE
+        .replace_all(&result, "${1}[REDACTED]")
+        .into_owned();
+    result = BEARER_RE.replace_all(&result, "[REDACTED]").into_owned();
+    result = SECRET_HEURISTIC_RE
+        .replace_all(&result, "$1 [REDACTED]")
+        .into_owned();
     result
 }
 
-/// Truncate `s` to at most `max_bytes`, cutting at a UTF-8 character
-/// boundary. If truncation occurs, appends ` …[truncated, N bytes elided]`.
+/// Truncate `s` to at most `max_bytes` total (including the suffix),
+/// cutting at a UTF-8 character boundary. If truncation occurs, appends
+/// ` …[truncated, N bytes elided]`. The result is *guaranteed* to be at
+/// most `max_bytes` bytes; if the suffix alone would exceed `max_bytes`,
+/// returns a hard-cut prefix without the suffix.
 fn truncate_excerpt(s: &str, max_bytes: usize) -> String {
     if s.len() <= max_bytes {
         return s.to_string();
     }
-    let mut boundary = max_bytes;
+    // Suffix template is " …[truncated, {N} bytes elided]" - 30 bytes plus
+    // the digit count of the elided byte count. Upper-bound the digit count
+    // by the digits in `s.len()` since `elided <= s.len()`.
+    const SUFFIX_TEMPLATE_LEN: usize = " …[truncated,  bytes elided]".len();
+    let digits = s.len().to_string().len();
+    let suffix_len = SUFFIX_TEMPLATE_LEN + digits;
+    if suffix_len >= max_bytes {
+        let mut boundary = max_bytes;
+        while boundary > 0 && !s.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        return s[..boundary].to_string();
+    }
+    let mut boundary = max_bytes - suffix_len;
     while boundary > 0 && !s.is_char_boundary(boundary) {
         boundary -= 1;
     }
@@ -175,10 +203,16 @@ fn truncate_excerpt(s: &str, max_bytes: usize) -> String {
 
 /// Assemble the `<previous-attempt>...<original-prompt>` envelope.
 ///
-/// Enforces `MAX_FAILURE_CONTEXT_BYTES`. If the envelope exceeds the cap,
-/// fields are progressively truncated: `response_excerpt` first, then
-/// `verify_reason` (capped at 1024), then `backend_error_class`.
-pub fn build_failure_envelope(ctx: &FailureContext, body: &str) -> String {
+/// Enforces `MAX_FAILURE_CONTEXT_BYTES` as a hard cap. The shrink loop first
+/// trims `response_excerpt` (in 512-byte steps) and then `verify_reason`
+/// (down to a 64-byte floor in 256-byte steps). If the envelope is still
+/// over budget after both budgets are exhausted (e.g. the original prompt
+/// body alone exceeds the cap), the assembled envelope is truncated as a
+/// final fallback so the returned string is *guaranteed* to fit.
+///
+/// `pub(crate)` because the only external consumers are this module's
+/// `execute()` and tests; promote to `pub` once a foreign caller appears.
+pub(crate) fn build_failure_envelope(ctx: &FailureContext, body: &str) -> String {
     let mut excerpt_budget = MAX_RESPONSE_EXCERPT_BYTES;
     let mut verify_cap = 1024usize;
 
@@ -216,8 +250,7 @@ pub fn build_failure_envelope(ctx: &FailureContext, body: &str) -> String {
             body,
         );
 
-        if envelope.len() <= MAX_FAILURE_CONTEXT_BYTES || (excerpt_budget == 0 && verify_cap <= 64)
-        {
+        if envelope.len() <= MAX_FAILURE_CONTEXT_BYTES {
             return envelope;
         }
 
@@ -225,6 +258,11 @@ pub fn build_failure_envelope(ctx: &FailureContext, body: &str) -> String {
             excerpt_budget = excerpt_budget.saturating_sub(512);
         } else if verify_cap > 64 {
             verify_cap = verify_cap.saturating_sub(256);
+        } else {
+            // Both shrink budgets exhausted (the body itself is over the
+            // cap). Fall through to a hard-cap truncation so the returned
+            // envelope is guaranteed to fit MAX_FAILURE_CONTEXT_BYTES.
+            return truncate_excerpt(&envelope, MAX_FAILURE_CONTEXT_BYTES);
         }
     }
 }
@@ -363,16 +401,21 @@ impl Strategy for EscalatingRetry {
                             }
 
                             // Verify failed - record failure context for next rung
-                            let reason = match &result {
-                                VerifyResult::Fail { reason } => reason.clone(),
-                                _ => "verify did not pass".to_string(),
-                            };
-                            previous_failure = Some(FailureContext::from_verify_fail(
-                                rung.tier,
-                                backend.name(),
-                                reason,
-                                Some(query.stdout.clone()),
-                            ));
+                            // only when the flag is on; building it eagerly when
+                            // disabled wastes work since the next rung will not
+                            // consume it (see `rung_prompt` selector below).
+                            previous_failure = self.pass_failure_context.then(|| {
+                                let reason = match &result {
+                                    VerifyResult::Fail { reason } => reason.clone(),
+                                    _ => "verify did not pass".to_string(),
+                                };
+                                FailureContext::from_verify_fail(
+                                    rung.tier,
+                                    backend.name(),
+                                    reason,
+                                    Some(&query.stdout),
+                                )
+                            });
                         }
                         Err(verify_err) => {
                             // Hook itself blew up: record as a failed attempt
@@ -389,12 +432,14 @@ impl Strategy for EscalatingRetry {
                                 verify: VerifyOutcome::failed(self.verify.name()),
                             });
 
-                            previous_failure = Some(FailureContext::from_verify_fail(
-                                rung.tier,
-                                backend.name(),
-                                &verify_err.message,
-                                Some(query.stdout.clone()),
-                            ));
+                            previous_failure = self.pass_failure_context.then(|| {
+                                FailureContext::from_verify_fail(
+                                    rung.tier,
+                                    backend.name(),
+                                    &verify_err.message,
+                                    Some(&query.stdout),
+                                )
+                            });
                         }
                     }
                 }
@@ -419,11 +464,9 @@ impl Strategy for EscalatingRetry {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    previous_failure = Some(FailureContext::from_backend_error(
-                        rung.tier,
-                        &rung.backend,
-                        &err,
-                    ));
+                    previous_failure = self.pass_failure_context.then(|| {
+                        FailureContext::from_backend_error(rung.tier, &rung.backend, &err)
+                    });
                 }
             }
         }
@@ -486,15 +529,33 @@ mod tests {
 
     #[test]
     fn truncate_multibyte_safe() {
-        // 🎉 is 4 bytes; place it right at the 5-byte boundary.
+        // 🎉 is 4 bytes; place it right at the 5-byte boundary. The cap of
+        // 5 is too small to fit the truncation suffix, so the function
+        // returns a hard-cut prefix that stops before the multi-byte char.
         let s = "ab🎉cd"; // 8 bytes total
-        assert_eq!(truncate_excerpt(s, 5), "ab …[truncated, 6 bytes elided]");
+        let out = truncate_excerpt(s, 5);
+        assert!(out.len() <= 5);
+        assert_eq!(out, "ab");
     }
 
     #[test]
     fn truncate_exact_boundary() {
+        // Cap of 3 is too small for the suffix; hard-cut prefix returned.
         let s = "abcdef";
-        assert_eq!(truncate_excerpt(s, 3), "abc …[truncated, 3 bytes elided]");
+        let out = truncate_excerpt(s, 3);
+        assert!(out.len() <= 3);
+        assert_eq!(out, "abc");
+    }
+
+    #[test]
+    fn truncate_with_suffix_fits_within_budget() {
+        // Cap large enough to fit the truncation suffix; verify the result
+        // is at or below the cap and ends with the elided-bytes marker.
+        let s = "a".repeat(200);
+        let out = truncate_excerpt(&s, 64);
+        assert!(out.len() <= 64, "got {} bytes, cap was 64", out.len());
+        assert!(out.contains("[truncated,"));
+        assert!(out.ends_with("bytes elided]"));
     }
 
     #[test]
@@ -521,9 +582,26 @@ mod tests {
         assert!(out.contains("…[truncated,"));
     }
 
+    /// Regression: when the original prompt body alone exceeds
+    /// `MAX_FAILURE_CONTEXT_BYTES`, the excerpt/verify shrink loop cannot
+    /// bring the envelope under the cap on its own. The function must still
+    /// return a string at or below the hard cap rather than the previous
+    /// behaviour of returning the oversized envelope verbatim.
+    #[test]
+    fn envelope_hard_caps_when_body_alone_exceeds_budget() {
+        let body = "y".repeat(MAX_FAILURE_CONTEXT_BYTES * 2);
+        let ctx = FailureContext::from_verify_fail(Tier::Cheap, "backend", "fail", Some("short"));
+        let out = build_failure_envelope(&ctx, &body);
+        assert!(
+            out.len() <= MAX_FAILURE_CONTEXT_BYTES,
+            "envelope must not exceed MAX_FAILURE_CONTEXT_BYTES; got {} bytes",
+            out.len()
+        );
+    }
+
     #[test]
     fn envelope_verify_reason_only_when_no_response() {
-        let ctx = FailureContext::from_verify_fail(Tier::Cheap, "backend", "bad", None::<String>);
+        let ctx = FailureContext::from_verify_fail(Tier::Cheap, "backend", "bad", None);
         let out = build_failure_envelope(&ctx, "p");
         assert!(out.contains("response_excerpt: null"));
         assert!(out.contains(r#"verify_reason: "bad""#));
