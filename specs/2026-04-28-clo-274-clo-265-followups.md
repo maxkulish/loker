@@ -8,7 +8,7 @@
 
 ## 1. Problem Statement
 
-CLO-265 (PR #18) merged before automated review bots posted comments. Five
+CLO-265 (PR #18) merged before automated review bots posted comments. Four
 review comments arrived 2-4 minutes post-merge and were not addressed:
 
 1. **Zhipu unreachable in `family_of`** (Copilot, `family.rs:103`) — `Family::Zhipu`

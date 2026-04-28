@@ -373,10 +373,25 @@ mod tests {
             "openai",
             "loker_d1_openai",
         ];
-        let first = enforce_cross_family(targets).unwrap_err().to_string();
+        let first = enforce_cross_family(targets).unwrap_err();
+        let (first_family, first_count) = match first {
+            PhaseError::FamilyOverlap { family, count } => (family, count),
+        };
+
         for _ in 0..100 {
-            let next = enforce_cross_family(targets).unwrap_err().to_string();
-            assert_eq!(first, next, "FamilyOverlap message must be deterministic");
+            let next = enforce_cross_family(targets).unwrap_err();
+            match next {
+                PhaseError::FamilyOverlap { family, count } => {
+                    assert_eq!(
+                        first_family, family,
+                        "FamilyOverlap family must be deterministic"
+                    );
+                    assert_eq!(
+                        first_count, count,
+                        "FamilyOverlap count must be deterministic"
+                    );
+                }
+            }
         }
     }
 }
