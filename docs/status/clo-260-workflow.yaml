@@ -30,7 +30,7 @@ workflow:
   current_phase: pr
   status: in_progress
   created_at: '2026-04-27T00:00:00Z'
-  updated_at: '2026-04-27T21:10:34.626Z'
+  updated_at: '2026-04-27T22:30:00.000Z'
 phases:
   discovery:
     status: skipped
@@ -72,6 +72,11 @@ phases:
     ci_passed: false
     pr_url: https://github.com/maxkulish/loker/pull/17
     pr_number: 17
+    reviews_addressed: 14
+    review_commits:
+      - 9e470b5
+      - ce3d697
+      - 873b4fe
   complete:
     status: pending
 history:
@@ -143,3 +148,36 @@ history:
       PR #17 already opened on this branch (https://github.com/maxkulish/loker/pull/17). Posted Linear comment with PR
       summary + validation gate results; transitioned CLO-260 to "In Review". Branch carries unrelated commit 4ad0747
       (orchestrator phase-transition automation) flagged in PR body.
+  - timestamp: '2026-04-27T22:30:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Addressed 12 PR review comments (2 from gemini-code-assist, 10 from Copilot) across 2 commits. 9e470b5 batched
+      eight fixes - cached redaction regex via LazyLock; pub(crate) for build_failure_envelope and EscalatingRetryConfig;
+      pi-init Makefile glob safety; flag-off short-circuit so previous_failure stays None when pass_failure_context is
+      false; envelope hard-cap fix in truncate_excerpt with regression test; FailureContext::from_verify_fail now takes
+      Option<&str> to avoid stdout clone. ce3d697 dropped unused insta dev-dep and switched the backend-error path to
+      backend.name() for consistency with verify-fail/error paths. Comment 3150231866 (Pi orchestrator scope)
+      acknowledged - flagged as already documented in PR body. All 12 replies posted with /gemini review trailer.
+      cargo fmt + clippy --lib -D warnings + full test suite green (524 lib tests + integration suites).
+  - timestamp: '2026-04-27T22:30:00.000Z'
+    action: pushed_to_remote
+    phase: pr
+    details: 9e470b5..ce3d697 pushed to feat/clo-260-pas-failure.
+  - timestamp: '2026-04-28T07:21:00.000Z'
+    action: rebased_on_main
+    phase: pr
+    details: >-
+      Rebased feat/clo-260-pas-failure on origin/main (e9caf2f) after CLO-259 ParallelFanOut merged in PR #16.
+      Resolved Pi orchestrator conflict (kept HEAD's "phase and dispatched instructions" wording with dispatched:true)
+      and Makefile pi-init conflict (kept npm-ci-when-lockfile variant with [ -f "$$ext" ] || continue safety).
+      Force-pushed ce3d697...873b4fe with --force-with-lease. cargo build + cargo test green post-rebase.
+  - timestamp: '2026-04-28T07:22:00.000Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      Addressed 2 new top-level Copilot comments at 07:17 UTC (3152224573 on Pi orchestrator dispatched:true behavior,
+      3152224618 on Makefile pi-init being orthogonal to CLO-260). Both replied with acknowledgement that Pi orchestrator
+      changes are out-of-scope and already called out in PR body's "Out of scope (bundled but tracked separately)"
+      section, as previously acknowledged in thread 3150231866. dispatchPhase error-path improvement deferred to
+      follow-up Pi orchestrator task. Reviews posted with /gemini review trailer (3152246448, 3152246572).
