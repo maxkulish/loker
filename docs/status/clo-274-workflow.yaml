@@ -20,7 +20,7 @@ linear:
   branch_suggested: kmamemo/clo-274-address-clo-265-pr-18-review-comments-zhipu-duplicate
   branch_actual: fix/clo-274-fix
 workflow:
-  current_phase: spec
+  current_phase: pr
   status: active
   created_at: '2026-04-28T00:00:00.000Z'
   updated_at: '2026-04-28T00:00:00.000Z'
@@ -45,9 +45,22 @@ phases:
     review_completed: true
     review_skip_reason: Spec is a follow-up cleanup with explicit fixes from PR review bots.
   implement:
-    status: pending
+    status: complete
+    commit_sha: 91063d07670af7b3138e34c77e84a3f1840aeaac
+    files_changed:
+      - src/family.rs
+      - src/strategy/mod.rs
+      - specs/2026-04-28-clo-274-clo-265-followups.md
+      - docs/status/clo-274-workflow.yaml
+    tests_added: 4
+    make_check: green
   pr:
-    status: pending
+    status: open
+    pr_url: https://github.com/maxkulish/loker/pull/19
+    pr_number: 19
+    title: 'fix(CLO-274): address CLO-265 PR #18 review comments'
+    branch: fix/clo-274-fix
+    base: main
   complete:
     status: pending
 history:
@@ -55,3 +68,23 @@ history:
     action: workflow_started
     phase: init
     details: Initialized as specification task; explicit fixes from PR #18 review.
+  - timestamp: '2026-04-28T00:00:00.000Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All 7 ACs satisfied. Zhipu arms added in family_of and family_of_suffix;
+      PhaseError de-duplicated (canonical in family.rs, re-exported from
+      strategy/mod.rs); enforce_cross_family switched HashMap→BTreeMap with
+      Ord derives on Family. 35 family tests pass; make check green.
+  - timestamp: '2026-04-28T00:00:00.000Z'
+    action: commit_created
+    phase: implement
+    details: 'Commit 91063d0 on branch fix/clo-274-fix'
+  - timestamp: '2026-04-28T00:00:00.000Z'
+    action: pushed_to_remote
+    phase: pr
+    details: Branch pushed to origin/fix/clo-274-fix
+  - timestamp: '2026-04-28T00:00:00.000Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #19 opened: https://github.com/maxkulish/loker/pull/19'
