@@ -21,10 +21,10 @@ linear:
   branch_suggested: kmamemo/clo-265-add-family_of-lookup-and-cross-family-runtime-check
   branch_actual: feat/clo-265-family
 workflow:
-  current_phase: pr
+  current_phase: complete
   status: active
   created_at: '2026-04-28T10:35:05.591Z'
-  updated_at: '2026-04-28T10:52:47.104Z'
+  updated_at: '2026-04-28T10:56:13.770Z'
 phases:
   discovery:
     status: pending
@@ -41,7 +41,15 @@ phases:
     codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-265-gemini-validation.md
   pr:
-    status: in_progress
+    status: complete
+    pr_number: 18
+    pr_url: https://github.com/maxkulish/loker/pull/18
+    ci_passed: true
+    merge_commit: 7c82ef13151a60825a3ddda632ab8cc92c4698a3
+    merged_at: '2026-04-28T10:55:43Z'
+    reviews_addressed: true
+    linear_completion_comment_id: 6199c07d-f622-45e5-b9a4-c8c3f1abf878
+    linear_status: Done
   complete:
     status: pending
   spec:
@@ -126,5 +134,27 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy -D warnings + 31 lib tests + 7 integration tests + schema validation all pass.'
+  - timestamp: '2026-04-28T10:53:16.564Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #18 opened: https://github.com/maxkulish/loker/pull/18'
+  - timestamp: '2026-04-28T10:55:18.997Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format 12s, clippy 1m12s, test 1m54s.'
+  - timestamp: '2026-04-28T10:55:56.085Z'
+    action: pr_merged
+    phase: pr
+    details: >-
+      PR #18 merged to main at 2026-04-28T10:55:43Z. Merge commit 7c82ef1. CI green (format 12s, clippy 1m12s, test
+      1m54s). No review comments to address.
+  - timestamp: '2026-04-28T10:56:09.706Z'
+    action: linear_status_updated
+    phase: pr
+    details: CLO-265 transitioned to Done in Linear. Completion comment posted (id 6199c07d-f622-45e5-b9a4-c8c3f1abf878).
+  - timestamp: '2026-04-28T10:56:13.770Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
 task_title: Add family_of() lookup and cross-family runtime check
 task_url: https://linear.app/cloud-ai/issue/clo-265/add-family-of-lookup-and-cross-family-runtime-check
