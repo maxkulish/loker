@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-04-29T20:51:35.684Z'
-  updated_at: '2026-04-29T21:13:39.482Z'
+  updated_at: '2026-04-29T21:16:18.977Z'
 phases:
   discovery:
     status: complete
@@ -71,7 +71,10 @@ phases:
     validation_synthesis_verdict: approve
     validation_fix_iteration_count: 0
   pr:
-    status: pending
+    status: in_progress
+    pr_url: https://github.com/maxkulish/loker/pull/25
+    pr_number: 25
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -175,5 +178,17 @@ history:
     action: phase_transition
     phase: implement
     details: Transitioned from implement to pr
+  - timestamp: '2026-04-29T21:14:00.382Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-04-29T21:14:12.653Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #25 opened: https://github.com/maxkulish/loker/pull/25'
+  - timestamp: '2026-04-29T21:16:18.977Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format/clippy/tests via GitHub PR checks 25134236291.'
 task_title: Wire create_backend("tensorzero") arm + BackendConfig→TensorZeroConfig adapter
 task_url: https://linear.app/cloud-ai/issue/clo-261/wire-create-backendtensorzero-arm-backendconfigtensorzeroconfig

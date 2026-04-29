@@ -17,7 +17,7 @@ pub use retry::{RetryExecutor, RetryPolicy};
 #[allow(unused_imports)]
 pub use tensorzero::{TensorZeroBackend, TensorZeroBackendOpts};
 
-pub use crate::config::BackendConfig;
+use crate::config::BackendConfig;
 use crate::config::Config;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -1028,10 +1028,30 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct EnvVarGuard {
+        key: String,
+    }
+
+    impl EnvVarGuard {
+        fn new(key: &str, value: &str) -> Self {
+            std::env::set_var(key, value);
+            Self {
+                key: key.to_string(),
+            }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            std::env::remove_var(&self.key);
+        }
+    }
+
     #[test]
     fn tensorzero_adapter_maps_endpoint_model_auth_timeout() {
         let var_name = "LOKER_CLO_261_TENSORZERO_ADAPTER_KEY";
-        std::env::set_var(var_name, "secret-token-261");
+        let _env_guard = EnvVarGuard::new(var_name, "secret-token-261");
 
         let mut config = tensorzero_backend_config();
         config.api_key_env = Some(var_name.to_string());
@@ -1041,8 +1061,6 @@ mod tests {
         assert_eq!(opts.model, "loker_d1_openai");
         assert_eq!(opts.api_key.as_deref(), Some("secret-token-261"));
         assert_eq!(opts.timeout, Duration::from_secs(7));
-
-        std::env::remove_var(var_name);
     }
 
     #[test]
@@ -1077,6 +1095,13 @@ mod tests {
             .to_string()
             .contains("scheme must be http or https"));
 
+        let mut invalid_url = tensorzero_backend_config();
+        invalid_url.command = Some("://bad".to_string());
+        assert!(tensorzero_backend_opts_from_config(&invalid_url)
+            .unwrap_err()
+            .to_string()
+            .contains("not a valid URL"));
+
         let mut missing_model = tensorzero_backend_config();
         missing_model.model = None;
         assert!(tensorzero_backend_opts_from_config(&missing_model)
@@ -1108,6 +1133,51 @@ mod tests {
         assert!(capabilities_for_name("tensorzero").is_some());
         assert_eq!(backend.name(), "tensorzero");
         assert!(backend.is_available());
+    }
+
+    #[tokio::test]
+    async fn tensorzero_create_backend_queries_wiremock_gateway() {
+        use serde_json::json;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "chatcmpl-test",
+                "object": "chat.completion",
+                "created": 1_700_000_000,
+                "model": "loker_d1_openai",
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hello"},
+                    "finish_reason": "stop"
+                }],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 2,
+                    "total_tokens": 3
+                }
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let mut config = tensorzero_backend_config();
+        config.command = Some(server.uri());
+
+        let backend = create_backend("tensorzero", &config, zero_retry_policy())
+            .expect("tensorzero dispatcher arm builds backend");
+
+        let out = backend
+            .query("ping", Path::new("."), None)
+            .await
+            .expect("query succeeds via wiremock gateway");
+
+        assert_eq!(out.stdout, "hello");
+        assert_eq!(out.backend, "tensorzero");
+        assert_eq!(out.model.as_deref(), Some("loker_d1_openai"));
     }
 
     #[test]
