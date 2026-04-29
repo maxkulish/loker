@@ -565,6 +565,18 @@ mod tests {
     }
 
     #[test]
+    fn vote_snapshot() {
+        let branches = vec![
+            success("claude", "anthropic", " YES "),
+            success("codex", "openai", "yes"),
+            success("gemini", "google", "no"),
+        ];
+        let config = make_config(TieBreak::FirstResponder);
+        let (artifact, _) = aggregate_vote(&branches, &config).unwrap();
+        insta::assert_snapshot!(artifact.text);
+    }
+
+    #[test]
     fn normalise_ballot_basic() {
         assert_eq!(normalise_ballot("  YES  "), "yes");
         assert_eq!(normalise_ballot("Yes\n"), "yes");
