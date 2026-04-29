@@ -1,0 +1,175 @@
+task_id: clo-269
+task_type: development
+classification_reason: >-
+  Issue title starts with Implement and includes open design decisions (ballot schema/tie-breakers), so classification
+  is development.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by:
+    - CLO-265
+  priority: Low
+  branch_suggested: kmamemo/clo-269-implement-aggregatorvote-with-ballot-schema-and-tie-breakers
+  branch_actual: feat/clo-269
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-04-29T15:46:46.491Z'
+  updated_at: '2026-04-29T19:23:20.683Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: B - Extract vote.rs module under src/aggregator/
+    approaches_identified: 3
+    approved: true
+    baseline_score: 7
+    discovery_debt:
+      - follow_up: TDD (design phase) will lock exact BallotSchema enum shape.
+        item: Ballot schema shape (enum vs free-text) must be decided in TDD doc before implementation.
+      - follow_up: TDD (design phase) will decide.
+        item: Seed source for TieBreak::Random — whether from lok.toml/workflow config or derived from run-level UUID.
+      - follow_up: TDD (design phase) will lock exact spelling and semantics.
+        item: 'Quorum threshold semantics: absolute count vs fraction.'
+    discovery_report: docs/discovery/clo-269.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-269-aggregator-vote.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-269-aggregator-vote.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions:
+      - 'Added #[non_exhaustive] to BallotSchema for v0+1 extensibility'
+      - Added Serialize/Deserialize derives to VoteConfig for TOML parsing
+      - Removed VoteError::NoOpinion (unanimous single-bucket is a valid win, not an error)
+      - Unified compute_vote signature on canonical VoteCandidate struct
+      - Added VoteCandidate struct definition to Public API surface
+      - 'Added StrategyError mapping: QuorumLost → PhaseError::QuorumLost, NoCandidates → PhaseError::AggregatorRejected'
+      - Replaced HashMap with BTreeMap in vote counting for deterministic tie-break ordering
+      - >-
+        Fixed ClosestToFamily fallback: when multiple tied buckets match the target family, apply FirstResponder among
+        the matching subset
+      - Added HTML comment sanitization note (replace --> with -- >)
+      - Added is_vote short-circuit guard in parallel_fanout.rs to collect all branches
+      - Updated all_abstain test expectation
+      - Updated migration/rollout with phase_result_parallel.schema.json 'vote' enum addition
+      - Updated open questions with min_responses/abstain_threshold independence and rand import minimization
+    flagged_suggestions:
+      - id: cross_family_enforcement
+        reason: >-
+          PRD FR-13 scopes cross-family enforcement to LLMJudge only. Vote has no judge and is inherently counting
+          diversity. Cross-family selection belongs to the strategy layer, not the aggregator. Documented as non-goal in
+          design.
+      - id: rename_concat_rs
+        reason: >-
+          Style concern (P3) - four variants in concat.rs is a smell, but renaming introduces churn without functional
+          benefit. Deferred to future refactoring (T-029 Aggregator trait formalization).
+    review_completed: true
+    review_gemini: docs/reviews/clo-269-design-gemini.md
+    review_synthesis: docs/reviews/clo-269-design-synthesis.md
+    review_verdict: approve_with_changes
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-269-aggregator-vote.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-04-29T15:46:46.491Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-269 as development
+  - timestamp: '2026-04-29T15:47:09.238Z'
+    action: workflow_resumed
+    phase: init
+    details: Resuming existing workflow from init; skipping re-initialization path.
+  - timestamp: '2026-04-29T15:47:11.477Z'
+    action: linear_status_updated
+    phase: init
+    details: Linear issue status moved Backlog -> Todo per init workflow initialization.
+  - timestamp: '2026-04-29T15:47:14.548Z'
+    action: task_requalified
+    phase: init
+    details: Classified as development (implementation scope with architecture decisions on ballot schema and tie-break rules).
+  - timestamp: '2026-04-29T15:47:16.643Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-29T15:47:19.344Z'
+    action: metadata_adjusted
+    phase: init
+    details: Preserved linear status_at_start as Backlog while current linear status is now Todo.
+  - timestamp: '2026-04-29T15:50:13.010Z'
+    action: first_phase_dispatched
+    phase: init
+    details: Init completed; advancing to first phase 'discovery' for development task per task type and dispatch contract.
+  - timestamp: '2026-04-29T16:06:15.852Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-269 already checked out and even with main; recording as actual.
+  - timestamp: '2026-04-29T18:37:53.367Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach B: Extract vote.rs module under src/aggregator/. Baseline 7/10. 3 approaches considered (A inline, B
+      extracted module, C reuse consensus.rs). PRD created from scratch. Discovery debt: 3 items to resolve in TDD
+      (ballot schema shape, Random seed source, quorum threshold semantics).
+  - timestamp: '2026-04-29T18:38:02.835Z'
+    action: discovery_status_fixed
+    phase: discovery
+    details: Set discovery.status to complete so transition to design is allowed.
+  - timestamp: '2026-04-29T18:38:06.397Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-04-29T18:45:47.143Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc draft at docs/designs/clo-269-aggregator-vote.md
+  - timestamp: '2026-04-29T19:21:18.964Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 13 applied suggestions, 2 flagged. Reviews written to
+      docs/reviews/clo-269-design-gemini.md and docs/reviews/clo-269-design-synthesis.md.
+  - timestamp: '2026-04-29T19:21:46.173Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. Review feedback applied: 13 additions, 2 flagged (cross-family enforcement, rename
+      concat.rs). All P0 items addressed (short-circuit guard, deterministic ordering). VoteError::NoOpinion variant
+      removed. BTreeMap used for determinism. HTML sanitization documented. StrategyError mapping specified.
+  - timestamp: '2026-04-29T19:21:49.711Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-04-29T19:23:08.265Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-269-aggregator-vote.md
+  - timestamp: '2026-04-29T19:23:14.565Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 6 sub-tasks queued (ST1–ST5 implementation + ST6 pre-merge gate).
+  - timestamp: '2026-04-29T19:23:20.683Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+task_title: Implement Aggregator::Vote with ballot schema and tie-breakers
+task_url: https://linear.app/cloud-ai/issue/clo-269/implement-aggregatorvote-with-ballot-schema-and-tie-breakers
