@@ -290,6 +290,10 @@ impl Strategy for ParallelFanOut {
             });
         }
 
+        // `min_responses` is a strategy-level floor on successful backend calls.
+        // It is independent of the aggregator's `abstain_threshold` (Vote-specific).
+        // Both can fire: if fewer than `min_responses` succeed, the phase fails
+        // with `FloorViolation` before the aggregator runs.
         if successes < self.min_responses {
             let output = StrategyOutput {
                 schema_version: SCHEMA_VERSION,

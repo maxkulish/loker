@@ -1,7 +1,3 @@
----
-source: src/aggregator/vote.rs
-expression: artifact.text
----
  YES 
 
 <!-- loker: Vote aggregator metadata

@@ -3,6 +3,7 @@
 //! Pure, synchronous vote counting over parallel branch outcomes.
 //! No secondary backend calls, no async, no I/O.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::family::{family_of, Family};
@@ -10,7 +11,7 @@ use crate::family::{family_of, Family};
 use super::{AggregatedArtifact, BranchOutcome};
 
 /// How a ballot is normalised and interpreted.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum BallotSchema {
     /// Free text: each backend returns prose; normalise before bucketing.
@@ -18,7 +19,7 @@ pub enum BallotSchema {
 }
 
 /// How to resolve a tie when no strict majority exists.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TieBreak {
     /// Pick the candidate whose backend family matches the given family.
     /// If multiple candidates match, first occurrence in arrival order wins.
@@ -30,7 +31,7 @@ pub enum TieBreak {
 }
 
 /// Config payload for the Vote aggregator.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoteConfig {
     pub ballot_schema: BallotSchema,
     pub tie_break: TieBreak,
@@ -46,6 +47,7 @@ pub struct VoteCandidate {
     pub backend_id: String,
     pub family: String,
     pub normalised: String,
+    pub original: String,
     pub arrival_order: usize,
 }
 
@@ -100,6 +102,7 @@ pub fn aggregate_vote(
                         backend_id: success.backend_id.clone(),
                         family: success.family.clone(),
                         normalised,
+                        original: success.output.clone(),
                         arrival_order,
                     });
                 }
@@ -135,7 +138,8 @@ pub fn aggregate_vote(
         .map(|(k, _)| k.as_str())
         .collect();
 
-    let mut result = if winners.len() == 1 {
+    let strict_majority = max_votes * 2 > candidates.len();
+    let mut result = if strict_majority {
         let winner_text = winners[0];
         VoteResult {
             winner: winner_text.into(),
@@ -241,7 +245,7 @@ fn build_aggregated_text(
         .and_then(|indices| {
             indices
                 .first()
-                .and_then(|&idx| candidates.get(idx).map(|c| c.normalised.as_str()))
+                .and_then(|&idx| candidates.get(idx).map(|c| c.original.as_str()))
         })
         .unwrap_or(&result.winner);
 

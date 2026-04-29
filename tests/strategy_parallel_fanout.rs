@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use jsonschema::Validator;
 use serde_json::Value;
 
-use loker::aggregator::Aggregator;
+use loker::aggregator::{Aggregator, BallotSchema, TieBreak, VoteConfig};
 use loker::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use loker::strategy::parallel_fanout::{ParallelFanOut, TargetSpec};
 use loker::strategy::{
@@ -332,6 +332,53 @@ fn load_schema() -> Validator {
         .with_draft(jsonschema::Draft::Draft202012)
         .build(&schema)
         .expect("compile schema")
+}
+
+#[test]
+fn vote_success_integration() {
+    let a = MockBackend::ok("a", " YES ");
+    let b = MockBackend::ok("b", "yes");
+    let c = MockBackend::ok("c", "no");
+    let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone(), c.clone()];
+    let strategy = ParallelFanOut::new(
+        vec![
+            TargetSpec::new("a"),
+            TargetSpec::new("b"),
+            TargetSpec::new("c"),
+        ],
+        2,
+        "render-me",
+        Aggregator::vote(VoteConfig {
+            ballot_schema: BallotSchema::FreeText,
+            tie_break: TieBreak::FirstResponder,
+            abstain_threshold: 0,
+        }),
+    );
+
+    let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+    assert_eq!(out.strategy, StrategyKind::Parallel);
+    assert_eq!(out.attempts.len(), 3);
+    assert_eq!(
+        out.verify.as_ref().unwrap().status,
+        loker::strategy::VerifyStatus::Pass
+    );
+    assert_eq!(out.aggregator.as_ref().unwrap().as_str(), "vote");
+    assert!(out
+        .aggregate_output_path
+        .as_ref()
+        .unwrap()
+        .ends_with("aggregated.txt"));
+
+    // Schema validation
+    let json = serde_json::to_value(&out).expect("serialize");
+    let schema = load_schema();
+    if let Err(e) = schema.validate(&json) {
+        panic!(
+            "Vote output failed schema validation: {}\npayload: {}",
+            e,
+            serde_json::to_string_pretty(&json).unwrap()
+        );
+    }
 }
 
 fn repo_root() -> std::path::PathBuf {
