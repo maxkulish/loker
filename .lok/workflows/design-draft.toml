@@ -6,22 +6,22 @@ description = "Claude-powered first draft of a design document from discovery ou
 name = "read_milestone"
 timeout = 10000
 continue_on_error = true
-shell = """
+shell = '''
 ACTIVE_MILESTONE=$(grep -E '^Active milestone:' CLAUDE.md | head -1 | sed 's/^Active milestone: //; s/\*\*//g; s/\.$//')
 if [ -z "$ACTIVE_MILESTONE" ]; then
   echo "Unknown"
 else
   echo "$ACTIVE_MILESTONE"
 fi
-"""
+'''
 
 # Step 2: Load designer persona from canonical file
 [[steps]]
 name = "load_persona"
 timeout = 5000
-shell = """
+shell = '''
 cat .pi/agents/claude-designer.md
-"""
+'''
 
 # Step 3: Compile discovery context from workflow YAML + referenced files
 [[steps]]
@@ -29,7 +29,7 @@ name = "read_discovery"
 timeout = 15000
 continue_on_error = false
 depends_on = ["read_milestone"]
-shell = """
+shell = '''
 TASK_ID="{{ arg.1 }}"
 TASK_ID_LOWER=$(printf '%s' "$TASK_ID" | tr '[:upper:]' '[:lower:]')
 
@@ -52,9 +52,9 @@ if [ -z "$YAML_PATH" ]; then
 fi
 
 # Extract field values - 4-space-indented YAML fields under phases.discovery
-PRD_FILE=$(grep -E '^\s{4}prd_file:' "$YAML_PATH" | head -1 | sed 's/.*prd_file:[[:space:]]*//' | tr -d '"'"'"' ')
-APPROACH=$(grep -E '^\s{4}approach_chosen:' "$YAML_PATH" | head -1 | sed 's/.*approach_chosen:[[:space:]]*//' | tr -d '"'"'"' ')
-DISCOVERY_REPORT=$(grep -E '^\s{4}discovery_report:' "$YAML_PATH" | head -1 | sed 's/.*discovery_report:[[:space:]]*//' | tr -d '"'"'"' ')
+PRD_FILE=$(grep -E '^    prd_file:' "$YAML_PATH" | head -1 | sed 's/.*prd_file:[[:space:]]*//' | tr -d '"'"'"' ')
+APPROACH=$(grep -E '^    approach_chosen:' "$YAML_PATH" | head -1 | sed 's/.*approach_chosen:[[:space:]]*//' | tr -d '"'"'"' ')
+DISCOVERY_REPORT=$(grep -E '^    discovery_report:' "$YAML_PATH" | head -1 | sed 's/.*discovery_report:[[:space:]]*//' | tr -d '"'"'"' ')
 
 printf '=== TASK: %s - {{ arg.3 }} ===\n' "$TASK_ID"
 printf 'Active milestone: %s\n\n' "{{ steps.read_milestone.output }}"
@@ -89,13 +89,13 @@ if [ -f docs/handoff.md ]; then
 else
   printf '[docs/handoff.md not found]\n' >&2
 fi
-"""
+'''
 
 # Step 4: Generate design draft via Claude
 [[steps]]
 name = "generate_draft"
 backend = "claude"
-timeout = 180000
+timeout = 300000
 retries = 2
 continue_on_error = false
 depends_on = ["load_persona", "read_discovery"]
@@ -119,7 +119,7 @@ Produce the design document now.
 name = "write_draft"
 timeout = 10000
 depends_on = ["generate_draft"]
-shell = """
+shell = '''
 mkdir -p docs/designs
 TASK_ID_LOWER=$(printf '%s' '{{ arg.1 }}' | tr '[:upper:]' '[:lower:]')
 OUTPUT_PATH="docs/designs/${TASK_ID_LOWER}-{{ arg.2 }}.md"
@@ -141,4 +141,4 @@ fi
 
 mv "$TMP" "$OUTPUT_PATH"
 printf 'Draft written to %s (%d lines)\n' "$OUTPUT_PATH" "$LINE_COUNT"
-"""
+'''

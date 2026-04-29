@@ -62,3 +62,5 @@ Produce a single markdown document. Include all seven sections in this order:
   flagging it as an open question.
 - Do not propose dependency additions unless strictly required by the design.
 - Never paste the entire discovery report back at the reader; synthesize it.
+- Do not use `{{` or `}}` in the design document. If you need to show template
+  or variable syntax, use angle brackets (`<ARG_1>`, `<STEP_OUTPUT>`) instead.
