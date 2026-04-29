@@ -1,0 +1,144 @@
+name = "design-draft"
+description = "Claude-powered first draft of a design document from discovery outputs"
+
+# Step 1: Resolve active milestone from CLAUDE.md
+[[steps]]
+name = "read_milestone"
+timeout = 10000
+continue_on_error = true
+shell = """
+ACTIVE_MILESTONE=$(grep -E '^Active milestone:' CLAUDE.md | head -1 | sed 's/^Active milestone: //; s/\*\*//g; s/\.$//')
+if [ -z "$ACTIVE_MILESTONE" ]; then
+  echo "Unknown"
+else
+  echo "$ACTIVE_MILESTONE"
+fi
+"""
+
+# Step 2: Load designer persona from canonical file
+[[steps]]
+name = "load_persona"
+timeout = 5000
+shell = """
+cat .pi/agents/claude-designer.md
+"""
+
+# Step 3: Compile discovery context from workflow YAML + referenced files
+[[steps]]
+name = "read_discovery"
+timeout = 15000
+continue_on_error = false
+depends_on = ["read_milestone"]
+shell = """
+TASK_ID="{{ arg.1 }}"
+TASK_ID_LOWER=$(printf '%s' "$TASK_ID" | tr '[:upper:]' '[:lower:]')
+
+# Locate workflow YAML - try exact case first, then lowercase
+YAML_PATH=""
+for candidate in \
+  "docs/status/${TASK_ID}-workflow.yaml" \
+  "docs/status/${TASK_ID_LOWER}-workflow.yaml"; do
+  if [ -f "$candidate" ]; then
+    YAML_PATH="$candidate"
+    break
+  fi
+done
+
+if [ -z "$YAML_PATH" ]; then
+  printf 'ERROR: No workflow YAML found for %s. Tried:\n' "$TASK_ID" >&2
+  printf '  docs/status/%s-workflow.yaml\n' "$TASK_ID" >&2
+  printf '  docs/status/%s-workflow.yaml\n' "$TASK_ID_LOWER" >&2
+  exit 1
+fi
+
+# Extract field values - 4-space-indented YAML fields under phases.discovery
+PRD_FILE=$(grep -E '^\s{4}prd_file:' "$YAML_PATH" | head -1 | sed 's/.*prd_file:[[:space:]]*//' | tr -d '"'"'"' ')
+APPROACH=$(grep -E '^\s{4}approach_chosen:' "$YAML_PATH" | head -1 | sed 's/.*approach_chosen:[[:space:]]*//' | tr -d '"'"'"' ')
+DISCOVERY_REPORT=$(grep -E '^\s{4}discovery_report:' "$YAML_PATH" | head -1 | sed 's/.*discovery_report:[[:space:]]*//' | tr -d '"'"'"' ')
+
+printf '=== TASK: %s - {{ arg.3 }} ===\n' "$TASK_ID"
+printf 'Active milestone: %s\n\n' "{{ steps.read_milestone.output }}"
+
+printf '=== PRD ===\n'
+if [ -n "$PRD_FILE" ] && [ -f "$PRD_FILE" ]; then
+  cat "$PRD_FILE"
+else
+  printf '[PRD unavailable: %s]\n' "${PRD_FILE:-field not found in YAML}" >&2
+  printf '[PRD unavailable]\n'
+fi
+
+printf '\n=== APPROACH CHOSEN ===\n'
+if [ -n "$APPROACH" ]; then
+  printf '%s\n' "$APPROACH"
+else
+  printf '[approach_chosen not found in %s]\n' "$YAML_PATH" >&2
+  printf '[Approach not specified]\n'
+fi
+
+printf '\n=== DISCOVERY REPORT ===\n'
+if [ -n "$DISCOVERY_REPORT" ] && [ -f "$DISCOVERY_REPORT" ]; then
+  cat "$DISCOVERY_REPORT"
+else
+  printf '[Discovery report unavailable: %s]\n' "${DISCOVERY_REPORT:-field not found in YAML}" >&2
+  printf '[Discovery report unavailable]\n'
+fi
+
+printf '\n=== PROJECT HANDOFF ===\n'
+if [ -f docs/handoff.md ]; then
+  cat docs/handoff.md
+else
+  printf '[docs/handoff.md not found]\n' >&2
+fi
+"""
+
+# Step 4: Generate design draft via Claude
+[[steps]]
+name = "generate_draft"
+backend = "claude"
+timeout = 180000
+retries = 2
+continue_on_error = false
+depends_on = ["load_persona", "read_discovery"]
+prompt = """
+{{ steps.load_persona.output }}
+
+---
+
+Active milestone: {{ steps.read_milestone.output }}
+Task: {{ arg.1 }} - {{ arg.3 }}
+Output path: docs/designs/<task-id-lowercase>-{{ arg.2 }}.md
+
+DISCOVERY CONTEXT:
+{{ steps.read_discovery.output }}
+
+Produce the design document now.
+"""
+
+# Step 5: Write draft to docs/designs/ with injection-safe heredoc
+[[steps]]
+name = "write_draft"
+timeout = 10000
+depends_on = ["generate_draft"]
+shell = """
+mkdir -p docs/designs
+TASK_ID_LOWER=$(printf '%s' '{{ arg.1 }}' | tr '[:upper:]' '[:lower:]')
+OUTPUT_PATH="docs/designs/${TASK_ID_LOWER}-{{ arg.2 }}.md"
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+
+# Single-quoted heredoc: lok substitutes {{ ... }} before shell runs,
+# but the shell itself does no further expansion (no $(...) execution).
+# Same pattern as write_reviews in design-review.toml.
+cat <<'LOKER_WF_DESIGNER_DRAFT_OUTPUT_EOF' > "$TMP"
+{{ steps.generate_draft.output }}
+LOKER_WF_DESIGNER_DRAFT_OUTPUT_EOF
+
+LINE_COUNT=$(wc -l < "$TMP")
+if [ "$LINE_COUNT" -lt 15 ]; then
+  printf 'ERROR: Draft is only %d lines - generation likely failed\n' "$LINE_COUNT" >&2
+  exit 1
+fi
+
+mv "$TMP" "$OUTPUT_PATH"
+printf 'Draft written to %s (%d lines)\n' "$OUTPUT_PATH" "$LINE_COUNT"
+"""
