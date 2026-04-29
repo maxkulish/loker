@@ -1,0 +1,190 @@
+task_id: clo-270
+task_type: development
+classification_reason: >-
+  Title 'Define VerifyHook trait and VerifyResult enum' — 'Define' does not match operational or specification patterns.
+  Issue describes implementing a trait + enum + unit tests. Defaulting to development.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_actual: feat/clo-270-hook
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-04-29T16:06:41.872Z'
+  updated_at: '2026-04-29T19:45:44.916Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: C — Enrich in-place VerifyHook trait + add VerifyContext factory constructor
+    approaches_identified: 3
+    approved: true
+    baseline_score: 6
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-270.md
+    prd_created: false
+    prd_exists: true
+    prd_file: docs/prd/2026-04-25-loker.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-270-hook.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions:
+      - 'doc: add redaction policy for FailureReason stdout/stderr (P1)'
+      - 'doc: add VerifyHook contract — missing context returns VerifyError (P1)'
+      - 'doc: reorder migration to TDD-first (tests before consumer update) (P1)'
+      - 'doc: confirm reason.summary.clone() integration in EscalatingRetry (P1)'
+      - 'doc: define MAX_OUTPUT_BYTES truncation cap referencing existing constant (P1)'
+      - 'doc: add Display impl for FailureReason (P2)'
+      - 'doc: add cancellation safety contract to VerifyHook trait doc (P2)'
+      - 'doc: document Score(f32) ordering convention (higher = better) (P3)'
+      - 'doc: add Acceptance Criteria section with 7 criteria + rollback plan (P3)'
+      - 'doc: defer Serialize/Deserialize derives to T-029 (P2)'
+      - 'doc: note future VerifyError #[source] field for CLO-271 (P3)'
+    flagged_suggestions:
+      - id: usage-field-on-verifycontext
+        reason: >-
+          Adding usage: Option<TokenUsage> creates coupling to QueryOutput shape. Token-usage access can be routed
+          through structured field or added when a concrete cost-aware hook (CLO-272) demonstrates the need. Deferred to
+          T-029 question.
+      - id: original-len-on-truncation
+        reason: >-
+          original_len: Option<usize> on FailureReason is a HITL UI nicety. Not needed for v0 — the truncated bool is
+          sufficient to prevent prompt overflow. Can be added when HITL UI is built.
+    review_completed: true
+    review_gemini: docs/reviews/CLO-270-review-gemini.md
+    review_synthesis: docs/reviews/CLO-270-review-synthesis.md
+    review_verdict: approve_with_changes
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-270-hook.md
+    approved: true
+  implement:
+    status: complete
+    commits:
+      - 8cd90cd
+    codex_report: docs/reviews/clo-270-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-270-gemini-validation.md
+    validation_fix_iteration_count: 0
+    validation_synthesis_report: docs/reviews/clo-270-validation-synthesis.md
+    validation_synthesis_verdict: approve
+  pr:
+    status: in_progress
+    pr_number: 23
+    pr_url: https://github.com/maxkulish/loker/pull/23
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-04-29T16:06:41.872Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-270 as development
+  - timestamp: '2026-04-29T16:07:08.860Z'
+    action: classification_complete
+    phase: init
+    details: >-
+      Classified as development: Title "Define VerifyHook trait and VerifyResult enum" — 'Define' does not match
+      operational (Investigate/Audit/Document/Migrate/Configure) or specification (Add/Implement/Fix/Refactor with
+      mechanical ACs) patterns. Issue describes implementing a trait + enum + unit tests. Defaulting to development.
+  - timestamp: '2026-04-29T16:07:36.019Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo. Skipping project sync.
+  - timestamp: '2026-04-29T16:07:41.180Z'
+    action: linear_status_updated
+    phase: init
+    details: Linear status moved from Backlog to Todo. First phase set to discovery for development task.
+  - timestamp: '2026-04-29T16:09:16.459Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-270-hook already exists from previous work. Recording as actual branch.
+  - timestamp: '2026-04-29T16:15:29.844Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: C — Enrich in-place + factory constructor. Baseline 6/10. 2 approaches considered. No discovery debt —
+      follow-ups tracked as CLO-271, CLO-272, CLO-273, CLO-260.
+  - timestamp: '2026-04-29T16:15:35.946Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-04-29T18:41:10.328Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc draft at docs/designs/clo-270-hook.md. Covers type taxonomy, public API, test plan, migration.
+  - timestamp: '2026-04-29T19:08:30.848Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_suggestions (PROCEED_WITH_FIXES). Gemini verdict: APPROVE. Ollama verdict:
+      APPROVE_WITH_SUGGESTIONS. 9 applied suggestions, 2 flagged for follow-up (usage field on VerifyContext deferred to
+      T-029 question, original_len on truncation tracked against HITL UI need). See synthesis at
+      docs/reviews/CLO-270-review-synthesis.md
+  - timestamp: '2026-04-29T19:08:36.450Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. Design doc at docs/designs/clo-270-hook.md updated with review feedback. 11
+      suggestions applied, 2 flagged for follow-up. Acceptance criteria defined. Migration steps reordered to TDD-first.
+  - timestamp: '2026-04-29T19:09:06.758Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-04-29T19:15:38.692Z'
+    action: plan_created
+    phase: plan
+    details: >-
+      Plan with 5 sub-tasks at docs/plans/clo-270-hook.md. ST1 (types + refactor), ST2 (unit tests TDD-first), ST3
+      (consumer update), ST4 (consumer test update), ST5 (pre-merge gate). All sub-tasks have concrete acceptance
+      commands and reference real files.
+  - timestamp: '2026-04-29T19:15:48.503Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 5 sub-tasks queued. TDD-first ordering (ST2 before ST3). All sub-tasks reference real files, have
+      concrete acceptance commands, pre-merge gate is make check.
+  - timestamp: '2026-04-29T19:16:05.693Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-04-29T19:29:22.798Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All sub-tasks landed. make check green. 1 commit (8cd90cd). Changes: 9 verify.rs unit tests, re-exported
+      FailureReason and VerifyContext, updated escalating_retry.rs consumer, updated integration test stubs.
+  - timestamp: '2026-04-29T19:43:22.718Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: approve_with_changes (2 non-blocking findings: usage deferred to T-029, truncation builder scope). Gemini:
+      SKIPPED (tooling timeout). Synthesis: approve — 0 must-fix items, 2 findings classified as
+      out-of-scope/false-positive. 0 fix iterations applied.
+  - timestamp: '2026-04-29T19:43:32.747Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-04-29T19:44:40.973Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + 1,158 tests all pass'
+  - timestamp: '2026-04-29T19:45:44.916Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #23 opened: https://github.com/maxkulish/loker/pull/23'
+task_title: Define VerifyHook trait and VerifyResult enum
+task_url: https://linear.app/cloud-ai/issue/CLO-270/define-verifyhook-trait-and-verifyresult-enum

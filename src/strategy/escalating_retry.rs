@@ -15,8 +15,8 @@
 use crate::backend::Backend;
 use crate::strategy::{
     pick_model, Attempt, BackendError, FinalStatus, FinishReason, PhaseContext, Prompt, Strategy,
-    StrategyError, StrategyKind, StrategyOutput, Tier, TokenUsageReport, VerifyHook, VerifyOutcome,
-    VerifyResult, SCHEMA_VERSION,
+    StrategyError, StrategyKind, StrategyOutput, Tier, TokenUsageReport, VerifyContext, VerifyHook,
+    VerifyOutcome, VerifyResult, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
 use regex::Regex;
@@ -367,7 +367,8 @@ impl Strategy for EscalatingRetry {
                         .unwrap_or_default();
                     let model = pick_model(&query, prompt);
 
-                    match self.verify.verify(&query).await {
+                    let verify_ctx = VerifyContext::from_query_output(&query);
+                    match self.verify.verify(&verify_ctx).await {
                         Ok(result) => {
                             let passed = result.is_pass();
                             let verify_outcome = if passed {
@@ -406,7 +407,7 @@ impl Strategy for EscalatingRetry {
                             // consume it (see `rung_prompt` selector below).
                             previous_failure = self.pass_failure_context.then(|| {
                                 let reason = match &result {
-                                    VerifyResult::Fail { reason } => reason.clone(),
+                                    VerifyResult::Fail { reason } => reason.summary.clone(),
                                     _ => "verify did not pass".to_string(),
                                 };
                                 FailureContext::from_verify_fail(
