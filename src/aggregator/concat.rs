@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::aggregator::{VoteConfig};
+use crate::aggregator::VoteConfig;
 use crate::backend::Backend;
 use crate::strategy::PhaseContext;
 

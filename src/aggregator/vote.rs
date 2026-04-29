@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::family::{family_of, Family};
 
-use super::{AggregatedArtifact, BranchOutcome, BranchSuccess};
+use super::{AggregatedArtifact, BranchOutcome};
 
 /// How a ballot is normalised and interpreted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,24 +139,17 @@ pub fn aggregate_vote(
         let winner_text = winners[0];
         VoteResult {
             winner: winner_text.into(),
-            vote_counts: buckets
-                .iter()
-                .map(|(k, v)| (k.clone(), v.len()))
-                .collect(),
+            vote_counts: buckets.iter().map(|(k, v)| (k.clone(), v.len())).collect(),
             abstain_count,
             total_branches: total,
             tie_broken: false,
             tie_break_rule: "none (strict majority)".into(),
         }
     } else {
-        let chosen_text =
-            resolve_tie(&winners, &candidates, &buckets, &config.tie_break);
+        let chosen_text = resolve_tie(&winners, &candidates, &buckets, &config.tie_break);
         VoteResult {
-            winner: chosen_text.into(),
-            vote_counts: buckets
-                .iter()
-                .map(|(k, v)| (k.clone(), v.len()))
-                .collect(),
+            winner: chosen_text,
+            vote_counts: buckets.iter().map(|(k, v)| (k.clone(), v.len())).collect(),
             abstain_count,
             total_branches: total,
             tie_broken: true,
@@ -165,7 +158,7 @@ pub fn aggregate_vote(
     };
 
     // Sort vote_counts descending for stable output
-    result.vote_counts.sort_by(|a, b| b.1.cmp(&a.1));
+    result.vote_counts.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let text = build_aggregated_text(&result, &candidates, &buckets);
     let artifact = AggregatedArtifact {
@@ -184,20 +177,18 @@ fn resolve_tie(
     tie_break: &TieBreak,
 ) -> String {
     match tie_break {
-        TieBreak::FirstResponder => {
-            tied_buckets
-                .iter()
-                .min_by_key(|&&bucket| {
-                    buckets[bucket]
-                        .iter()
-                        .map(|&ci| candidates[ci].arrival_order)
-                        .min()
-                        .unwrap_or(usize::MAX)
-                })
-                .copied()
-                .unwrap_or(tied_buckets[0])
-                .to_string()
-        }
+        TieBreak::FirstResponder => tied_buckets
+            .iter()
+            .min_by_key(|&&bucket| {
+                buckets[bucket]
+                    .iter()
+                    .map(|&ci| candidates[ci].arrival_order)
+                    .min()
+                    .unwrap_or(usize::MAX)
+            })
+            .copied()
+            .unwrap_or(tied_buckets[0])
+            .to_string(),
 
         TieBreak::ClosestToFamily(target_family) => {
             let matching: Vec<&str> = tied_buckets
@@ -248,9 +239,9 @@ fn build_aggregated_text(
     let winner_original = buckets
         .get(&result.winner)
         .and_then(|indices| {
-            indices.first().and_then(|&idx| {
-                candidates.get(idx).map(|c| c.normalised.as_str())
-            })
+            indices
+                .first()
+                .and_then(|&idx| candidates.get(idx).map(|c| c.normalised.as_str()))
         })
         .unwrap_or(&result.winner);
 
@@ -285,6 +276,7 @@ fn sanitize_comment(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::super::BranchSuccess;
     use super::*;
 
     fn success(backend_id: &str, family: &str, output: &str) -> BranchOutcome {
@@ -324,7 +316,10 @@ mod tests {
         let (artifact, result) = aggregate_vote(&branches, &config).unwrap();
         assert_eq!(result.winner, "yes");
         assert!(!result.tie_broken);
-        assert_eq!(result.vote_counts, vec![("yes".into(), 2), ("no".into(), 1)]);
+        assert_eq!(
+            result.vote_counts,
+            vec![("yes".into(), 2), ("no".into(), 1)]
+        );
         assert_eq!(result.abstain_count, 0);
         assert!(artifact.text.contains("yes"));
     }
@@ -464,8 +459,7 @@ mod tests {
             success("gemini", "google", "a"),
             success("openai", "openai", "b"),
         ];
-        let config =
-            make_config(TieBreak::ClosestToFamily(Family::Anthropic));
+        let config = make_config(TieBreak::ClosestToFamily(Family::Anthropic));
         let (_, result) = aggregate_vote(&branches, &config).unwrap();
         // No match for Anthropic: falls back to FirstResponder
         assert!(result.tie_broken);
@@ -478,8 +472,7 @@ mod tests {
             success("gemini", "google", "b"),
             success("loker_d1_anthropic", "anthropic", "a"),
         ];
-        let config =
-            make_config(TieBreak::ClosestToFamily(Family::Anthropic));
+        let config = make_config(TieBreak::ClosestToFamily(Family::Anthropic));
         let (_, result) = aggregate_vote(&branches, &config).unwrap();
         // "a" has two Anthropic candidates, "b" has zero.
         // ClosestToFamily matches "a" uniquely, so no need for fallback.
@@ -497,8 +490,7 @@ mod tests {
             success("loker_d1_anthropic", "anthropic", "b"),
             success("openai", "openai", "b"),
         ];
-        let config =
-            make_config(TieBreak::ClosestToFamily(Family::Anthropic));
+        let config = make_config(TieBreak::ClosestToFamily(Family::Anthropic));
         let (_, result) = aggregate_vote(&branches, &config).unwrap();
         // Both "a" and "b" have Anthropic candidates; tie -> FirstResponder
         // picks the bucket whose first candidate arrived earliest.
@@ -542,20 +534,21 @@ mod tests {
         ];
         let config = make_config(TieBreak::FirstResponder);
         let (_, result) = aggregate_vote(&branches, &config).unwrap();
-        assert_eq!(result.vote_counts, vec![
-            ("yes".into(), 2),
-            // "maybe" and "no" tie at 1; BTreeMap iteration order is alphabetical,
-            // and stable_sort preserves that relative order.
-            ("maybe".into(), 1),
-            ("no".into(), 1),
-        ]);
+        assert_eq!(
+            result.vote_counts,
+            vec![
+                ("yes".into(), 2),
+                // "maybe" and "no" tie at 1; BTreeMap iteration order is alphabetical,
+                // and stable_sort preserves that relative order.
+                ("maybe".into(), 1),
+                ("no".into(), 1),
+            ]
+        );
     }
 
     #[test]
     fn sanitize_comment_in_metadata() {
-        let branches = vec![
-            success("a", "anthropic", "ok --> bad"),
-        ];
+        let branches = vec![success("a", "anthropic", "ok --> bad")];
         let config = make_config(TieBreak::FirstResponder);
         let (artifact, _) = aggregate_vote(&branches, &config).unwrap();
         // The metadata should have sanitized the `-->` in the winner text.

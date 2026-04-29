@@ -11,9 +11,7 @@
 //! settles, a structured `StrategyError::FloorViolation` is returned so
 //! callers can still persist the schema-shaped JSON.
 
-use crate::aggregator::{
-    aggregate_llm_judge, Aggregator, BallotSchema, BranchSuccess, TieBreak, VoteConfig,
-};
+use crate::aggregator::{aggregate_llm_judge, Aggregator, BranchSuccess};
 use crate::backend::{Backend, QueryOutput};
 use crate::family::family_of;
 use crate::strategy::{
@@ -185,7 +183,8 @@ impl Strategy for ParallelFanOut {
                     };
                     successful_candidates.push(branch_success.clone());
                     if is_vote {
-                        vote_branches.push(crate::aggregator::BranchOutcome::Success(branch_success));
+                        vote_branches
+                            .push(crate::aggregator::BranchOutcome::Success(branch_success));
                     }
 
                     attempts.push(Attempt {
@@ -199,7 +198,8 @@ impl Strategy for ParallelFanOut {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    if !is_any_fail && !is_llm_judge && !is_vote && successes >= self.min_responses {
+                    if !is_any_fail && !is_llm_judge && !is_vote && successes >= self.min_responses
+                    {
                         // For non-LLMJudge / non-Vote aggregation modes, stop once enough
                         // successes are in to meet the configured floor.
                         // LLMJudge must inspect all candidates first and therefore
@@ -404,39 +404,32 @@ impl Strategy for ParallelFanOut {
                 _ => unreachable!(),
             };
 
-            let (aggregate, _result) =
-                crate::aggregator::aggregate_vote(&vote_branches, config)
-                    .map_err(|err| match err {
-                        crate::aggregator::VoteError::QuorumLost {
-                            abstains,
-                            threshold,
-                        } => StrategyError::Phase(
-                            crate::family::PhaseError::QuorumLost {
-                                abstains,
-                                threshold,
-                            },
-                        ),
-                        crate::aggregator::VoteError::NoCandidates => {
-                            StrategyError::Phase(
-                                crate::family::PhaseError::AggregatorRejected {
-                                    message: "no candidates".into(),
-                                },
-                            )
-                        }
-                    })?;
+            let (aggregate, _result) = crate::aggregator::aggregate_vote(&vote_branches, config)
+                .map_err(|err| match err {
+                    crate::aggregator::VoteError::QuorumLost {
+                        abstains,
+                        threshold,
+                    } => StrategyError::Phase(crate::family::PhaseError::QuorumLost {
+                        abstains,
+                        threshold,
+                    }),
+                    crate::aggregator::VoteError::NoCandidates => {
+                        StrategyError::Phase(crate::family::PhaseError::AggregatorRejected {
+                            message: "no candidates".into(),
+                        })
+                    }
+                })?;
 
             if let Some(parent) = Path::new(&aggregated_output_path).parent() {
                 if !parent.as_os_str().is_empty() {
                     fs::create_dir_all(parent).await.map_err(|err| {
-                        StrategyError::Backend(
-                            crate::backend::BackendError::ExecutionFailed {
-                                message: format!(
-                                    "failed to create aggregate output parent {}: {err}",
-                                    parent.display()
-                                ),
-                                exit_code: None,
-                            },
-                        )
+                        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                            message: format!(
+                                "failed to create aggregate output parent {}: {err}",
+                                parent.display()
+                            ),
+                            exit_code: None,
+                        })
                     })?;
                 }
             }
@@ -478,7 +471,9 @@ fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aggregator::AnyFailReason;
+    use crate::aggregator::{
+        AnyFailReason, BallotSchema, BranchFailure, BranchSuccess, TieBreak, VoteConfig,
+    };
     use crate::backend::BackendError;
     use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1048,14 +1043,8 @@ mod tests {
             out.verify.as_ref().unwrap().status,
             crate::strategy::VerifyStatus::Pass
         );
-        assert_eq!(
-            out.verify.as_ref().unwrap().hook.as_deref(),
-            Some("Vote")
-        );
-        assert_eq!(
-            out.aggregator.as_ref().unwrap().as_str(),
-            "vote"
-        );
+        assert_eq!(out.verify.as_ref().unwrap().hook.as_deref(), Some("Vote"));
+        assert_eq!(out.aggregator.as_ref().unwrap().as_str(), "vote");
     }
 
     #[test]
@@ -1076,8 +1065,14 @@ mod tests {
 
         let out1 = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
         let out2 = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
-        assert_eq!(out1.verify.unwrap().status, crate::strategy::VerifyStatus::Pass);
-        assert_eq!(out2.verify.unwrap().status, crate::strategy::VerifyStatus::Pass);
+        assert_eq!(
+            out1.verify.unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+        assert_eq!(
+            out2.verify.unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
         // Same winner on repeated runs because the seed and inputs are identical
     }
 
@@ -1110,7 +1105,10 @@ mod tests {
         match err {
             StrategyError::Phase(phase_err) => {
                 let msg = phase_err.to_string();
-                assert!(msg.contains("quorum lost"), "expected quorum lost, got: {msg}");
+                assert!(
+                    msg.contains("quorum lost"),
+                    "expected quorum lost, got: {msg}"
+                );
             }
             other => panic!("expected PhaseError::QuorumLost, got {other:?}"),
         }
