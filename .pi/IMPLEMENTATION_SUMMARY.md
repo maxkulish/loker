@@ -119,7 +119,7 @@ loker version diverges in these places:
 | Tracker | Plane.so | Linear (MCP) |
 | Tracker tools | `mcp__plane__*` | `mcp__linear__*` |
 | Status file | `docs/status/menti-XX-workflow.yaml` | `docs/status/clo-XX-workflow.yaml` |
-| Review phase | Separate `review` phase before `pr` | None - validation gate is inside `implement.md` step 5 |
+| Review phase | Separate `review` phase before `pr` | None - validation gate is inside `implement.md` step 4 |
 | Stack | Tauri v2 + Rust + React | Pure Rust + TensorZero |
 | Pre-merge gate | `cargo fmt --manifest-path src-tauri/...` | `make check` |
 

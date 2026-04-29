@@ -80,3 +80,9 @@ canonical strings - the orchestrator parses it.
 - Never propose dependency additions unless the change cannot work
   without them.
 - Never paste the entire diff back at the user; reference file:line.
+- Do not write any preamble. Start directly with the `# Gemini design /
+  implementation review - CLO-XX` heading. Do not describe what you are about
+  to do (e.g. "I will now review", "I have read", "Let me review", "Here is
+  my review").
+- Do not include chain-of-thought, scratchpad, internal monologue, or
+  `<think>` blocks. Output only final review markdown.

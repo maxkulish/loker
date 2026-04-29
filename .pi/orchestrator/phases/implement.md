@@ -85,6 +85,10 @@ This is the loker equivalent of the mentis `review` phase. It is a
 5. If the synthesis recommends a pivot or fundamental rework, stop and ask
    the user instead of auto-fixing.
 
+The roster is intentionally asymmetric: design-review uses Gemini + Ollama + Claude
+fallback during iteration, while implement-gate uses Codex + Gemini for final PR
+decisions.
+
 Never loop indefinitely on reviewer suggestions. Raw reviewer reports are
 inputs; only the synthesis report drives fixes.
 
@@ -114,16 +118,31 @@ approve | approve_with_changes | rework
 
 ```bash
 # Codex validation (background)
-codex exec -m gpt-5.4 \
-  --persona .pi/agents/codex-pre-pr.md \
-  --input "branch: feat/clo-XX-...; design: docs/designs/clo-XX-<slug>.md; plan: docs/plans/clo-XX-<slug>.md" \
-  > docs/reviews/clo-XX-codex-validation.md &
+{
+  cat .pi/agents/codex-pre-pr.md
+  printf '\nYou are a senior code reviewer. Review all changes on this branch against this task'\''s design document and implementation plan.\n\n'
+  printf 'Inputs:\n'
+  printf '- Branch: feat/clo-XX-...\n'
+  printf '- Design: docs/designs/clo-XX-<slug>.md\n'
+  printf '- Plan: docs/plans/clo-XX-<slug>.md\n'
+  printf '- Diff: git diff main...HEAD\n'
+  printf '\n'
+} | codex exec -m gpt-5.4 > docs/reviews/clo-XX-codex-validation.md &
 PID_CODEX=$!
 
 # Gemini validation (background)
+GEMINI_VALIDATE_PROMPT=$(
+cat .pi/agents/gemini-architect.md
+printf '\nYou are a senior code reviewer. Review all changes on this branch against this task'\''s design document and implementation plan.\n\n'
+printf 'Inputs:\n'
+printf '- Branch: feat/clo-XX-...\n'
+printf '- Design: docs/designs/clo-XX-<slug>.md\n'
+printf '- Plan: docs/plans/clo-XX-<slug>.md\n'
+printf '- Diff: git diff main...HEAD\n'
+)
+
 gemini --model gemini-3.1-pro-preview \
-  --persona .pi/agents/gemini-architect.md \
-  --input "branch: feat/clo-XX-...; design: docs/designs/clo-XX-<slug>.md; plan: docs/plans/clo-XX-<slug>.md" \
+  -p "$GEMINI_VALIDATE_PROMPT" \
   > docs/reviews/clo-XX-gemini-validation.md &
 PID_GEMINI=$!
 

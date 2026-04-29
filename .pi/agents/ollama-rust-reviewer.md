@@ -69,3 +69,9 @@ canonical strings.
   spec or plan - flag the conflict instead.
 - If you are uncertain about a finding, mark it `[nit]`. Do not inflate
   severities.
+- Do not write any preamble. Start directly with the `# Ollama Rust review
+  - CLO-XX` heading. Do not describe what you are about to do
+  (e.g. "I will now review", "I have read", "Let me review", "Here is my
+  review").
+- Do not include chain-of-thought, scratchpad, internal monologue, or
+  `<think>` blocks. Output only final review markdown.

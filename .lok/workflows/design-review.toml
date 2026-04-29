@@ -21,20 +21,30 @@ fi
 echo "gemini=$GEMINI_OK ollama=$OLLAMA_OK"
 """
 
+# Step 1b: Resolve active milestone text for prompt injection from CLAUDE.md
+[[steps]]
+name = "read_milestone"
+timeout = 10000
+continue_on_error = true
+shell = """
+ACTIVE_MILESTONE=$(grep -E '^Active milestone:' CLAUDE.md | head -1 | sed 's/^Active milestone: //; s/\*\*//g; s/\.$//')
+if [ -z "$ACTIVE_MILESTONE" ]; then
+  echo "Unknown"
+else
+  echo "$ACTIVE_MILESTONE"
+fi
+"""
+
 # Step 2: Gemini review with fallback model support
 [[steps]]
 name = "gemini_review"
 timeout = 300000
 retries = 3
-continue_on_error = true
-depends_on = ["health_check"]
+continue_on_error = false
+depends_on = ["health_check", "read_milestone"]
+when = "steps.health_check.success"
 shell = """
-if ! timeout 10 gemini --model "${GEMINI_MODEL:-gemini-3.1-pro-preview}" -p "reply OK" -o text 2>/dev/null | grep -qi "ok"; then
-  echo "REVIEW_FAILED: Gemini CLI unreachable (pre-flight check failed)"
-  exit 0
-fi
-
-PROMPT=$(sed 's|__DOC_PATH__|{{ arg.1 }}|g' .lok/prompts/design-review-prompt.md)
+PROMPT=$(cat .pi/agents/gemini-architect.md .lok/prompts/design-review-prompt.md | sed -e 's|__DOC_PATH__|{{ arg.1 }}|g' -e 's|__TASK_ID__|{{ arg.2 }}|g')
 PRIMARY_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 FALLBACK_MODEL="${GEMINI_FALLBACK_MODEL:-gemini-2.5-pro}"
 
@@ -61,11 +71,11 @@ echo "$OUTPUT"
 check = "min_length(200)"
 backend = "claude"
 model = "haiku"
-replace_output = false
+replace_output = true
 max_input_length = 100000
 timeout_ms = 60000
-on_error = "pass"
-on_parse_error = "pass"
+on_error = "fail"
+on_parse_error = "fail"
 prompt = """
 {{ output }}
 
@@ -80,25 +90,18 @@ If valid review: {"status": "pass"}
 If noise/garbage: {"status": "fail", "reason": "<one-line reason>"}
 """
 
-# Step 3: Ollama/OpenCode review with empty output short-circuit
-# Uses `ollama launch opencode` with --yes (non-interactive) and opencode's
-# --dangerously-skip-permissions for unattended execution.
+# Step 3: Ollama/OpenCode review
 [[steps]]
 name = "ollama_review"
 timeout = 600000
 retries = 2
-continue_on_error = true
-depends_on = ["health_check"]
+continue_on_error = false
+depends_on = ["health_check", "read_milestone"]
+when = "steps.health_check.success"
 shell = """
-if ! timeout 10 ollama list 2>/dev/null | grep -q .; then
-  echo "REVIEW_FAILED: Ollama CLI unreachable (pre-flight check failed)"
-  exit 0
-fi
+PROMPT=$(cat .pi/agents/ollama-rust-reviewer.md .lok/prompts/design-review-prompt.md | sed -e 's|__DOC_PATH__|{{ arg.1 }}|g' -e 's|__TASK_ID__|{{ arg.2 }}|g')
 
-PROMPT=$(sed 's|__DOC_PATH__|{{ arg.1 }}|g' .lok/prompts/design-review-prompt.md)
-
-OUTPUT=$(timeout 570 ollama launch opencode --yes --model "${OLLAMA_MODEL:-glm-5.1:cloud}" -- \
-  run --dangerously-skip-permissions "$PROMPT" 2>/tmp/lok-ollama-stderr.log)
+OUTPUT=$(timeout 570 opencode run --model "${OLLAMA_MODEL:-ollama/glm-5.1:cloud}" --dangerously-skip-permissions "$PROMPT" 2>/tmp/lok-ollama-stderr.log)
 
 if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
   STDERR=$(head -5 /tmp/lok-ollama-stderr.log 2>/dev/null || echo "no stderr")
@@ -113,11 +116,11 @@ echo "$OUTPUT"
 check = "min_length(200)"
 backend = "claude"
 model = "haiku"
-replace_output = false
+replace_output = true
 max_input_length = 100000
 timeout_ms = 60000
-on_error = "pass"
-on_parse_error = "pass"
+on_error = "fail"
+on_parse_error = "fail"
 prompt = """
 {{ output }}
 
@@ -151,14 +154,15 @@ DESIGN DOCUMENT PATH: {{ arg.1 }}
 Read these files for context:
 1. {{ arg.1 }} - The design document to review
 2. docs/handoff.md - Project intent, constraints, conventions
-3. docs/prd/2026-04-25-loker.md - Product requirements
-4. docs/plans/001-implementation-roadmap.md - Milestone and task roadmap
-5. docs/security/ - Threat models (list and read relevant)
-6. docs/specs/ - Schema specs (list and read relevant)
-7. CLAUDE.md - Active milestone and pre-merge gate
+3. docs/prd/2026-04-25-loker.md - Milestone product requirements
+4. docs/prds/{{ arg.2 }}.md - Task-specific PRD (if present)
+5. docs/plans/001-implementation-roadmap.md - Milestone and task roadmap
+6. docs/security/ - Threat models (list files, then read those relevant)
+7. docs/specs/ - Schema specs (list and read those relevant)
+8. CLAUDE.md - Active milestone and pre-merge gate
 
 PROJECT CONTEXT:
-- Active milestone: M1 - TensorZero backend
+- Active milestone: {{ steps.read_milestone.output }}
 - Linear workspace: cloud-ai
 - Issue prefix: CLO
 - Pre-merge gate: `make check` (fmt + clippy + test)
@@ -211,6 +215,7 @@ backend = "claude"
 retries = 3
 depends_on = ["gemini_review", "ollama_review", "claude_fallback"]
 min_deps_success = 0
+when = "steps.gemini_review.success or steps.ollama_review.success or steps.claude_fallback.success"
 prompt = """
 You are synthesizing findings from AI code reviewers of a loker design document. Cross-reference findings and produce a structured synthesis.
 
@@ -293,31 +298,83 @@ min_deps_success = 0
 shell = """
 mkdir -p docs/reviews
 REVIEW_DATE=$(date +%Y-%m-%d)
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+REVIEW_SUFFIX="{{ arg.2 }}_${REVIEW_DATE}"
 
-printf '%s\n' '# Design Review: {{ arg.2 }}' '' '**Reviewer**: Gemini 3.1 Pro' "**Reviewed**: $REVIEW_DATE" '**Pipeline**: lok design-review' '' '---' '' > docs/reviews/{{ arg.2 }}-review-gemini.md
-cat >> docs/reviews/{{ arg.2 }}-review-gemini.md << 'ENDGEMINI'
+cat <<'__GEMINI_REVIEW_PAYLOAD__' > "$TMP_DIR/gemini-review-${REVIEW_SUFFIX}.md"
 {{ steps.gemini_review.output }}
-ENDGEMINI
+__GEMINI_REVIEW_PAYLOAD__
 
-printf '%s\n' '# Design Review: {{ arg.2 }}' '' '**Reviewer**: Codex via Ollama (glm-5.1:cloud)' "**Reviewed**: $REVIEW_DATE" '**Pipeline**: lok design-review' '' '---' '' > docs/reviews/{{ arg.2 }}-review-ollama.md
-cat >> docs/reviews/{{ arg.2 }}-review-ollama.md << 'ENDOLLAMA'
+cat <<'__OLLAMA_REVIEW_PAYLOAD__' > "$TMP_DIR/ollama-review-${REVIEW_SUFFIX}.md"
 {{ steps.ollama_review.output }}
-ENDOLLAMA
+__OLLAMA_REVIEW_PAYLOAD__
+
+cat <<'__SYNTHESIS_REVIEW_PAYLOAD__' > "$TMP_DIR/synthesis-review-${REVIEW_SUFFIX}.md"
+{{ steps.synthesis.output }}
+__SYNTHESIS_REVIEW_PAYLOAD__
+
+write_review() {
+  local input_path="$1"
+  local output_path="$2"
+  local reviewer="$3"
+  local note="$4"
+
+  if [ ! -f "$input_path" ] || [ ! -s "$input_path" ]; then
+    return 0
+  fi
+
+  if [ -z "$(sed '/^[[:space:]]*$/d' "$input_path" | tr -d '[:space:]' | tr -d '\n')" ]; then
+    return 0
+  fi
+
+  if grep -q '^REVIEW_FAILED' "$input_path"; then
+    return 0
+  fi
+
+  {
+    printf '%s\n' "# Design Review: {{ arg.2 }}"
+    printf '%s\n' ''
+    printf '%s\n' "**Reviewer**: $reviewer"
+    printf '%s\n' "**Reviewed**: $REVIEW_DATE"
+    printf '%s\n' '**Pipeline**: lok design-review'
+    if [ -n "$note" ]; then
+      printf '%s\n' "**Note**: $note"
+    fi
+    printf '%s\n' '---'
+    printf '%s\n' ''
+    cat "$input_path"
+  } > "$output_path"
+}
+
+write_review \
+  "$TMP_DIR/gemini-review-${REVIEW_SUFFIX}.md" \
+  "docs/reviews/{{ arg.2 }}-review-gemini.md" \
+  "Gemini 3.1 Pro"
+
+write_review \
+  "$TMP_DIR/ollama-review-${REVIEW_SUFFIX}.md" \
+  "docs/reviews/{{ arg.2 }}-review-ollama.md" \
+  "Codex via Ollama (glm-5.1:cloud)"
 
 {% if steps.claude_fallback is defined %}
-FALLBACK_OUTPUT='{{ steps.claude_fallback.output }}'
-if [ -n "$FALLBACK_OUTPUT" ] && ! echo "$FALLBACK_OUTPUT" | grep -q 'REVIEW_FAILED'; then
-  printf '%s\n' '# Design Review: {{ arg.2 }}' '' '**Reviewer**: Claude (fallback)' "**Reviewed**: $REVIEW_DATE" '**Pipeline**: lok design-review' '**Note**: External reviewers failed; this is the fallback review' '' '---' '' > docs/reviews/{{ arg.2 }}-review-claude-fallback.md
-  cat >> docs/reviews/{{ arg.2 }}-review-claude-fallback.md << 'ENDFALLBACK'
+printf '%s\n' "{{ steps.claude_fallback.output }}" > "$TMP_DIR/claude-fallback-review-${REVIEW_SUFFIX}.md"
+
+cat <<'__FALLBACK_REVIEW_PAYLOAD__' > "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md"
 {{ steps.claude_fallback.output }}
-ENDFALLBACK
-fi
+__FALLBACK_REVIEW_PAYLOAD__
+
+write_review \
+  "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md" \
+  "docs/reviews/{{ arg.2 }}-review-fallback.md" \
+  "Claude (fallback)" \
+  "External reviewers failed; this is the fallback review"
 {% endif %}
 
-printf '%s\n' '# Review Synthesis: {{ arg.2 }}' '' "**Synthesized**: $REVIEW_DATE" '**Pipeline**: lok design-review' '**Reviewers**: Gemini 3.1 Pro, Codex/Ollama (glm-5.1:cloud), Claude (fallback if needed)' '' '---' '' > docs/reviews/{{ arg.2 }}-review-synthesis.md
-cat >> docs/reviews/{{ arg.2 }}-review-synthesis.md << 'ENDSYNTH'
-{{ steps.synthesis.output }}
-ENDSYNTH
+write_review \
+  "$TMP_DIR/synthesis-review-${REVIEW_SUFFIX}.md" \
+  "docs/reviews/{{ arg.2 }}-review-synthesis.md" \
+  "Synthesis engine"
 
 echo "Reviews written to docs/reviews/{{ arg.2 }}-review-*.md"
 """
