@@ -103,6 +103,8 @@ phases:
     status: in_progress
     pr_url: https://github.com/maxkulish/loker/pull/24
     pr_number: 24
+    ci_passed: true
+    reviews_addressed: true
   complete:
     status: pending
 history:
@@ -208,6 +210,14 @@ history:
   - timestamp: '2026-04-29T20:24:34Z'
     action: pr_created
     phase: pr
-    details: Created draft PR https://github.com/maxkulish/loker/pull/24 (status: draft).
+    details: 'Created draft PR https://github.com/maxkulish/loker/pull/24 (status: draft).'
+  - timestamp: '2026-04-29T20:38:41Z'
+    action: ci_passed
+    phase: pr
+    details: 'CI checks all green on PR 24 for required checks (format, clippy, test).'
+  - timestamp: '2026-04-29T20:38:41Z'
+    action: review_addressed
+    phase: pr
+    details: 'Addressed gemini-code-assist review on PR 24; posted /gemini review confirmation.'
 task_title: Implement Aggregator::Vote with ballot schema and tie-breakers
 task_url: https://linear.app/cloud-ai/issue/clo-269/implement-aggregatorvote-with-ballot-schema-and-tie-breakers
