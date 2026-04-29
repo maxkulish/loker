@@ -18,10 +18,10 @@ linear:
   blocked_by: []
   branch_actual: feat/clo-270-hook
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-04-29T16:06:41.872Z'
-  updated_at: '2026-04-29T19:45:44.916Z'
+  updated_at: '2026-04-29T19:57:27.202Z'
 phases:
   discovery:
     status: complete
@@ -83,11 +83,19 @@ phases:
     validation_synthesis_report: docs/reviews/clo-270-validation-synthesis.md
     validation_synthesis_verdict: approve
   pr:
-    status: in_progress
+    status: complete
     pr_number: 23
     pr_url: https://github.com/maxkulish/loker/pull/23
+    ci_passed: true
+    reviews_addressed: true
+    merge_commit: 1a2d096
+    merged_at: '2026-04-29T19:54:15Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 1a2d096
+    merged_at: '2026-04-29T19:54:15Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-04-29T16:06:41.872Z'
     action: workflow_started
