@@ -196,39 +196,81 @@ git push origin feat/clo-XX-<slug>
 Push **before** replying so commit SHAs are live on GitHub when reviewers read
 the replies.
 
-### 3.5.6 - Reply to EVERY comment (MANDATORY)
+### 3.5.6 - Reply or resolve each thread
 
-**No comment may be left without a reply.** Every inline reply MUST end with
-`/gemini review` on its own line - for all reviewers (gemini-code-assist,
-copilot-pull-request-reviewer, and human alike). Gemini re-validates any thread
-on that trigger.
+For each thread, check its current state before acting:
+
+**Fetch thread state (GraphQL node IDs required to resolve):**
 
 ```bash
-COMMIT_SHA=$(git rev-parse --short HEAD)
 REPO=maxkulish/loker
 PR=<n>
 
-# Reply template (repeat for each comment ID)
+gh api graphql -f query='
+query($owner:String!, $repo:String!, $pr:Int!) {
+  repository(owner:$owner, name:$repo) {
+    pullRequest(number:$pr) {
+      reviewThreads(first:100) {
+        nodes {
+          id
+          isResolved
+          comments(first:20) {
+            nodes { author { login } body }
+          }
+        }
+      }
+    }
+  }
+}' -f owner=maxkulish -f repo=loker -F pr=<n>
+```
+
+**Decision per thread:**
+
+| Thread state | Action |
+|---|---|
+| Already resolved | Skip |
+| Gemini's latest comment approves the fix ("looks good", "this is sound", "no further action") | Resolve only - no reply |
+| Awaiting author fix (no author reply yet) | Post reply with `/gemini review`, then resolve after Gemini approves |
+| Author replied but Gemini hasn't re-reviewed | Post `/gemini review` reply to trigger re-review |
+| Declined suggestion | Post "Intentionally kept as-is: `<rationale>`" reply |
+
+**CRITICAL: one reply per thread, maximum. NEVER post a second standalone comment
+to add the trigger after the fact.**
+
+**Resolve a thread (no reply needed when Gemini already approved):**
+
+```bash
+gh api graphql -f query='
+mutation($id:ID!) {
+  resolveReviewThread(input:{threadId:$id}) {
+    thread { id isResolved }
+  }
+}' -f id="<thread_graphql_id>"
+```
+
+**Reply when fix needs Gemini re-validation:**
+
+```bash
+COMMIT_SHA=$(git rev-parse --short HEAD)
+
 gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
   -X POST -f body="Fixed in ${COMMIT_SHA}. <one-line explanation>
 
 /gemini review"
 ```
 
-For declined suggestions:
+**Reply for declined suggestions:**
 
 ```bash
 gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
-  -X POST -f body="Intentionally kept as-is: <rationale>.
-
-/gemini review"
+  -X POST -f body="Intentionally kept as-is: <rationale>."
 ```
 
-Track reply count - the state update must show all comments replied to.
+Track reply count in state update.
 
 ### 3.5.7 - Re-check for new comments
 
-After pushing and replying, check whether new comments arrived (bots re-review
+After pushing and replying, check for new unresolved threads (bots re-review
 after the `/gemini review` trigger):
 
 ```bash
@@ -237,7 +279,8 @@ gh api repos/${REPO}/pulls/${PR}/comments --paginate \
   --jq '.[] | select(.created_at > "<push_timestamp>") | {id, user: .user.login, body}'
 ```
 
-If new comments exist, return to 3.5.3 and repeat. Otherwise proceed.
+If new comments exist in unresolved threads, return to 3.5.3 and repeat.
+Threads already resolved by Gemini approval can be skipped. Otherwise proceed.
 
 ### 3.5.8 - Log state
 
