@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::aggregator::VoteConfig;
 use crate::backend::Backend;
 use crate::strategy::PhaseContext;
 
@@ -39,6 +40,9 @@ pub enum Aggregator {
         prompt_template: String,
         require_judge_different_family: bool,
     },
+    Vote {
+        config: VoteConfig,
+    },
 }
 
 impl Aggregator {
@@ -62,6 +66,11 @@ impl Aggregator {
         }
     }
 
+    /// Build a Vote aggregator with the provided configuration.
+    pub fn vote(config: VoteConfig) -> Self {
+        Self::Vote { config }
+    }
+
     /// Build an AnyFail aggregator (no configuration needed).
     pub fn any_fail() -> Self {
         Self::AnyFail
@@ -73,6 +82,7 @@ impl Aggregator {
             Self::Concat { .. } => crate::strategy::Aggregator::Concat,
             Self::AnyFail => crate::strategy::Aggregator::AnyFail,
             Self::LLMJudge { .. } => crate::strategy::Aggregator::LLMJudge,
+            Self::Vote { .. } => crate::strategy::Aggregator::Vote,
         }
     }
 
@@ -90,6 +100,9 @@ impl Aggregator {
             )),
             Self::LLMJudge { .. } => Err(AggregatorError::Unsupported(
                 "LLMJudge requires async backend access; use aggregate_llm_judge()".into(),
+            )),
+            Self::Vote { .. } => Err(AggregatorError::Unsupported(
+                "Vote is evaluated inline by ParallelFanOut, not via aggregate()".into(),
             )),
         }
     }
@@ -459,6 +472,19 @@ mod tests {
         assert_eq!(
             Aggregator::llm_judge("judge", "template", true).kind(),
             crate::strategy::Aggregator::LLMJudge
+        );
+    }
+
+    #[test]
+    fn vote_kind_maps_to_strategy_label() {
+        assert_eq!(
+            Aggregator::vote(crate::aggregator::VoteConfig {
+                ballot_schema: crate::aggregator::BallotSchema::FreeText,
+                tie_break: crate::aggregator::TieBreak::FirstResponder,
+                abstain_threshold: 0,
+            })
+            .kind(),
+            crate::strategy::Aggregator::Vote
         );
     }
 
