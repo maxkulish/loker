@@ -358,8 +358,6 @@ write_review \
   "Codex via Ollama (glm-5.1:cloud)"
 
 {% if steps.claude_fallback is defined %}
-printf '%s\n' "{{ steps.claude_fallback.output }}" > "$TMP_DIR/claude-fallback-review-${REVIEW_SUFFIX}.md"
-
 cat <<'__FALLBACK_REVIEW_PAYLOAD__' > "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md"
 {{ steps.claude_fallback.output }}
 __FALLBACK_REVIEW_PAYLOAD__
