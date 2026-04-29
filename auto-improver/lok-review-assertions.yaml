@@ -1,0 +1,51 @@
+- id: REV-NO-PREAMBLE
+  description: Review file does not begin with preamble like "I have read" or "Let me review"
+  check: |
+    ! head -3 "$REVIEW_FILE" \
+      | grep -iE "^(i (have|now have|will|am)|let me|here is my|based on the diff|now let me|i'?ve|one sentence)"
+
+- id: REV-VERDICT-PRESENT
+  description: Review file contains a verdict line in one of the accepted forms
+  check: |
+    grep -qE "^(##|\*\*)\s*(Verdict|Overall verdict|Consolidated Verdict)" "$REVIEW_FILE" \
+      && grep -qiE "(APPROVE|APPROVE_WITH_SUGGESTIONS|APPROVE_WITH_CHANGES|NEEDS_REVISION|REWORK)" "$REVIEW_FILE"
+
+- id: REV-NO-COT-LEAKAGE
+  description: Review file contains no <think> blocks, scratchpad markers, or "let me organize" preamble
+  check: |
+    ! grep -qE "<think>|^internal:|chain\.of\.thought|let me organize|I now have enough context" "$REVIEW_FILE"
+
+- id: REV-MIN-FINDINGS
+  description: Review file documents at least one finding, table row, or explicitly says "no findings"
+  check: |
+    grep -qE "^(### F[0-9]+|\| [0-9]+ \||No findings\.?$|^- \[)" "$REVIEW_FILE"
+
+- id: REV-MILESTONE-MATCHES
+  description: Review file does not reference an obsolete milestone
+  check: |
+    ACTIVE=$(grep -E '^Active milestone:' CLAUDE.md | head -1 \
+              | sed 's/^Active milestone: //; s/\*\*//g; s/\.$//')
+    OBSOLETE=$(grep -oE "M[0-9]+ - [A-Za-z ]+" "$REVIEW_FILE" | grep -v "$ACTIVE" || true)
+    [ -z "$OBSOLETE" ]
+
+- id: REV-NO-EMPTY-FILE
+  description: Review file has more than just a header
+  check: |
+    [ "$(wc -l < "$REVIEW_FILE")" -gt 5 ]
+
+- id: REV-FINDING-PARITY
+  description: No reviewer's finding count falls below 50% of the highest reviewer's count
+  check: |
+    set -e
+    MAX=0
+    for f in docs/reviews/${TASK_ID}-review-{gemini,ollama,fallback}.md; do
+      [ -f "$f" ] || continue
+      n=$(grep -cE "^### F[0-9]+|^\| [0-9]+ \|" "$f")
+      [ "$n" -gt "$MAX" ] && MAX="$n"
+    done
+    THRESHOLD=$(( MAX / 2 ))
+    for f in docs/reviews/${TASK_ID}-review-{gemini,ollama,fallback}.md; do
+      [ -f "$f" ] || continue
+      n=$(grep -cE "^### F[0-9]+|^\| [0-9]+ \|" "$f")
+      [ "$n" -ge "$THRESHOLD" ] || { echo "FAIL: $f has $n findings, threshold $THRESHOLD"; exit 1; }
+    done
