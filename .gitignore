@@ -4,3 +4,6 @@ tensorzero/.env
 
 # Node (pi extensions)
 node_modules/
+
+# Parallel fanout runtime artifacts
+phase-*/
