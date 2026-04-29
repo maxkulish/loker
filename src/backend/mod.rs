@@ -17,7 +17,8 @@ pub use retry::{RetryExecutor, RetryPolicy};
 #[allow(unused_imports)]
 pub use tensorzero::{TensorZeroBackend, TensorZeroBackendOpts};
 
-use crate::config::{BackendConfig, Config};
+use crate::config::BackendConfig;
+use crate::config::Config;
 use anyhow::Result;
 use async_trait::async_trait;
 use colored::Colorize;
@@ -343,6 +344,51 @@ pub fn get_retry_policy(config: &BackendConfig, defaults: &crate::config::Defaul
     }
 }
 
+fn tensorzero_backend_opts_from_config(
+    config: &BackendConfig,
+) -> Result<tensorzero::TensorZeroBackendOpts> {
+    let endpoint = config
+        .command
+        .as_deref()
+        .map(str::trim)
+        .filter(|endpoint| !endpoint.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("tensorzero backend requires command endpoint"))?;
+
+    let url = reqwest::Url::parse(endpoint)
+        .map_err(|err| anyhow::anyhow!("tensorzero backend endpoint: not a valid URL: {err}"))?;
+    let scheme = url.scheme();
+    if scheme != "http" && scheme != "https" {
+        anyhow::bail!("tensorzero backend endpoint: scheme must be http or https");
+    }
+
+    let model = config
+        .model
+        .as_deref()
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("tensorzero backend requires model"))?;
+
+    let timeout_secs = config.timeout.unwrap_or(60);
+    if timeout_secs == 0 {
+        anyhow::bail!("tensorzero backend timeout must be greater than zero");
+    }
+
+    let api_key = match config.api_key_env.as_deref() {
+        Some(var) if !var.is_empty() => Some(
+            std::env::var(var)
+                .map_err(|_| anyhow::anyhow!("Missing environment variable: {var}"))?,
+        ),
+        _ => None,
+    };
+
+    Ok(tensorzero::TensorZeroBackendOpts {
+        endpoint: endpoint.to_string(),
+        model: model.to_string(),
+        api_key,
+        timeout: Duration::from_secs(timeout_secs),
+    })
+}
+
 pub fn create_backend(
     name: &str,
     config: &BackendConfig,
@@ -353,6 +399,9 @@ pub fn create_backend(
         "gemini" => Arc::new(gemini::GeminiBackend::new(config)?),
         "claude" => Arc::new(claude::ClaudeBackend::new(config)?),
         "ollama" => Arc::new(ollama::OllamaBackend::new(config)?),
+        "tensorzero" => Arc::new(tensorzero::TensorZeroBackend::new(
+            tensorzero_backend_opts_from_config(config)?,
+        )?),
         #[cfg(feature = "bedrock")]
         "bedrock" => {
             // BedrockBackend::new is async, need runtime
@@ -955,6 +1004,180 @@ mod tests {
             }
         }
         assert_eq!(Stub.capabilities(), BackendCapabilities::none());
+    }
+
+    fn tensorzero_backend_config() -> BackendConfig {
+        BackendConfig {
+            enabled: true,
+            command: Some("http://127.0.0.1:3000".to_string()),
+            args: vec![],
+            skip_lines: 0,
+            api_key_env: None,
+            model: Some("loker_d1_openai".to_string()),
+            timeout: Some(7),
+            max_retries: None,
+            retry_delay_ms: None,
+        }
+    }
+
+    fn zero_retry_policy() -> RetryPolicy {
+        RetryPolicy {
+            max_retries: 0,
+            base_delay: Duration::from_millis(1),
+            max_delay: Duration::from_millis(1),
+        }
+    }
+
+    #[derive(Debug)]
+    struct EnvVarGuard {
+        key: String,
+    }
+
+    impl EnvVarGuard {
+        fn new(key: &str, value: &str) -> Self {
+            std::env::set_var(key, value);
+            Self {
+                key: key.to_string(),
+            }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            std::env::remove_var(&self.key);
+        }
+    }
+
+    #[test]
+    fn tensorzero_adapter_maps_endpoint_model_auth_timeout() {
+        let var_name = "LOKER_CLO_261_TENSORZERO_ADAPTER_KEY";
+        let _env_guard = EnvVarGuard::new(var_name, "secret-token-261");
+
+        let mut config = tensorzero_backend_config();
+        config.api_key_env = Some(var_name.to_string());
+
+        let opts = tensorzero_backend_opts_from_config(&config).expect("valid tensorzero opts");
+        assert_eq!(opts.endpoint, "http://127.0.0.1:3000");
+        assert_eq!(opts.model, "loker_d1_openai");
+        assert_eq!(opts.api_key.as_deref(), Some("secret-token-261"));
+        assert_eq!(opts.timeout, Duration::from_secs(7));
+    }
+
+    #[test]
+    fn tensorzero_adapter_allows_missing_api_key_env_field() {
+        let mut config = tensorzero_backend_config();
+        config.api_key_env = None;
+
+        let opts = tensorzero_backend_opts_from_config(&config).expect("missing auth is allowed");
+        assert!(opts.api_key.is_none());
+    }
+
+    #[test]
+    fn tensorzero_adapter_rejects_missing_endpoint_model_zero_timeout_and_bad_scheme() {
+        let mut missing_endpoint = tensorzero_backend_config();
+        missing_endpoint.command = None;
+        assert!(tensorzero_backend_opts_from_config(&missing_endpoint)
+            .unwrap_err()
+            .to_string()
+            .contains("requires command endpoint"));
+
+        let mut empty_endpoint = tensorzero_backend_config();
+        empty_endpoint.command = Some("  ".to_string());
+        assert!(tensorzero_backend_opts_from_config(&empty_endpoint)
+            .unwrap_err()
+            .to_string()
+            .contains("requires command endpoint"));
+
+        let mut bad_scheme = tensorzero_backend_config();
+        bad_scheme.command = Some("file:///tmp/tensorzero".to_string());
+        assert!(tensorzero_backend_opts_from_config(&bad_scheme)
+            .unwrap_err()
+            .to_string()
+            .contains("scheme must be http or https"));
+
+        let mut invalid_url = tensorzero_backend_config();
+        invalid_url.command = Some("://bad".to_string());
+        assert!(tensorzero_backend_opts_from_config(&invalid_url)
+            .unwrap_err()
+            .to_string()
+            .contains("not a valid URL"));
+
+        let mut missing_model = tensorzero_backend_config();
+        missing_model.model = None;
+        assert!(tensorzero_backend_opts_from_config(&missing_model)
+            .unwrap_err()
+            .to_string()
+            .contains("requires model"));
+
+        let mut empty_model = tensorzero_backend_config();
+        empty_model.model = Some("".to_string());
+        assert!(tensorzero_backend_opts_from_config(&empty_model)
+            .unwrap_err()
+            .to_string()
+            .contains("requires model"));
+
+        let mut zero_timeout = tensorzero_backend_config();
+        zero_timeout.timeout = Some(0);
+        assert!(tensorzero_backend_opts_from_config(&zero_timeout)
+            .unwrap_err()
+            .to_string()
+            .contains("timeout must be greater than zero"));
+    }
+
+    #[test]
+    fn tensorzero_create_backend_supported_when_capability_supported() {
+        let config = tensorzero_backend_config();
+        let backend = create_backend("tensorzero", &config, zero_retry_policy())
+            .expect("tensorzero is creatable when capability-supported");
+
+        assert!(capabilities_for_name("tensorzero").is_some());
+        assert_eq!(backend.name(), "tensorzero");
+        assert!(backend.is_available());
+    }
+
+    #[tokio::test]
+    async fn tensorzero_create_backend_queries_wiremock_gateway() {
+        use serde_json::json;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/openai/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "chatcmpl-test",
+                "object": "chat.completion",
+                "created": 1_700_000_000,
+                "model": "loker_d1_openai",
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hello"},
+                    "finish_reason": "stop"
+                }],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 2,
+                    "total_tokens": 3
+                }
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let mut config = tensorzero_backend_config();
+        config.command = Some(server.uri());
+
+        let backend = create_backend("tensorzero", &config, zero_retry_policy())
+            .expect("tensorzero dispatcher arm builds backend");
+
+        let out = backend
+            .query("ping", Path::new("."), None)
+            .await
+            .expect("query succeeds via wiremock gateway");
+
+        assert_eq!(out.stdout, "hello");
+        assert_eq!(out.backend, "tensorzero");
+        assert_eq!(out.model.as_deref(), Some("loker_d1_openai"));
     }
 
     #[test]
