@@ -21,10 +21,10 @@ linear:
   branch_suggested: kmamemo/clo-269-implement-aggregatorvote-with-ballot-schema-and-tie-breakers
   branch_actual: feat/clo-269
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-04-29T15:46:46.491Z'
-  updated_at: '2026-04-29T20:24:34Z'
+  updated_at: '2026-04-29T20:39:36.822Z'
 phases:
   discovery:
     status: complete
@@ -100,13 +100,17 @@ phases:
     validation_synthesis_report: docs/reviews/clo-269-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: in_progress
+    status: complete
     pr_url: https://github.com/maxkulish/loker/pull/24
     pr_number: 24
     ci_passed: true
     reviews_addressed: true
+    merged_at: '2026-04-29T20:39:09Z'
+    merge_commit: db6a577c3f5b9f298ad288c193197ccb1f7eb6e6
   complete:
-    status: pending
+    status: complete
+    merged_at: '2026-04-29T20:39:09Z'
+    merge_commit: db6a577c3f5b9f298ad288c193197ccb1f7eb6e6
 history:
   - timestamp: '2026-04-29T15:46:46.491Z'
     action: workflow_started
@@ -212,12 +216,24 @@ history:
     phase: pr
     details: 'Created draft PR https://github.com/maxkulish/loker/pull/24 (status: draft).'
   - timestamp: '2026-04-29T20:38:41Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: make check run passed locally (fmt/clippy/tests).
+  - timestamp: '2026-04-29T20:38:41Z'
     action: ci_passed
     phase: pr
-    details: 'CI checks all green on PR 24 for required checks (format, clippy, test).'
+    details: CI checks all green on PR 24 for required checks (format, clippy, test).
   - timestamp: '2026-04-29T20:38:41Z'
     action: review_addressed
     phase: pr
-    details: 'Addressed gemini-code-assist review on PR 24; posted /gemini review confirmation.'
+    details: Addressed gemini-code-assist review on PR 24; posted /gemini review confirmation.
+  - timestamp: '2026-04-29T20:39:09Z'
+    action: pr_merged
+    phase: pr
+    details: 'Merged PR #24 via GitHub API squash merge. merge_commit=db6a577c3f5b9f298ad288c193197ccb1f7eb6e6'
+  - timestamp: '2026-04-29T20:39:36.822Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
 task_title: Implement Aggregator::Vote with ballot schema and tie-breakers
 task_url: https://linear.app/cloud-ai/issue/clo-269/implement-aggregatorvote-with-ballot-schema-and-tie-breakers
