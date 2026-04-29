@@ -8,6 +8,7 @@
 
 mod concat;
 mod llm_judge;
+mod vote;
 
 pub use concat::{
     AggregateInput, AggregatedArtifact, Aggregator, AggregatorError, BranchFailure, BranchOutcome,
@@ -17,6 +18,11 @@ pub use concat::{
 pub use llm_judge::{
     aggregate_llm_judge, check_cross_family, clamp_chosen_index, parse_ballot,
     render_ballot_prompt, Ballot, Candidate, LLMJudgeError,
+};
+
+pub use vote::{
+    aggregate_vote, normalise_ballot, BallotSchema, TieBreak, VoteCandidate, VoteConfig, VoteError,
+    VoteResult,
 };
 
 use serde_json::Value;

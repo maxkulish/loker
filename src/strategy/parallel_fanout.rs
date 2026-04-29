@@ -120,8 +120,10 @@ impl Strategy for ParallelFanOut {
         let mut successes = 0;
         let mut successful_candidates: Vec<crate::aggregator::BranchSuccess> =
             Vec::with_capacity(self.targets.len());
+        let mut vote_branches: Vec<crate::aggregator::BranchOutcome> = Vec::new();
         let is_any_fail = matches!(self.aggregator, Aggregator::AnyFail);
         let is_llm_judge = matches!(self.aggregator, Aggregator::LLMJudge { .. });
+        let is_vote = matches!(self.aggregator, Aggregator::Vote { .. });
 
         while let Some((idx, result)) = futures.next().await {
             let target = &self.targets[idx];
@@ -173,12 +175,17 @@ impl Strategy for ParallelFanOut {
                     }
 
                     successes += 1;
-                    successful_candidates.push(BranchSuccess {
+                    let branch_success = BranchSuccess {
                         backend_id: target.backend.clone(),
                         family: family_of(&target.backend).to_string(),
                         index: successful_candidates.len() + 1,
                         output: query.stdout.clone(),
-                    });
+                    };
+                    successful_candidates.push(branch_success.clone());
+                    if is_vote {
+                        vote_branches
+                            .push(crate::aggregator::BranchOutcome::Success(branch_success));
+                    }
 
                     attempts.push(Attempt {
                         tier: None,
@@ -191,11 +198,15 @@ impl Strategy for ParallelFanOut {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    if !is_any_fail && !is_llm_judge && successes >= self.min_responses {
-                        // For non-LLMJudge aggregation modes, stop once enough
+                    if !is_any_fail && !is_llm_judge && !is_vote && successes >= self.min_responses
+                    {
+                        // For non-LLMJudge / non-Vote aggregation modes, stop once enough
                         // successes are in to meet the configured floor.
                         // LLMJudge must inspect all candidates first and therefore
                         // cannot short-circuit on min_responses.
+                        // Vote must collect all branches (including failures as
+                        // abstentions) before it can compute a majority or detect
+                        // a quorum loss.
                         break;
                     }
                 }
@@ -246,6 +257,17 @@ impl Strategy for ParallelFanOut {
                         });
                     }
 
+                    if is_vote {
+                        vote_branches.push(crate::aggregator::BranchOutcome::Failure(
+                            crate::aggregator::BranchFailure {
+                                backend_id: target.backend.clone(),
+                                family: family_of(&target.backend).to_string(),
+                                index: attempts.len() + 1,
+                                reason: err.to_string(),
+                            },
+                        ));
+                    }
+
                     attempts.push(attempt);
                 }
             }
@@ -268,6 +290,10 @@ impl Strategy for ParallelFanOut {
             });
         }
 
+        // `min_responses` is a strategy-level floor on successful backend calls.
+        // It is independent of the aggregator's `abstain_threshold` (Vote-specific).
+        // Both can fire: if fewer than `min_responses` succeed, the phase fails
+        // with `FloorViolation` before the aggregator runs.
         if successes < self.min_responses {
             let output = StrategyOutput {
                 schema_version: SCHEMA_VERSION,
@@ -376,6 +402,59 @@ impl Strategy for ParallelFanOut {
             output.verify = Some(VerifyOutcome::passed("LLMJudge"));
         }
 
+        if is_vote {
+            let config = match &self.aggregator {
+                Aggregator::Vote { config } => config,
+                _ => unreachable!(),
+            };
+
+            let (aggregate, _result) = crate::aggregator::aggregate_vote(&vote_branches, config)
+                .map_err(|err| match err {
+                    crate::aggregator::VoteError::QuorumLost {
+                        abstains,
+                        threshold,
+                    } => StrategyError::Phase(crate::family::PhaseError::QuorumLost {
+                        abstains,
+                        threshold,
+                    }),
+                    crate::aggregator::VoteError::NoCandidates => {
+                        StrategyError::Phase(crate::family::PhaseError::AggregatorRejected {
+                            message: "no candidates".into(),
+                        })
+                    }
+                })?;
+
+            if let Some(parent) = Path::new(&aggregated_output_path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent).await.map_err(|err| {
+                        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                            message: format!(
+                                "failed to create aggregate output parent {}: {err}",
+                                parent.display()
+                            ),
+                            exit_code: None,
+                        })
+                    })?;
+                }
+            }
+
+            let aggregate_output_path_ref = aggregated_output_path.as_str();
+            fs::write(&aggregated_output_path, aggregate.text)
+                .await
+                .map_err(|err| {
+                    StrategyError::Backend(
+                        crate::backend::BackendError::ExecutionFailed {
+                            message: format!(
+                                "failed to write aggregate output to {aggregate_output_path_ref}: {err}"
+                            ),
+                            exit_code: None,
+                        },
+                    )
+                })?;
+
+            output.verify = Some(VerifyOutcome::passed("Vote"));
+        }
+
         Ok(output)
     }
 }
@@ -396,7 +475,9 @@ fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aggregator::AnyFailReason;
+    use crate::aggregator::{
+        AnyFailReason, BallotSchema, BranchFailure, BranchSuccess, TieBreak, VoteConfig,
+    };
     use crate::backend::BackendError;
     use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -935,6 +1016,105 @@ mod tests {
                 assert!(matches!(reason, AnyFailReason::VerdictRejected { .. }));
             }
             other => panic!("expected AnyFail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vote_success() {
+        let a = MockBackend::ok("a", "A");
+        let b = MockBackend::ok("b", "A");
+        let c = MockBackend::ok("c", "B");
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone(), c.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![
+                TargetSpec::new("a"),
+                TargetSpec::new("b"),
+                TargetSpec::new("c"),
+            ],
+            2,
+            "render-me",
+            Aggregator::vote(VoteConfig {
+                ballot_schema: BallotSchema::FreeText,
+                tie_break: TieBreak::FirstResponder,
+                abstain_threshold: 0,
+            }),
+        );
+
+        let out = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+        assert_eq!(out.strategy, StrategyKind::Parallel);
+        assert_eq!(out.attempts.len(), 3);
+        assert_eq!(
+            out.verify.as_ref().unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+        assert_eq!(out.verify.as_ref().unwrap().hook.as_deref(), Some("Vote"));
+        assert_eq!(out.aggregator.as_ref().unwrap().as_str(), "vote");
+    }
+
+    #[test]
+    fn vote_tie_random_deterministic() {
+        let a = MockBackend::ok("a", "A");
+        let b = MockBackend::ok("b", "B");
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![TargetSpec::new("a"), TargetSpec::new("b")],
+            2,
+            "render-me",
+            Aggregator::vote(VoteConfig {
+                ballot_schema: BallotSchema::FreeText,
+                tie_break: TieBreak::Random { seed: 123 },
+                abstain_threshold: 0,
+            }),
+        );
+
+        let out1 = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+        let out2 = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap();
+        assert_eq!(
+            out1.verify.unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+        assert_eq!(
+            out2.verify.unwrap().status,
+            crate::strategy::VerifyStatus::Pass
+        );
+        // Same winner on repeated runs because the seed and inputs are identical
+    }
+
+    #[test]
+    fn vote_quorum_lost() {
+        let a = MockBackend::ok("a", "yes");
+        let b = MockBackend::fail("b", || BackendError::Network {
+            message: "boom".into(),
+        });
+        let c = MockBackend::fail("c", || BackendError::Auth {
+            message: "bad key".into(),
+        });
+        let backends: Vec<Arc<dyn Backend>> = vec![a.clone(), b.clone(), c.clone()];
+        let strategy = ParallelFanOut::new(
+            vec![
+                TargetSpec::new("a"),
+                TargetSpec::new("b"),
+                TargetSpec::new("c"),
+            ],
+            1,
+            "render-me",
+            Aggregator::vote(VoteConfig {
+                ballot_schema: BallotSchema::FreeText,
+                tie_break: TieBreak::FirstResponder,
+                abstain_threshold: 0,
+            }),
+        );
+
+        let err = run(strategy.execute(&backends, &Prompt::new(), &ctx())).unwrap_err();
+        match err {
+            StrategyError::Phase(phase_err) => {
+                let msg = phase_err.to_string();
+                assert!(
+                    msg.contains("quorum lost"),
+                    "expected quorum lost, got: {msg}"
+                );
+            }
+            other => panic!("expected PhaseError::QuorumLost, got {other:?}"),
         }
     }
 }

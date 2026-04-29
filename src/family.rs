@@ -136,6 +136,12 @@ pub enum PhaseError {
     #[error("aggregator contract violation: {message}")]
     AggregatorContract { message: String },
 
+    #[error("quorum lost: {abstains} abstentions exceed threshold {threshold}")]
+    QuorumLost { abstains: usize, threshold: usize },
+
+    #[error("aggregator rejected: {message}")]
+    AggregatorRejected { message: String },
+
     #[error("judge unavailable: {detail}")]
     JudgeUnavailable { detail: String },
 }
@@ -401,6 +407,26 @@ mod tests {
                 _ => panic!("expected FamilyOverlap, got {next:?}"),
             }
         }
+    }
+
+    #[test]
+    fn quorum_lost_display() {
+        let err = PhaseError::QuorumLost {
+            abstains: 3,
+            threshold: 2,
+        };
+        assert_eq!(
+            err.to_string(),
+            "quorum lost: 3 abstentions exceed threshold 2"
+        );
+    }
+
+    #[test]
+    fn aggregator_rejected_display() {
+        let err = PhaseError::AggregatorRejected {
+            message: "no candidates".into(),
+        };
+        assert_eq!(err.to_string(), "aggregator rejected: no candidates");
     }
 
     #[test]

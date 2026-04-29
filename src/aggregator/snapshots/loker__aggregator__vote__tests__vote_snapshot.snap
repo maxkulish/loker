@@ -1,0 +1,16 @@
+---
+source: src/aggregator/vote.rs
+expression: artifact.text
+---
+ YES 
+
+<!-- loker: Vote aggregator metadata
+  winner: yes
+  total_branches: 3
+  vote_counts:
+    yes: 2
+    no: 1
+  abstain_count: 0
+  tie_broken: false
+  tie_break_rule: none (strict majority)
+-->
