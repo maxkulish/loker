@@ -18,10 +18,10 @@ linear:
   branch_suggested: kmamemo/clo-261-wire-create_backendtensorzero-arm
   branch_actual: feat/clo-261-back
 workflow:
-  current_phase: pr
+  current_phase: complete
   status: active
   created_at: '2026-04-29T20:51:35.684Z'
-  updated_at: '2026-04-29T21:29:21.492Z'
+  updated_at: '2026-04-29T21:32:25.191Z'
 phases:
   discovery:
     status: complete
@@ -71,7 +71,7 @@ phases:
     validation_synthesis_verdict: approve
     validation_fix_iteration_count: 0
   pr:
-    status: in_progress
+    status: complete
     pr_url: https://github.com/maxkulish/loker/pull/25
     pr_number: 25
     ci_passed: true
@@ -207,5 +207,19 @@ history:
     details: >-
       3 original review threads resolved; replies posted to 3/3 original inline comments, with follow-up /gemini review
       trailers on their own line. Gemini re-review replies were acknowledgements only; no additional changes required.
+  - timestamp: '2026-04-29T21:32:17.445Z'
+    action: ci_passed
+    phase: pr
+    details: All required checks passing on latest push ef460be (format/clippy/test).
+  - timestamp: '2026-04-29T21:32:23.654Z'
+    action: pr_ready_for_merge
+    phase: pr
+    details: >-
+      PR #25 is clean: latest CI passed, all original review threads addressed/replied, and no blocking reviewer
+      requests remain.
+  - timestamp: '2026-04-29T21:32:25.192Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
 task_title: Wire create_backend("tensorzero") arm + BackendConfig→TensorZeroConfig adapter
 task_url: https://linear.app/cloud-ai/issue/clo-261/wire-create-backendtensorzero-arm-backendconfigtensorzeroconfig
