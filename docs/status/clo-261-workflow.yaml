@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-04-29T20:51:35.684Z'
-  updated_at: '2026-04-29T21:16:18.977Z'
+  updated_at: '2026-04-29T21:29:21.492Z'
 phases:
   discovery:
     status: complete
@@ -75,6 +75,7 @@ phases:
     pr_url: https://github.com/maxkulish/loker/pull/25
     pr_number: 25
     ci_passed: true
+    reviews_addressed: true
   complete:
     status: pending
 history:
@@ -190,5 +191,21 @@ history:
     action: ci_passed
     phase: pr
     details: 'All required checks passing: format/clippy/tests via GitHub PR checks 25134236291.'
+  - timestamp: '2026-04-29T21:24:57.716Z'
+    action: ci_iteration
+    phase: pr
+    details: >-
+      Addressed all 3 initial review comments (public API cleanup, env cleanup RAII, invalid URL coverage) and added
+      inline dispatcher integration test in unit suite; pushed commit 0a1d9c8.
+  - timestamp: '2026-04-29T21:27:28.405Z'
+    action: ci_passed
+    phase: pr
+    details: All required checks passing after push 0a1d9c8 (format/clippy/test).
+  - timestamp: '2026-04-29T21:29:21.492Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      3 original review threads resolved; replies posted to 3/3 original inline comments, with follow-up /gemini review
+      trailers on their own line. Gemini re-review replies were acknowledgements only; no additional changes required.
 task_title: Wire create_backend("tensorzero") arm + BackendConfig→TensorZeroConfig adapter
 task_url: https://linear.app/cloud-ai/issue/clo-261/wire-create-backendtensorzero-arm-backendconfigtensorzeroconfig
