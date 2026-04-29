@@ -1,0 +1,143 @@
+task_id: CLO-261
+task_type: development
+classification_reason: Defaulted to development (no explicit Type label/marker and title not matching operational prefixes).
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  priority: Medium
+  branch_suggested: kmamemo/clo-261-wire-create_backendtensorzero-arm
+  branch_actual: feat/clo-261-back
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-04-29T20:51:35.684Z'
+  updated_at: '2026-04-29T20:56:27.082Z'
+phases:
+  discovery:
+    status: complete
+    approved: true
+    problem_framed: true
+    prd_exists: true
+    prd_file: docs/prds/clo-261-tensorzero-create-backend-wiring.md
+    prd_created: true
+    discovery_report: docs/discovery/clo-261.md
+    discovery_debt: []
+    baseline_score: 8
+    approaches_identified: 3
+    approach_chosen: Minimal dispatcher arm + BackendConfig adapter
+  design:
+    status: complete
+    design_doc: docs/designs/clo-261-tensorzero-create-backend-wiring.md
+    draft_ready: true
+    discovery_context_used: true
+    review_completed: true
+    review_gemini: docs/reviews/clo-261-design-gemini.md
+    review_synthesis: docs/reviews/clo-261-design-synthesis.md
+    review_verdict: approve_with_changes
+    applied_suggestions:
+      - 'G1: Require adapter endpoint to parse as http/https while keeping path normalization in TensorZeroBackend.'
+      - 'G3: Specify CLO-specific env var cleanup in adapter tests.'
+      - 'G4: Clarify CLO-261 does not synthesize top-level [tensorzero] into [backends.tensorzero].'
+    flagged_suggestions:
+      - id: G5
+        reason: >-
+          Changing create_backend to accept full Config contradicts the chosen minimal adapter approach and would
+          require broad call-site refactoring.
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-261-tensorzero-create-backend-wiring.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-04-29T20:51:35.684Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-261 as development
+  - timestamp: '2026-04-29T20:51:42.745Z'
+    action: workflow_started
+    phase: init
+    details: >-
+      Workflow initialized for CLO-261. Classified as development: defaulted (no **Type:** marker/label and title
+      indicates implementation work, not operational prefix).
+  - timestamp: '2026-04-29T20:51:43.711Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-04-29T20:51:47.224Z'
+    action: linear_status_updated
+    phase: init
+    details: Linear issue CLO-261 moved from Backlog to Todo during init.
+  - timestamp: '2026-04-29T20:52:57.132Z'
+    action: branch_created
+    phase: discovery
+    details: Using existing branch feat/clo-261-back for CLO-261 discovery work.
+  - timestamp: '2026-04-29T20:54:21.273Z'
+    action: discovery_docs_written
+    phase: discovery
+    details: >-
+      Wrote PRD docs/prds/clo-261-tensorzero-create-backend-wiring.md and discovery report docs/discovery/clo-261.md.
+      Chosen approach: minimal dispatcher arm plus BackendConfig adapter.
+  - timestamp: '2026-04-29T20:54:28.782Z'
+    action: linear_status_updated
+    phase: discovery
+    details: Linear issue CLO-261 moved to In Progress for discovery/design work.
+  - timestamp: '2026-04-29T20:54:33.510Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Minimal dispatcher arm + BackendConfig adapter. Baseline 8/10. 3 approaches considered.'
+  - timestamp: '2026-04-29T20:54:37.373Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-04-29T20:55:07.136Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc draft at docs/designs/clo-261-tensorzero-create-backend-wiring.md
+  - timestamp: '2026-04-29T20:55:51.631Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 3 applied, 1 flagged. lok design-review parse failed and pi persona CLI
+      rejected --input, so review was performed directly in-agent and saved to docs/reviews.
+  - timestamp: '2026-04-29T20:55:57.056Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. Final design doc includes adapter mapping, public API invariants, concrete
+      unit/integration test plan, rollout notes, and review-applied clarifications.
+  - timestamp: '2026-04-29T20:55:58.707Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-04-29T20:56:20.439Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 5 sub-tasks at docs/plans/clo-261-tensorzero-create-backend-wiring.md
+  - timestamp: '2026-04-29T20:56:25.502Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 5 sub-tasks queued. Each sub-task references real files/modules and has a concrete acceptance
+      command; pre-merge gate is make check.
+  - timestamp: '2026-04-29T20:56:27.082Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+task_title: Wire create_backend("tensorzero") arm + BackendConfig→TensorZeroConfig adapter
+task_url: https://linear.app/cloud-ai/issue/clo-261/wire-create-backendtensorzero-arm-backendconfigtensorzeroconfig
