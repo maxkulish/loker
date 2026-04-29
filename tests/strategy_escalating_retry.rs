@@ -17,7 +17,7 @@ use serde_json::Value;
 
 use loker::backend::{Backend, BackendError, QueryOutput, TokenUsage};
 use loker::strategy::escalating_retry::{EscalatingRetry, Rung};
-use loker::strategy::verify::{VerifyError, VerifyHook, VerifyResult};
+use loker::strategy::verify::{VerifyContext, VerifyError, VerifyHook, VerifyResult};
 use loker::strategy::{
     FinalStatus, PhaseContext, Prompt, Strategy, StrategyError, StrategyKind, Tier, VerifyStatus,
     SCHEMA_VERSION,
@@ -117,7 +117,7 @@ impl VerifyHook for SequenceVerify {
         "make check"
     }
 
-    async fn verify(&self, _output: &QueryOutput) -> Result<VerifyResult, VerifyError> {
+    async fn verify(&self, _ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
         let idx = self.calls.fetch_add(1, Ordering::SeqCst);
         self.results
             .get(idx)
@@ -134,7 +134,7 @@ impl VerifyHook for AlwaysPass {
         "make check"
     }
 
-    async fn verify(&self, _output: &QueryOutput) -> Result<VerifyResult, VerifyError> {
+    async fn verify(&self, _ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
         Ok(VerifyResult::pass())
     }
 }
