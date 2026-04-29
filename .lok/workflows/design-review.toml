@@ -302,17 +302,17 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 REVIEW_SUFFIX="{{ arg.2 }}_${REVIEW_DATE}"
 
-cat <<'__GEMINI_REVIEW_PAYLOAD__' > "$TMP_DIR/gemini-review-${REVIEW_SUFFIX}.md"
+cat <<'LOKER_WF_REVIEW_GEMINI_OUTPUT_EOF' > "$TMP_DIR/gemini-review-${REVIEW_SUFFIX}.md"
 {{ steps.gemini_review.output }}
-__GEMINI_REVIEW_PAYLOAD__
+LOKER_WF_REVIEW_GEMINI_OUTPUT_EOF
 
-cat <<'__OLLAMA_REVIEW_PAYLOAD__' > "$TMP_DIR/ollama-review-${REVIEW_SUFFIX}.md"
+cat <<'LOKER_WF_REVIEW_OLLAMA_OUTPUT_EOF' > "$TMP_DIR/ollama-review-${REVIEW_SUFFIX}.md"
 {{ steps.ollama_review.output }}
-__OLLAMA_REVIEW_PAYLOAD__
+LOKER_WF_REVIEW_OLLAMA_OUTPUT_EOF
 
-cat <<'__SYNTHESIS_REVIEW_PAYLOAD__' > "$TMP_DIR/synthesis-review-${REVIEW_SUFFIX}.md"
+cat <<'LOKER_WF_REVIEW_SYNTHESIS_OUTPUT_EOF' > "$TMP_DIR/synthesis-review-${REVIEW_SUFFIX}.md"
 {{ steps.synthesis.output }}
-__SYNTHESIS_REVIEW_PAYLOAD__
+LOKER_WF_REVIEW_SYNTHESIS_OUTPUT_EOF
 
 write_review() {
   local input_path="$1"
@@ -358,9 +358,9 @@ write_review \
   "Codex via Ollama (glm-5.1:cloud)"
 
 {% if steps.claude_fallback is defined %}
-cat <<'__FALLBACK_REVIEW_PAYLOAD__' > "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md"
+cat <<'LOKER_WF_REVIEW_FALLBACK_OUTPUT_EOF' > "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md"
 {{ steps.claude_fallback.output }}
-__FALLBACK_REVIEW_PAYLOAD__
+LOKER_WF_REVIEW_FALLBACK_OUTPUT_EOF
 
 write_review \
   "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md" \

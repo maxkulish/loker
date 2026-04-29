@@ -124,37 +124,144 @@ update_workflow_state({
 })
 ```
 
-## Step 4 - Address review comments
+## Step 3.5 - Wait for bot reviews then fetch and address all comments
 
-For each comment from a human reviewer or `gemini-code-assist[bot]` /
-`Copilot`:
+**Do this immediately after CI goes green** - bot reviewers (gemini-code-assist,
+copilot-pull-request-reviewer) post their inline comments within minutes of a
+green run. PRs merged without this step miss all bot feedback.
 
-1. Make the requested change locally.
-2. Push.
-3. Reply to the comment.
+### 3.5.1 - Wait 6 minutes
 
-**CRITICAL**: replies to `gemini-code-assist[bot]` MUST end with
-`/gemini review` on its own line, otherwise the bot will not re-evaluate.
-Replies to other reviewers do not need that trailer.
+After `ci_passed` is logged, wait for bot reviewers to post:
 
 ```bash
-gh api repos/maxkulish/loker/pulls/<n>/comments \
-  -F body="Addressed in <sha>: <one-line how>.
+sleep 360
+```
+
+### 3.5.2 - Fetch all inline comments
+
+```bash
+PR=<n>
+REPO=maxkulish/loker
+
+# All inline review comments (paginated - do not omit --paginate)
+gh api repos/${REPO}/pulls/${PR}/comments --paginate \
+  --jq '.[] | {id, path, line: .original_line, body, user: .user.login, commit_id: .original_commit_id}'
+
+# General PR-level comments
+gh pr view ${PR} --json comments \
+  --jq '.comments[] | {id: .databaseId, body, author: .author.login}'
+```
+
+### 3.5.3 - Categorize comments
+
+| Reviewer | Severity signal | Priority |
+|----------|----------------|----------|
+| `gemini-code-assist` | `**Severity**: high/medium/low` in body | Parse it; default medium |
+| `copilot-pull-request-reviewer` | None | Treat as medium |
+| Human | CHANGES_REQUESTED state | High; COMMENTED = medium |
+
+High-severity and CHANGES_REQUESTED comments are blocking - must be addressed
+before merge. Medium/low may be addressed or declined with rationale.
+
+### 3.5.4 - Stale comment detection
+
+For each inline comment, check if the referenced code has changed since it was
+posted:
+
+```bash
+git diff <original_commit_id>..HEAD -- <path>
+```
+
+If lines within 5 of the commented line changed, flag as `[STALE?]` and confirm
+with user before acting. Do not auto-skip stale comments.
+
+### 3.5.5 - Address feedback, commit, push
+
+Group comments by file. Address all comments on a file together, then commit:
+
+```bash
+git add <modified files>
+git commit -m "$(cat <<'EOF'
+fix(CLO-XX): address PR review feedback
+
+- <file>: <change> (<reviewer>)
+
+Resolves <N> review comments
+EOF
+)"
+git push origin feat/clo-XX-<slug>
+```
+
+Push **before** replying so commit SHAs are live on GitHub when reviewers read
+the replies.
+
+### 3.5.6 - Reply to EVERY comment (MANDATORY)
+
+**No comment may be left without a reply.** Every inline reply MUST end with
+`/gemini review` on its own line - for all reviewers (gemini-code-assist,
+copilot-pull-request-reviewer, and human alike). Gemini re-validates any thread
+on that trigger.
+
+```bash
+COMMIT_SHA=$(git rev-parse --short HEAD)
+REPO=maxkulish/loker
+PR=<n>
+
+# Reply template (repeat for each comment ID)
+gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
+  -X POST -f body="Fixed in ${COMMIT_SHA}. <one-line explanation>
 
 /gemini review"
 ```
 
-When all review threads are resolved:
+For declined suggestions:
+
+```bash
+gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
+  -X POST -f body="Intentionally kept as-is: <rationale>.
+
+/gemini review"
+```
+
+Track reply count - the state update must show all comments replied to.
+
+### 3.5.7 - Re-check for new comments
+
+After pushing and replying, check whether new comments arrived (bots re-review
+after the `/gemini review` trigger):
+
+```bash
+gh pr view ${PR} --json reviews,reviewDecision
+gh api repos/${REPO}/pulls/${PR}/comments --paginate \
+  --jq '.[] | select(.created_at > "<push_timestamp>") | {id, user: .user.login, body}'
+```
+
+If new comments exist, return to 3.5.3 and repeat. Otherwise proceed.
+
+### 3.5.8 - Log state
 
 ```ts
 update_workflow_state({
   task_id: "CLO-XX",
   phase: "pr",
   action: "review_addressed",
-  details: "<n> threads resolved. /gemini review trailer used on all bot replies.",
+  details: "<N> threads resolved; replies posted N/N; /gemini review trailer on all inline replies.",
   phase_updates: { reviews_addressed: true }
 })
 ```
+
+## Step 4 - Address escalated review comments
+
+If Step 3.5 surfaces a comment that requires a design change or contradicts the
+existing plan, surface the conflict in the PR thread rather than silently
+complying. Options:
+
+- Post a PR comment explaining the tension and asking for guidance.
+- Link to the relevant design doc or ADR.
+- Tag the user for a decision if blocking.
+
+When all threads are resolved and `reviews_addressed: true` is set, proceed.
 
 ## Step 5 - Approval checkpoint
 
