@@ -1,0 +1,106 @@
+task_id: CLO-272
+task_type: specification
+classification_reason: >-
+  Title starts with "Implement" and ACs are mechanical/tidy (implement hook, deterministic parsing, dedicated unit
+  tests). No ops-style signals.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by:
+    - CLO-270
+  priority: Medium
+  branch_suggested: kmamemo/clo-272-implement-llmverifier-verify-hook-with-mock-backend-fixture
+  branch_actual: feat/clo-272-implement-llmverifier-verify-hook-with-mock-backend-fixture
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-04-30T20:02:38.700Z'
+  updated_at: '2026-04-30T20:05:31.168Z'
+phases:
+  discovery:
+    status: pending
+  design:
+    status: pending
+  plan:
+    status: pending
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+  spec:
+    status: complete
+    spec_file: specs/2026-04-30-clo-272-implement-llmverifier-verify-hook-with-mock-backend-fixture.md
+    approved: true
+    review_completed: true
+    review_skip_reason: No .lok/workflows/spec-review.toml present
+    auto_approved: true
+    auto_approval_reason: >-
+      ACs are mechanically testable, reference explicit files and commands, and include concrete unit-test coverage for
+      parser, templating, and failure/error semantics. No architectural decisions deferred.
+    review_verdict: approve
+    review_applied: true
+    applied_suggestions: []
+    flagged_suggestions: []
+history:
+  - timestamp: '2026-04-30T20:02:38.700Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-272 as development
+  - timestamp: '2026-04-30T20:03:15.984Z'
+    action: classification_complete
+    phase: init
+    details: >-
+      Classified as specification: title starts with "Implement" and the issue is a scoped implementation + explicit
+      AC/TDD test checklist with minimal architectural risk, so discovery/design are skipped.
+  - timestamp: '2026-04-30T20:03:17.402Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo. Skipping project sync.
+  - timestamp: '2026-04-30T20:03:18.814Z'
+    action: linear_status_updated
+    phase: init
+    details: Linear issue CLO-272 transitioned from Backlog to Todo.
+  - timestamp: '2026-04-30T20:04:50.551Z'
+    action: branch_created
+    phase: spec
+    details: >-
+      Created branch feat/clo-272-implement-llmverifier-verify-hook-with-mock-backend-fixture from current task context
+      (diverging from linear suggestion to satisfy local branch naming convention).
+  - timestamp: '2026-04-30T20:05:19.165Z'
+    action: spec_drafted
+    phase: spec
+    details: >-
+      Spec drafted at specs/2026-04-30-clo-272-implement-llmverifier-verify-hook-with-mock-backend-fixture.md (12 ACs, 5
+      STs).
+  - timestamp: '2026-04-30T20:05:20.816Z'
+    action: spec_review_skipped
+    phase: spec
+    details: AI review tooling unavailable (no .lok/workflows/spec-review.toml); marking review_completed=true.
+  - timestamp: '2026-04-30T20:05:22.754Z'
+    action: spec_approved
+    phase: spec
+    details: >-
+      Auto-approved: mechanically scoped verification task with explicit 12 ACs and concrete TDD coverage, including
+      template substitution, yes/no parsing, and backend error path. No API-design uncertainty remains for spec
+      execution.
+  - timestamp: '2026-04-30T20:05:27.014Z'
+    action: phase_completed
+    phase: spec
+    details: Transitioning spec -> implement. Skipping plan phase per specification workflow.
+  - timestamp: '2026-04-30T20:05:31.168Z'
+    action: phase_transition
+    phase: spec
+    details: Transitioned from spec to implement
+task_title: Implement LLMVerifier verify hook with mock-backend fixture
+task_url: https://linear.app/cloud-ai/issue/CLO-272/implement-llmverifier-verify-hook-with-mock-backend-fixture

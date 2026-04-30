@@ -11,12 +11,14 @@
 //! reason into the next prompt. Hook implementations that log or persist
 //! `FailureReason` fields directly must apply their own redaction.
 
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::backend::QueryOutput;
-
+use crate::backend::{Backend, QueryOutput};
 // ── FailureReason ────────────────────────────────────────────
 
 /// Structured reason a verification hook returned `Fail`.
@@ -267,6 +269,138 @@ pub trait VerifyHook: Send + Sync {
     fn name(&self) -> &str;
 
     async fn verify(&self, ctx: &VerifyContext) -> Result<VerifyResult, VerifyError>;
+}
+
+// ── LLMVerifier ────────────────────────────────────────────
+
+/// Concrete verify hook that delegates to a backend and parses a
+/// deterministic yes/no verdict from the backend response.
+pub struct LLMVerifier {
+    /// Identifier used for observability/debugging.
+    pub backend: String,
+    backend_client: Arc<dyn Backend>,
+    /// Optional model override passed to the backend.
+    pub model: Option<String>,
+    /// Prompt template used for verification. `{candidate}` is replaced with
+    /// the candidate text under test; any `{key}` present in `params`
+    /// is also substituted.
+    pub prompt_template: String,
+    /// Optional system-level context prepended to the candidate prompt.
+    pub system_prompt: Option<String>,
+    /// Temperature hint used when available. `0.0` is deterministic default.
+    pub temperature: f32,
+    params: HashMap<String, String>,
+}
+
+impl LLMVerifier {
+    pub const DEFAULT_TEMPERATURE: f32 = 0.0;
+
+    /// Construct a verifier bound to a backend object.
+    pub fn new(
+        backend: impl Into<String>,
+        backend_client: Arc<dyn Backend>,
+        prompt_template: impl Into<String>,
+    ) -> Self {
+        Self {
+            backend: backend.into(),
+            backend_client,
+            model: None,
+            prompt_template: prompt_template.into(),
+            system_prompt: None,
+            temperature: Self::DEFAULT_TEMPERATURE,
+            params: HashMap::new(),
+        }
+    }
+
+    /// Set deterministic temperature hint (used where backend support exists).
+    pub fn with_temperature(mut self, temperature: f32) -> Self {
+        self.temperature = temperature;
+        self
+    }
+
+    /// Set a model override.
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+
+    /// Set system prompt prepended to candidate prompt.
+    pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.system_prompt = Some(prompt.into());
+        self
+    }
+
+    /// Add one user-supplied template parameter.
+    pub fn with_param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.params.insert(key.into(), value.into());
+        self
+    }
+
+    fn rendered_prompt(&self, candidate: &str) -> String {
+        let mut prompt = self.prompt_template.clone();
+
+        for (key, value) in &self.params {
+            let needle = format!("{{{key}}}");
+            prompt = prompt.replace(&needle, value);
+        }
+
+        let prompt = prompt.replace("{candidate}", candidate);
+
+        match &self.system_prompt {
+            Some(system) => format!("{system}\n\n{prompt}"),
+            None => prompt,
+        }
+    }
+
+    fn parse_response(raw: &str) -> VerifyResult {
+        let first = raw
+            .split_whitespace()
+            .next()
+            .map(|token| token.trim().trim_matches(|c: char| !c.is_alphanumeric()))
+            .map(|token| token.to_ascii_lowercase())
+            .unwrap_or_default();
+
+        if first == "yes" {
+            return VerifyResult::pass();
+        }
+
+        if first == "no" {
+            return VerifyResult::fail("no");
+        }
+
+        VerifyResult::Fail {
+            reason: FailureReason::new("unparseable verifier response")
+                .with_stdout(raw.to_string()),
+        }
+    }
+}
+
+#[async_trait]
+impl VerifyHook for LLMVerifier {
+    fn name(&self) -> &str {
+        "LLMVerifier"
+    }
+
+    async fn verify(&self, ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
+        let prompt = self.rendered_prompt(&ctx.stdout);
+
+        // Keep deterministic defaults for future backends that support
+        // temperature control; for backends that don't, this call is still
+        // best-effort and uses the best-available deterministic path.
+        let _deterministic_temperature = self.temperature;
+
+        match self
+            .backend_client
+            .query(&prompt, Path::new("."), self.model.as_deref())
+            .await
+        {
+            Ok(query) => Ok(Self::parse_response(&query.stdout)),
+            Err(err) => Ok(VerifyResult::Fail {
+                reason: FailureReason::new(format!("backend error: {err}"))
+                    .with_stdout(err.to_string()),
+            }),
+        }
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────
