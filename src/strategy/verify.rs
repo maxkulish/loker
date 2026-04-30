@@ -339,7 +339,13 @@ impl LLMVerifier {
     fn rendered_prompt(&self, candidate: &str) -> String {
         let mut prompt = self.prompt_template.clone();
 
-        for (key, value) in &self.params {
+        // Sort params by key length descending so that longer, more specific
+        // keys (e.g. {env_name}) are replaced before shorter substrings (e.g. {env}).
+        // HashMap iteration order is non-deterministic, so we must sort explicitly
+        // for reproducible prompt rendering.
+        let mut sorted_params: Vec<(&String, &String)> = self.params.iter().collect();
+        sorted_params.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+        for (key, value) in sorted_params {
             let needle = format!("{{{key}}}");
             prompt = prompt.replace(&needle, value);
         }
@@ -365,13 +371,12 @@ impl LLMVerifier {
         }
 
         if first == "no" {
-            return VerifyResult::fail("no");
+            return VerifyResult::fail_with(FailureReason::new("no").with_stdout(raw.to_string()));
         }
 
-        VerifyResult::Fail {
-            reason: FailureReason::new("unparseable verifier response")
-                .with_stdout(raw.to_string()),
-        }
+        VerifyResult::fail_with(
+            FailureReason::new("unparseable verifier response").with_stdout(raw.to_string()),
+        )
     }
 }
 
@@ -384,21 +389,13 @@ impl VerifyHook for LLMVerifier {
     async fn verify(&self, ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
         let prompt = self.rendered_prompt(&ctx.stdout);
 
-        // Keep deterministic defaults for future backends that support
-        // temperature control; for backends that don't, this call is still
-        // best-effort and uses the best-available deterministic path.
-        let _deterministic_temperature = self.temperature;
-
         match self
             .backend_client
             .query(&prompt, Path::new("."), self.model.as_deref())
             .await
         {
             Ok(query) => Ok(Self::parse_response(&query.stdout)),
-            Err(err) => Ok(VerifyResult::Fail {
-                reason: FailureReason::new(format!("backend error: {err}"))
-                    .with_stdout(err.to_string()),
-            }),
+            Err(err) => Err(VerifyError::new(format!("backend error: {err}"))),
         }
     }
 }

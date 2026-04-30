@@ -5612,8 +5612,8 @@ timeout = 5000
     #[test]
     fn test_heuristic_contains_single_quote_char() {
         // Edge case: single quote character as the entire argument should not panic
-        let result = run_heuristic_check("contains(')", "some output with '");
-        assert!(result.passed || !result.passed); // Just verify no panic
+        let _result = run_heuristic_check("contains(')", "some output with '");
+        // Just verify no panic
     }
 
     #[tokio::test]

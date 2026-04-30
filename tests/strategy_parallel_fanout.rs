@@ -161,7 +161,7 @@ fn one_fails_min_responses_still_satisfied() {
     assert_eq!(out.strategy, StrategyKind::Parallel);
     // Short-circuit may drop the failing future; attempts is 1 or 2.
     assert!(
-        out.attempts.len() >= 1 && out.attempts.len() <= 2,
+        !out.attempts.is_empty() && out.attempts.len() <= 2,
         "expected 1-2 attempts, got {}",
         out.attempts.len()
     );

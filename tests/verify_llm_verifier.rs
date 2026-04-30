@@ -138,32 +138,23 @@ async fn yes_variants_pass() {
 
 #[tokio::test]
 async fn unparseable_response_fails() {
-    let backend = MockBackend::ok("judge", "maybe");
-    let verifier = LLMVerifier::new("judge", backend.clone(), "{candidate}");
+    let verify_cases = ["maybe", "", "   "];
 
-    let result = verifier
-        .verify(&ctx_with_candidate("anything"))
-        .await
-        .unwrap();
+    for response in verify_cases {
+        let backend = MockBackend::ok("judge", response);
+        let verifier = LLMVerifier::new("judge", backend.clone(), "{candidate}");
 
-    match result {
-        VerifyResult::Fail { reason } => {
-            assert!(reason.summary.contains("unparseable verifier response"));
+        let result = verifier
+            .verify(&ctx_with_candidate("anything"))
+            .await
+            .unwrap();
+
+        match result {
+            VerifyResult::Fail { reason } => {
+                assert!(reason.summary.contains("unparseable verifier response"));
+            }
+            other => panic!("expected Fail, got {other:?}"),
         }
-        other => panic!("expected Fail, got {other:?}"),
-    }
-
-    let backend = MockBackend::ok("judge", "");
-    let verifier = LLMVerifier::new("judge", backend.clone(), "{candidate}");
-    let result = verifier
-        .verify(&ctx_with_candidate("anything"))
-        .await
-        .unwrap();
-    match result {
-        VerifyResult::Fail { reason } => {
-            assert!(reason.summary.contains("unparseable verifier response"));
-        }
-        other => panic!("expected Fail, got {other:?}"),
     }
 }
 
@@ -177,18 +168,13 @@ async fn backend_error_is_fail() {
     );
 
     let verifier = LLMVerifier::new("judge", backend.clone(), "{candidate}");
-    let result = verifier
+    let err = verifier
         .verify(&ctx_with_candidate("anything"))
         .await
-        .unwrap();
+        .expect_err("expected VerifyError when backend errors");
 
-    match result {
-        VerifyResult::Fail { reason } => {
-            assert!(reason.summary.contains("backend error"));
-            assert!(reason.stdout.contains("service unavailable"));
-        }
-        other => panic!("expected Fail, got {other:?}"),
-    }
+    assert!(err.message.contains("backend error"));
+    assert!(err.message.contains("service unavailable"));
 }
 
 #[tokio::test]
@@ -251,4 +237,25 @@ async fn candidate_substitution_and_prompt_params() {
     assert_eq!(prompt, "Policy: strict\nCandidate: actual output");
     assert_eq!(backend.calls(), 1);
     assert_eq!(backend.all_prompts().len(), 1);
+}
+
+#[tokio::test]
+async fn deterministic_param_sorting_respects_key_length() {
+    // When params have overlapping prefixes (e.g. {env} and {env_name}),
+    // the longer key must be replaced first so that shorter keys don't
+    // partially overwrite longer key placeholders.
+    let backend = MockBackend::ok("judge", "yes");
+    let verifier = LLMVerifier::new("judge", backend.clone(), "{env} vs {env_name}")
+        .with_param("env", "prod")
+        .with_param("env_name", "staging");
+
+    let _ = verifier
+        .verify(&ctx_with_candidate("anything"))
+        .await
+        .unwrap();
+
+    let prompt = backend
+        .last_prompt()
+        .expect("backend should have been queried");
+    assert_eq!(prompt, "prod vs staging");
 }

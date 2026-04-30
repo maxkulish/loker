@@ -16,7 +16,7 @@
 
 use serde_json::{json, Value};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const DEFAULT_GATEWAY_URL: &str = "http://localhost:3000";
@@ -155,7 +155,7 @@ fn sanitise_request(req: &Value) -> Value {
     clone
 }
 
-fn write_fixture(dir: &PathBuf, name: &str, value: &Value) -> anyhow::Result<()> {
+fn write_fixture(dir: &Path, name: &str, value: &Value) -> anyhow::Result<()> {
     let path = dir.join(name);
     let body = serde_json::to_string_pretty(value)?;
     fs::write(&path, body + "\n")?;
