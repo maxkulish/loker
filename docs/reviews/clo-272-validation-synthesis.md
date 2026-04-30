@@ -1,15 +1,15 @@
 # Validation synthesis - CLO-272
 
 ## Inputs
-- Codex: docs/reviews/clo-272-codex-validation.md
-- Gemini: docs/reviews/clo-272-gemini-validation.md
+- Codex: docs/reviews/clo-272-codex-validation.md (verdict: approve)
+- Gemini: docs/reviews/clo-272-gemini-validation.md (verdict: approve)
 - Diff: `git diff main...HEAD`
 
 ## Verdict
 approve
 
 ## Must Fix Before PR
-- None.
+- None. All gates pass.
 
 ## Out of Scope / Deferred
 - None.
@@ -18,4 +18,4 @@ approve
 - None.
 
 ## Recommendation
-No blocking issues remain. Proceed to implementation-complete update and transition to `pr`.
+No blocking issues remain. Proceed to PR creation.
