@@ -91,54 +91,75 @@ else
 fi
 '''
 
-# Step 4: Generate design draft via Claude
+# Step 4: Generate design draft via Claude.
+# File-based approach: draft content is written to a .draft file by this step.
+# This step outputs ONLY the file path to stdout, which is safe for lok template
+# expansion in write_draft (a file path never contains double-brace sequences).
 [[steps]]
 name = "generate_draft"
-backend = "claude"
 timeout = 300000
 retries = 2
 continue_on_error = false
 depends_on = ["load_persona", "read_discovery"]
-prompt = """
-{{ steps.load_persona.output }}
+shell = '''
+PROMPT_FILE=$(mktemp)
+trap 'rm -f "$PROMPT_FILE"' EXIT
+
+# Read persona directly - its text contains curly-brace examples that would
+# confuse lok if substituted via template variable into this shell script
+cat .pi/agents/claude-designer.md > "$PROMPT_FILE"
+
+# Append runtime context via lok-expanded heredoc
+cat >> "$PROMPT_FILE" <<'LOKER_WF_DESIGNER_PROMPT_EOF'
 
 ---
 
 Active milestone: {{ steps.read_milestone.output }}
 Task: {{ arg.1 }} - {{ arg.3 }}
-Output path: docs/designs/<task-id-lowercase>-{{ arg.2 }}.md
+Output path: docs/designs/{{ arg.1 }}-{{ arg.2 }}.md
 
 DISCOVERY CONTEXT:
 {{ steps.read_discovery.output }}
 
 Produce the design document now.
-"""
+LOKER_WF_DESIGNER_PROMPT_EOF
 
-# Step 5: Write draft to docs/designs/ with injection-safe heredoc
+mkdir -p docs/designs
+TASK_ID_LOWER=$(printf '%s' '{{ arg.1 }}' | tr '[:upper:]' '[:lower:]')
+DRAFT_PATH="docs/designs/${TASK_ID_LOWER}-{{ arg.2 }}.draft"
+
+# Write draft to file - content never passes through lok template engine
+claude -p --output-format text --no-session-persistence < "$PROMPT_FILE" > "$DRAFT_PATH"
+
+LINE_COUNT=$(wc -l < "$DRAFT_PATH")
+printf 'Draft: %d lines\n' "$LINE_COUNT" >&2
+
+# Output only the file path - safe for template substitution in write_draft
+printf '%s\n' "$DRAFT_PATH"
+'''
+
+# Step 5: Validate and publish the draft written by generate_draft.
+# Reads the draft path from generate_draft output (just a file path: no injection risk).
 [[steps]]
 name = "write_draft"
 timeout = 10000
 depends_on = ["generate_draft"]
 shell = '''
-mkdir -p docs/designs
 TASK_ID_LOWER=$(printf '%s' '{{ arg.1 }}' | tr '[:upper:]' '[:lower:]')
+DRAFT_PATH="docs/designs/${TASK_ID_LOWER}-{{ arg.2 }}.draft"
 OUTPUT_PATH="docs/designs/${TASK_ID_LOWER}-{{ arg.2 }}.md"
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
 
-# Single-quoted heredoc: lok substitutes {{ ... }} before shell runs,
-# but the shell itself does no further expansion (no $(...) execution).
-# Same pattern as write_reviews in design-review.toml.
-cat <<'LOKER_WF_DESIGNER_DRAFT_OUTPUT_EOF' > "$TMP"
-{{ steps.generate_draft.output }}
-LOKER_WF_DESIGNER_DRAFT_OUTPUT_EOF
+if [ ! -f "$DRAFT_PATH" ]; then
+  printf 'ERROR: Draft file not found: %s\n' "$DRAFT_PATH" >&2
+  exit 1
+fi
 
-LINE_COUNT=$(wc -l < "$TMP")
+LINE_COUNT=$(wc -l < "$DRAFT_PATH")
 if [ "$LINE_COUNT" -lt 15 ]; then
   printf 'ERROR: Draft is only %d lines - generation likely failed\n' "$LINE_COUNT" >&2
   exit 1
 fi
 
-mv "$TMP" "$OUTPUT_PATH"
+mv "$DRAFT_PATH" "$OUTPUT_PATH"
 printf 'Draft written to %s (%d lines)\n' "$OUTPUT_PATH" "$LINE_COUNT"
 '''
