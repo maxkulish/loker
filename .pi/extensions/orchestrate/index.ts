@@ -657,10 +657,14 @@ ${phaseBody}
 ---
 
 Tools available:
-- update_workflow_state: Update the workflow YAML with history events and field changes
-- transition_phase: Move to the next phase (with validation)
+- update_workflow_state, transition_phase (orchestrator)
+- mcp__linear__* (Linear bridge) - for Linear issue/comment updates
+- bash / shell, git, gh (host) - REQUIRED for steps that use \`gh api ...\`,
+  \`gh pr ...\`, \`git push\`, \`cargo ...\`, \`make ...\`, etc. Step 3.5 of pr.md
+  is shell-only; do not skip it just because no orchestrator tool covers it.
+- Read / Edit / Write (host) - for editing files referenced by review comments
+  or for any in-repo file changes the phase asks for.
 
-For Linear interactions use the mcp__linear__* tools (served by the .pi/extensions/linear bridge).
 Always use real newlines in Linear MCP body fields (no literal \\n).
 
 Begin executing these instructions now. Update state after every significant action.

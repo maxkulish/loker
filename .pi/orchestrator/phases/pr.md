@@ -130,13 +130,29 @@ update_workflow_state({
 copilot-pull-request-reviewer) post their inline comments within minutes of a
 green run. PRs merged without this step miss all bot feedback.
 
-### 3.5.1 - Wait 6 minutes
+### 3.5.1 - Wait for bot reviewers to post
 
-After `ci_passed` is logged, wait for bot reviewers to post:
+After `ci_passed` is logged, poll for inline review comments instead of a
+single long blocking sleep (long sleeps may be truncated by the agent
+runtime, and bots usually post within 1-3 minutes anyway):
 
 ```bash
-sleep 360
+PR=<n>
+REPO=maxkulish/loker
+
+for i in $(seq 1 60); do
+  count=$(gh api repos/${REPO}/pulls/${PR}/comments --paginate --jq 'length' 2>/dev/null || echo 0)
+  if [ "$count" -gt 0 ]; then
+    echo "Found ${count} inline review comment(s) after ${i} poll(s)"
+    break
+  fi
+  sleep 10
+done
 ```
+
+If after 10 minutes no inline comments exist, proceed anyway - some PRs
+get only PR-level (issue) comments or no bot review at all. Step 3.5.2
+fetches both endpoints.
 
 ### 3.5.2 - Fetch all inline comments
 

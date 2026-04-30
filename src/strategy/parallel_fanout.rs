@@ -475,9 +475,7 @@ fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aggregator::{
-        AnyFailReason, BallotSchema, BranchFailure, BranchSuccess, TieBreak, VoteConfig,
-    };
+    use crate::aggregator::{AnyFailReason, BallotSchema, TieBreak, VoteConfig};
     use crate::backend::BackendError;
     use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -629,7 +627,7 @@ mod tests {
         // Short-circuit means we may return before the failing backend
         // settles; attempt count is therefore >= min_responses and <= targets.
         assert!(
-            out.attempts.len() >= 1 && out.attempts.len() <= 2,
+            !out.attempts.is_empty() && out.attempts.len() <= 2,
             "expected 1 or 2 attempts, got {}",
             out.attempts.len()
         );

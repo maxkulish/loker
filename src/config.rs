@@ -712,7 +712,7 @@ parallel = false
 
     #[test]
     fn test_deep_merge_hashmap_add() {
-        let mut base: toml::Value = toml::Value::try_from(&Config::default()).unwrap();
+        let mut base: toml::Value = toml::Value::try_from(Config::default()).unwrap();
         let overlay: toml::Value = toml::from_str(
             r#"
 [backends.custom]
@@ -734,7 +734,7 @@ command = "my-llm"
 
     #[test]
     fn test_deep_merge_hashmap_override() {
-        let mut base: toml::Value = toml::Value::try_from(&Config::default()).unwrap();
+        let mut base: toml::Value = toml::Value::try_from(Config::default()).unwrap();
         let overlay: toml::Value = toml::from_str(
             r#"
 [backends.ollama]
@@ -756,7 +756,7 @@ model = "mistral"
 
     #[test]
     fn test_deep_merge_partial_config() {
-        let mut base: toml::Value = toml::Value::try_from(&Config::default()).unwrap();
+        let mut base: toml::Value = toml::Value::try_from(Config::default()).unwrap();
         let overlay: toml::Value = toml::from_str(
             r#"
 [defaults]
@@ -775,7 +775,7 @@ timeout = 60
 
     #[test]
     fn test_deep_merge_vec_replace() {
-        let mut base: toml::Value = toml::Value::try_from(&Config::default()).unwrap();
+        let mut base: toml::Value = toml::Value::try_from(Config::default()).unwrap();
         let overlay: toml::Value = toml::from_str(
             r#"
 [backends.codex]
@@ -792,7 +792,7 @@ args = ["exec", "--json", "-s", "full-auto"]
 
     #[test]
     fn test_deep_merge_empty_overlay() {
-        let mut base: toml::Value = toml::Value::try_from(&Config::default()).unwrap();
+        let mut base: toml::Value = toml::Value::try_from(Config::default()).unwrap();
         let overlay: toml::Value = toml::from_str("").unwrap();
         deep_merge(&mut base, overlay);
         let config: Config = base.try_into().unwrap();
@@ -916,17 +916,19 @@ timeout = 999
 
     #[test]
     fn test_tensorzero_config_serialization_roundtrip() {
-        let mut original = Config::default();
-        original.tensorzero = Some(TensorZeroConfig {
-            endpoint: "https://gateway.local:3000".to_string(),
-            default_model: "tensorzero::function_name::loker_d1_openai".to_string(),
-            api_key_env: Some("TENSORZERO_API_KEY".to_string()),
-            timeout_secs: 90,
-            retry_policy: RetryPolicyConfig {
-                max_retries: 3,
-                delay_ms: 500,
-            },
-        });
+        let original = Config {
+            tensorzero: Some(TensorZeroConfig {
+                endpoint: "https://gateway.local:3000".to_string(),
+                default_model: "tensorzero::function_name::loker_d1_openai".to_string(),
+                api_key_env: Some("TENSORZERO_API_KEY".to_string()),
+                timeout_secs: 90,
+                retry_policy: RetryPolicyConfig {
+                    max_retries: 3,
+                    delay_ms: 500,
+                },
+            }),
+            ..Config::default()
+        };
 
         let serialized = toml::to_string_pretty(&original).unwrap();
         let deserialized: Config = toml::from_str(&serialized).unwrap();
