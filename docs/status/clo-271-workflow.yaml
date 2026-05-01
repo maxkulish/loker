@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-01T08:41:34.520Z'
-  updated_at: '2026-05-01T09:10:49.015Z'
+  updated_at: '2026-05-01T09:45:57.044Z'
 phases:
   discovery:
     status: complete
@@ -59,10 +59,11 @@ phases:
     plan_file: docs/plans/clo-271-run-command.md
     approved: true
   implement:
-    status: in_progress
+    status: complete
     commits:
       - 97c6a08
       - f2a38e7
+      - 3444c4f
   pr:
     status: pending
   complete:
@@ -142,3 +143,14 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: RunCommand struct with 8 fields, Default, builder pattern, skeleton VerifyHook impl. Commit f2a38e7.'
+  - timestamp: '2026-05-01T09:45:32.721Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST3-ST7 landed: core execution, sandboxing (env allowlist, secret redaction, cpu timeout), VerifyHook trait
+      mapping + SandboxViolation enum, integration tests (8 scenarios), and pre-merge gate (make check green). Commit
+      3444c4f.
+  - timestamp: '2026-05-01T09:45:57.044Z'
+    action: implementation_complete
+    phase: implement
+    details: All 7 sub-tasks landed. make check green (636 lib + 532 bin + all integration tests pass). 3 commits.

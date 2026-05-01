@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 use tokio::time::timeout;
-use which::which;
+use which::{which, which_in};
 
 use crate::strategy::verify::{
     FailureReason, SandboxViolation, VerifyContext, VerifyError, VerifyHook, VerifyResult,
@@ -122,6 +122,12 @@ impl RunCommand {
         let path = Path::new(&self.cmd);
         if path.is_absolute() {
             Ok(PathBuf::from(path))
+        } else if let Some(cwd) = &self.cwd {
+            // Resolve relative to the configured working directory, not the
+            // orchestrator's CWD. This matters when cmd is a relative path
+            // like `./scripts/verify.sh` — it should resolve against cwd.
+            which_in(&self.cmd, std::env::var_os("PATH"), cwd.as_os_str())
+                .map_err(|_| VerifyError::new(format!("command not found: {}", self.cmd)))
         } else {
             which(&self.cmd)
                 .map_err(|_| VerifyError::new(format!("command not found: {}", self.cmd)))
@@ -132,14 +138,6 @@ impl RunCommand {
         self.env_allowlist
             .iter()
             .filter_map(|name| std::env::var(name).ok().map(|value| (name.clone(), value)))
-            .map(|(name, value)| {
-                let redacted = if is_secret_like_env_key(&name) {
-                    redact_secrets(&value)
-                } else {
-                    value
-                };
-                (name, redacted)
-            })
             .collect()
     }
 
@@ -166,6 +164,7 @@ impl RunCommand {
         // reaps descendants as well.
         #[cfg(unix)]
         command.process_group(0);
+        command.kill_on_drop(true);
 
         #[cfg(unix)]
         if let Some(cpu_timeout) = self.cpu_timeout {
