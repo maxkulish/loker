@@ -230,7 +230,11 @@ const TYPE_ALLOWED_PHASES: Record<string, Set<WorkflowPhase>> = {
   operational: new Set(["init", "operational", "execute", "document", "pr", "complete"]),
 };
 
-const PHASE_CONFIG: Record<string, { requiredFields: string[]; historyEvents: string[] }> = {
+const PHASE_CONFIG: Record<string, {
+  requiredFields: string[];
+  historyEvents: string[];
+  auto_dispatch_after_transition?: boolean;
+}> = {
   discovery: {
     requiredFields: ["status"],
     historyEvents: ["discovery_approved"],
