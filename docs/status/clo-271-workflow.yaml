@@ -19,7 +19,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-01T08:41:34.520Z'
-  updated_at: '2026-05-01T10:43:16.153Z'
+  updated_at: '2026-05-01T11:00:59.559Z'
 phases:
   discovery:
     status: complete
@@ -75,6 +75,9 @@ phases:
     validation_synthesis_verdict: approve
   pr:
     status: in_progress
+    pr_number: 28
+    pr_url: https://github.com/maxkulish/loker/pull/28
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -188,3 +191,11 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass (1176 tests, 0 failures, 0 warnings)'
+  - timestamp: '2026-05-01T11:00:17.832Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #28 opened: https://github.com/maxkulish/loker/pull/28'
+  - timestamp: '2026-05-01T11:00:59.559Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format (16s ✅), clippy (28s ✅), test (2m10s ✅)'

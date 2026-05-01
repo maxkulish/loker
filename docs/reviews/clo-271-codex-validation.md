@@ -20,9 +20,9 @@
 ## Findings
 
 ### F1 [major] Secret-like allowlisted env values can leak into `FailureReason`
-**Where:** [run_command.rs](/Users/mk/Code/orchestrator/loker--feat-clo-271-run-command-01/src/strategy/verify/run_command.rs:137)
+**Where:** [run_command.rs](src/strategy/verify/run_command.rs#L137)
 
-**What:** `build_environment()` forwards allowlisted env vars unchanged, and the secret-key detector at [run_command.rs](/Users/mk/Code/orchestrator/loker--feat-clo-271-run-command-01/src/strategy/verify/run_command.rs:329) is unused. Output redaction only applies generic token regexes, so a secret-like env key such as `MY_SECRET=plain-internal-value` will leak if the command prints only the value. The current test uses an AWS-shaped value, so it passes through value-pattern redaction and does not cover the AC requiring known-secret-shaped env names to be redacted.
+**What:** `build_environment()` forwards allowlisted env vars unchanged, and the secret-key detector at [run_command.rs](src/strategy/verify/run_command.rs#L329) is unused. Output redaction only applies generic token regexes, so a secret-like env key such as `MY_SECRET=plain-internal-value` will leak if the command prints only the value. The current test uses an AWS-shaped value, so it passes through value-pattern redaction and does not cover the AC requiring known-secret-shaped env names to be redacted.
 
 **Suggested fix:** Track values for allowlisted keys where `is_secret_like_env_key(key)` is true and redact those exact values from stdout/stderr before constructing `FailureReason`; add a test with a non-regex-shaped value like `CLO271_SECRET_TOKEN=plain-secret-value`.
 
