@@ -18,13 +18,15 @@ phases:
     review_gemini: "docs/reviews/clo-XX-design-gemini.md"
     review_synthesis: "docs/reviews/clo-XX-design-synthesis.md"
     review_verdict: "approve" | "approve_with_changes" | "rework"
-    finalized: true
     applied_suggestions: []
     flagged_suggestions: []
+    human_review_completed: true
+    plannotator_annotations: ""
+    finalized: true
 ```
 
 History events required: `design_draft_ready`, `design_review_complete`,
-`design_finalized`.
+`design_human_review_complete`, `design_finalized`.
 
 ## Step 1 - Generate the design draft
 
@@ -133,7 +135,75 @@ update_workflow_state({
 })
 ```
 
-## Step 4 - Finalize
+## Step 4 - Human review via plannotator
+
+The AI review iterations in Steps 2-3 caught what models can catch. This step
+is the human gate on the post-AI-review design before code starts landing.
+
+Print a one-line summary of what changed in Step 3 (count of applied vs
+flagged suggestions), then run:
+
+```bash
+/plannotator-review docs/designs/clo-XX-<slug>.md
+```
+
+Read the result. Plannotator returns either approved, or denied with
+inline annotations.
+
+**On approval:**
+
+```ts
+update_workflow_state({
+  task_id: "CLO-XX",
+  phase: "design",
+  action: "design_human_review_complete",
+  details: "Plannotator review approved.",
+  phase_updates: {
+    human_review_completed: true
+  }
+})
+```
+
+Then proceed to Step 5.
+
+**On denial with annotations:**
+
+```ts
+update_workflow_state({
+  task_id: "CLO-XX",
+  phase: "design",
+  action: "design_human_review_denied",
+  details: "<one-line summary, max 200 chars>",
+  phase_updates: {
+    human_review_completed: false,
+    plannotator_annotations: "<full annotation text>"
+  }
+})
+```
+
+Then print the full annotations to the user and **STOP**. Do not call
+`transition_phase`. Tell the user:
+
+```
+Plannotator denied the design. Annotations recorded in
+phases.design.plannotator_annotations. Edit
+docs/designs/clo-XX-<slug>.md by hand, then re-run
+/task:orchestrate CLO-XX to re-fire the gate.
+```
+
+**Re-entry on resume.** When the user re-runs `/task:orchestrate CLO-XX`
+after editing, the design phase will dispatch again. At that point
+`draft_ready: true` and `review_completed: true` are already set, so
+skip Steps 1-3 and re-enter at Step 4 (re-fire plannotator on the
+edited doc).
+
+If `/plannotator-review` is unavailable or returns an unparseable
+result, treat it as a denial with annotations =
+`"plannotator unavailable; manual review required"`. The user can
+either install plannotator and resume, or pass `validation_override:
+true` on the next `transition_phase` to bypass.
+
+## Step 5 - Finalize
 
 Re-read the design doc end-to-end. Make sure:
 
