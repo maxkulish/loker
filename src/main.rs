@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod apply_verify;
 mod backend;
 mod cache;

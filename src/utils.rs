@@ -2,6 +2,9 @@
 
 use colored::Colorize;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use crate::backend::BackendError;
 
@@ -195,9 +198,63 @@ pub fn truncate_utf8(s: &str, max_bytes: usize) -> &str {
         .unwrap_or("")
 }
 
+// ── Secret redaction ─────────────────────────────────────
+
+static AWS_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"AKIA[0-9A-Z]{16}").expect("valid regex"));
+
+static KEY_VALUE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)((?:api[_-]?key|secret|token|password)\s*[=:]\s*)[^\s'\"]+"#)
+        .expect("valid regex")
+});
+
+static BEARER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)Bearer\s+[A-Za-z0-9._\-~+/=]+").expect("valid regex"));
+
+static SECRET_HEURISTIC_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(key|secret|token)[\s:=]+([A-Za-z0-9+/=_\-]{32,})").expect("valid regex")
+});
+
+/// Redact common secret-like tokens from free text.
+pub fn redact_secrets(input: &str) -> String {
+    let mut result = AWS_KEY_RE.replace_all(input, "[REDACTED]").into_owned();
+    result = KEY_VALUE_RE
+        .replace_all(&result, "${1}[REDACTED]")
+        .into_owned();
+    result = BEARER_RE.replace_all(&result, "[REDACTED]").into_owned();
+    result = SECRET_HEURISTIC_RE
+        .replace_all(&result, "$1 [REDACTED]")
+        .into_owned();
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_redact_secrets_aws_key() {
+        assert_eq!(
+            redact_secrets("key: AKIA0123456789ABCDEF rest"),
+            "key: [REDACTED] rest"
+        );
+    }
+
+    #[test]
+    fn test_redact_secrets_api_key_value() {
+        assert_eq!(
+            redact_secrets("api_key=AKIA0123456789ABCDEF other"),
+            "api_key=[REDACTED] other"
+        );
+    }
+
+    #[test]
+    fn test_redact_secrets_bearer_token() {
+        assert_eq!(
+            redact_secrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9"),
+            "Authorization: [REDACTED]"
+        );
+    }
 
     #[test]
     fn test_truncate_short_string() {

@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)]
+
 //! Verification hooks for strategy gating.
 //!
 //! Each hook implements [`VerifyHook`] and returns a [`VerifyResult`]
@@ -11,7 +13,9 @@ pub mod run_command;
 pub mod verify;
 
 // Re-export the core types so `strategy::verify::FailureReason` etc. work.
-pub use verify::{FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult};
+pub use verify::{
+    FailureReason, SandboxViolation, VerifyContext, VerifyError, VerifyHook, VerifyResult,
+};
 
 // Re-export concrete implementations.
 pub use llm_verifier::LLMVerifier;

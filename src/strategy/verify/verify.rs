@@ -16,6 +16,19 @@
 //! reason into the next prompt. Hook implementations that log or persist
 //! `FailureReason` fields directly must apply their own redaction.
 
+/// Sandbox-level signal captured from command execution failures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SandboxViolation {
+    /// Wall-clock timeout expired while the command was running.
+    Timeout,
+    /// Process exited due to an OS signal (Unix-only).
+    Signal { signal: i32 },
+    /// Non-zero process exit code.
+    NonZeroExit { code: i32 },
+}
+
+// ── FailureReason ────────────────────────────────────────────
+
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -38,6 +51,7 @@ use crate::backend::QueryOutput;
 /// path runs `redact_secrets()` on the reason before flowing it into
 /// the next prompt. Hook implementations that log or persist
 /// `FailureReason` fields directly must apply their own redaction.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FailureReason {
     /// Human-readable summary (e.g. "test `it_adds` failed").
@@ -53,6 +67,8 @@ pub struct FailureReason {
     /// Exit code if the verifier ran as a process. `None` for in‑process
     /// verifiers (e.g. `LLMVerifier`).
     pub exit_code: Option<i32>,
+    /// Optional sandbox signal that further explains process termination.
+    pub sandbox_violation: Option<SandboxViolation>,
 }
 
 impl FailureReason {
@@ -65,6 +81,7 @@ impl FailureReason {
             stderr: String::new(),
             truncated: false,
             exit_code: None,
+            sandbox_violation: None,
         }
     }
 
@@ -89,6 +106,12 @@ impl FailureReason {
     /// Attach an exit code (builder-pattern).
     pub fn with_exit_code(mut self, exit_code: i32) -> Self {
         self.exit_code = Some(exit_code);
+        self
+    }
+
+    /// Attach sandbox metadata (builder-pattern).
+    pub fn with_sandbox_violation(mut self, sandbox_violation: SandboxViolation) -> Self {
+        self.sandbox_violation = Some(sandbox_violation);
         self
     }
 }

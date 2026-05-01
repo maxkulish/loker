@@ -10,7 +10,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::backend::Backend;
-use crate::strategy::verify::{FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult};
+use crate::strategy::verify::{
+    FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult,
+};
 
 /// Concrete verify hook that delegates to a backend and parses a
 /// deterministic yes/no verdict from the backend response.

@@ -31,7 +31,8 @@ pub use escalating_retry::EscalatingRetry;
 pub use parallel_fanout::{ParallelFanOut, TargetSpec};
 pub use single_model::SingleModel;
 pub use verify::{
-    FailureReason, LLMVerifier, RunCommand, VerifyContext, VerifyError, VerifyHook, VerifyResult,
+    FailureReason, LLMVerifier, RunCommand, SandboxViolation, VerifyContext, VerifyError,
+    VerifyHook, VerifyResult,
 };
 
 /// `schema_version` value emitted by every `StrategyOutput`. Pinned to the

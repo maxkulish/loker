@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-01T08:41:34.520Z'
-  updated_at: '2026-05-01T09:09:43.856Z'
+  updated_at: '2026-05-01T09:10:49.015Z'
 phases:
   discovery:
     status: complete
@@ -62,6 +62,7 @@ phases:
     status: in_progress
     commits:
       - 97c6a08
+      - f2a38e7
   pr:
     status: pending
   complete:
@@ -137,3 +138,7 @@ history:
     details: >-
       ST1 landed: Converted verify.rs to directory module (verify/mod.rs + verify/verify.rs + verify/llm_verifier.rs).
       Commit 97c6a08.
+  - timestamp: '2026-05-01T09:10:49.015Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: RunCommand struct with 8 fields, Default, builder pattern, skeleton VerifyHook impl. Commit f2a38e7.'
