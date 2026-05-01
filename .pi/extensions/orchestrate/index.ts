@@ -238,14 +238,16 @@ const PHASE_CONFIG: Record<string, {
   discovery: {
     requiredFields: ["status"],
     historyEvents: ["discovery_approved"],
+    auto_dispatch_after_transition: false,
   },
   spec: {
     requiredFields: ["status", "spec_file", "approved", "review_completed"],
     historyEvents: ["spec_approved"],
   },
   design: {
-    requiredFields: ["status", "design_doc", "draft_ready", "finalized", "review_completed"],
-    historyEvents: ["design_draft_ready", "design_review_complete", "design_finalized"],
+    requiredFields: ["status", "design_doc", "draft_ready", "finalized", "review_completed", "human_review_completed"],
+    historyEvents: ["design_draft_ready", "design_review_complete", "design_human_review_complete", "design_finalized"],
+    auto_dispatch_after_transition: false,
   },
   plan: {
     requiredFields: ["status", "plan_file", "approved"],
