@@ -279,8 +279,14 @@ gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
 
 ```bash
 gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
-  -X POST -f body="Intentionally kept as-is: <rationale>."
+  -X POST -f body="Intentionally kept as-is: <rationale>.
+
+/gemini review"
 ```
+
+The `/gemini review` trailer asks Gemini to re-evaluate after the
+rationale. If Gemini accepts, the thread can be resolved; if it pushes
+back, escalate via Step 4.
 
 Track reply count in state update.
 
