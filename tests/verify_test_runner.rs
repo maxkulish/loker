@@ -7,9 +7,6 @@
 
 use std::path::Path;
 
-#[cfg(unix)]
-use std::os::unix::process::ExitStatusExt;
-
 use loker::strategy::verify::run_command::{CapturedOutput, CommandRun};
 use loker::strategy::verify::{TestRunner, VerifyResult};
 
@@ -45,28 +42,32 @@ fn fake_captured_output(data: &str) -> CapturedOutput {
 }
 
 fn exit_status(code: i32) -> std::process::ExitStatus {
-    // On Unix, the raw waitpid status encodes exit code in bits 8-15.
-    // Exit code `code` has raw status `code << 8` (no signal).
     #[cfg(unix)]
     {
+        use std::os::unix::process::ExitStatusExt;
         std::process::ExitStatus::from_raw(code << 8)
     }
+
     #[cfg(not(unix))]
     {
-        // On non-Unix platforms, use the exit code directly.
-        std::process::ExitStatus::from_raw(code)
+        use std::os::windows::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(code as u32)
     }
 }
 
-fn fake_command_run(stdout_data: &str) -> CommandRun {
+fn fake_command_run_with_code(stdout_data: &str, exit_code: i32) -> CommandRun {
     CommandRun {
-        status: exit_status(0),
+        status: exit_status(exit_code),
         timed_out: false,
         stdout: fake_captured_output(stdout_data),
         stderr: fake_captured_output(""),
         secret_values: vec![],
         elapsed_ms: 10,
     }
+}
+
+fn fake_command_run(stdout_data: &str) -> CommandRun {
+    fake_command_run_with_code(stdout_data, 0)
 }
 
 /// Parse cargo fixture, then convert to VerifyResult.
@@ -185,6 +186,24 @@ fn pytest_4_pass_2_fail() {
 }
 
 #[test]
+fn pytest_noisy_multiline_output_is_parsed() {
+    let stdout = r#"INFO: running tests
+{
+  "created": 1234567890,
+  "duration": 0.1,
+  "exitcode": 0,
+  "root": "/tmp",
+  "summary": {"passed": 1, "failed": 0, "total": 1, "collected": 1},
+  "tests": [{"nodeid": "test.py::test_ok", "outcome": "passed"}]
+}
+INFO: done
+"#;
+    let result = TestRunner::parse_pytest_output(stdout);
+    assert_eq!(result.passed, 1);
+    assert_eq!(result.failed, 0);
+}
+
+#[test]
 fn pytest_non_json_exit() {
     // Simulate process exits non-zero with no JSON written
     let stdout = "pytest: error: no tests found in test_runner/\n";
@@ -208,6 +227,30 @@ fn pytest_non_json_exit() {
                 reason.summary.contains("no tests ran"),
                 "expected 'no tests ran', got: {}",
                 reason.summary
+            );
+        }
+        other => panic!("expected Fail, got {other:?}"),
+    }
+}
+
+#[test]
+fn verify_result_non_zero_exit_with_passing_tests_fails() {
+    let stdout = r#"{"type":"test","event":"ok","name":"test_a","test_type":"unit"}
+{"type":"test","event":"ok","name":"test_b","test_type":"unit"}
+"#;
+    let result = TestRunner::parse_cargo_output(stdout);
+    let run = fake_command_run_with_code(stdout, 1);
+    let vr = TestRunner::to_verify_result(run, result);
+    match vr {
+        VerifyResult::Fail { reason } => {
+            assert!(
+                reason.summary.contains("test runner exited with status 1"),
+                "expected non-zero status summary, got: {}",
+                reason.summary
+            );
+            assert!(
+                matches!(reason.sandbox_violation, Some(_)),
+                "expected sandbox violation for non-zero exit"
             );
         }
         other => panic!("expected Fail, got {other:?}"),

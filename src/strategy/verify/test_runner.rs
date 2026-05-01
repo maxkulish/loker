@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use serde::de::Deserialize;
 
 use super::run_command::RunCommand;
 use super::{FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult};
@@ -87,8 +88,8 @@ impl TestRunner {
     }
 
     /// Append extra arguments passed to the test command.
-    pub fn with_extra_args(mut self, args: &[&str]) -> Self {
-        self.extra_args = args.iter().map(|s| s.to_string()).collect();
+    pub fn with_extra_args(mut self, args: impl IntoIterator<Item: AsRef<str>>) -> Self {
+        self.extra_args = args.into_iter().map(|s| s.as_ref().to_string()).collect();
         self
     }
 
@@ -194,11 +195,7 @@ impl TestRunner {
                             value.get("stdout").and_then(|v| v.as_str()).map(|s| {
                                 let s = s.trim();
                                 // Truncate to first 200 chars for a concise excerpt
-                                if s.len() > 200 {
-                                    format!("{}…", &s[..200])
-                                } else {
-                                    s.to_string()
-                                }
+                                truncate_excerpt(s, 200)
                             });
                     }
                 }
@@ -225,13 +222,9 @@ impl TestRunner {
         // Fall back to line-by-line search if that fails.
         let maybe_value: Option<serde_json::Value> =
             serde_json::from_str(stdout).ok().or_else(|| {
-                stdout.lines().find_map(|line| {
-                    let line = line.trim();
-                    if line.starts_with('{') {
-                        serde_json::from_str(line).ok()
-                    } else {
-                        None
-                    }
+                stdout.find('{').and_then(|start| {
+                    let mut de = serde_json::Deserializer::from_str(&stdout[start..]);
+                    serde_json::Value::deserialize(&mut de).ok()
                 })
             });
 
@@ -291,13 +284,7 @@ impl TestRunner {
                     .or_else(|| t.get("longrepr"))
                     .and_then(|l| l.as_str())
             })
-            .map(|s| {
-                if s.len() > 200 {
-                    format!("{}…", &s[..200])
-                } else {
-                    s.to_string()
-                }
-            });
+            .map(|s| truncate_excerpt(s, 200));
 
         TestResult {
             passed,
@@ -362,11 +349,39 @@ impl TestRunner {
         }
 
         // Parse test output
+        if let Some(code) = exit_code {
+            if code != 0 && result.failed == 0 {
+                if result.passed == 0 {
+                    return VerifyResult::Fail {
+                        reason: FailureReason::new("no tests ran")
+                            .with_stdout(runner_stdout)
+                            .with_stderr(runner_stderr)
+                            .with_truncated(truncated)
+                            .with_exit_code(code)
+                            .with_sandbox_violation(
+                                crate::strategy::verify::SandboxViolation::NonZeroExit { code },
+                            ),
+                    };
+                }
+
+                return VerifyResult::Fail {
+                    reason: FailureReason::new(format!("test runner exited with status {code}"))
+                        .with_stdout(runner_stdout)
+                        .with_stderr(runner_stderr)
+                        .with_truncated(truncated)
+                        .with_exit_code(code)
+                        .with_sandbox_violation(
+                            crate::strategy::verify::SandboxViolation::NonZeroExit { code },
+                        ),
+                };
+            }
+        }
+
         if result.passed == 0 && result.failed == 0 {
             return VerifyResult::Fail {
                 reason: FailureReason::new("no tests ran")
                     .with_stdout(runner_stdout)
-                    .with_stderr(runner_stderr.clone())
+                    .with_stderr(runner_stderr)
                     .with_truncated(truncated)
                     .with_exit_code(exit_code.unwrap_or(1)),
             };
@@ -426,6 +441,38 @@ pub struct TestResult {
     pub failed: u32,
     pub first_failure_name: Option<String>,
     pub first_failure_excerpt: Option<String>,
+}
+
+fn truncate_excerpt(text: &str, max_chars: usize) -> String {
+    let normalized = text.trim();
+
+    let char_count = normalized.chars().count();
+    if char_count <= max_chars {
+        return normalized.to_string();
+    }
+
+    normalized
+        .chars()
+        .take(max_chars)
+        .collect::<String>()
+        .chars()
+        .chain(Some('…'))
+        .collect()
+}
+
+#[cfg(test)]
+fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(code << 8)
+    }
+
+    #[cfg(not(unix))]
+    {
+        use std::os::windows::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(code as u32)
+    }
 }
 
 // ── unit tests (parser logic only, no subprocess) ───────────
@@ -524,6 +571,24 @@ this is not json at all
         assert!(excerpt.contains("left == right"));
     }
 
+    #[test]
+    fn cargo_first_failure_truncates_utf8_excerpt_safely() {
+        let unicode_excerpt = "😀".repeat(260);
+        let output = format!(
+            "{{\"type\":\"test\",\"event\":\"ok\",\"name\":\"passing\",\"test_type\":\"unit\"}}\n{{\"type\":\"test\",\"event\":\"failed\",\"name\":\"failing_test\",\"test_type\":\"unit\",\"stdout\":\"{unicode_excerpt}\"}}",
+        );
+        let result = cargo_test_result(&output);
+
+        let excerpt = result
+            .first_failure_excerpt
+            .expect("expected excerpt to be captured");
+
+        assert_eq!(excerpt.chars().count(), 201);
+        assert!(excerpt.ends_with('…'));
+        assert!(excerpt.as_bytes().len() > 200);
+        assert!(excerpt.as_bytes().len() < 810);
+    }
+
     // ── Pytest parser ───────────────────────────────────────
 
     #[test]
@@ -588,13 +653,6 @@ this is not json at all
 
     // ── VerifyResult conversion ─────────────────────────────
 
-    #[cfg(unix)]
-    use std::os::unix::process::ExitStatusExt;
-
-    fn cargo_stdout_from_lines(lines: &str) -> String {
-        lines.to_string()
-    }
-
     fn fake_captured_output(data: &str) -> super::super::run_command::CapturedOutput {
         super::super::run_command::CapturedOutput {
             data: data.as_bytes().to_vec(),
@@ -605,25 +663,13 @@ this is not json at all
 
     fn fake_command_run(stdout_data: &str) -> super::super::run_command::CommandRun {
         super::super::run_command::CommandRun {
-            status: std::process::ExitStatus::from_raw(0),
+            status: exit_status_from_code(0),
             timed_out: false,
             stdout: fake_captured_output(stdout_data),
             stderr: fake_captured_output(""),
             secret_values: vec![],
             elapsed_ms: 10,
         }
-    }
-
-    // Only available on cfg(unix)
-    #[cfg(not(unix))]
-    fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
-        std::process::ExitStatus::from_raw(code)
-    }
-
-    #[cfg(unix)]
-    fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
-        use std::os::unix::process::ExitStatusExt;
-        std::process::ExitStatus::from_raw(code)
     }
 
     #[test]
