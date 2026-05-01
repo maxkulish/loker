@@ -4,7 +4,7 @@
 
 **Goal:** Add per-phase pause boundaries to the Pi orchestrator so the user can switch models manually at `discovery → design` and `design → plan`, and add a plannotator human-review gate inside the design phase before finalize.
 
-**Architecture:** Three deliverables - extend `PHASE_CONFIG` in the orchestrate extension with an optional `auto_dispatch_after_transition` flag and a new banner helper, insert a plannotator gate as Step 4 in `.pi/orchestrator/phases/design.md` (renumbering finalize to Step 5), and mirror the gate change in `.claude/commands/task/phases/design.md` for schema parity.
+**Architecture:** Two deliverables - extend `PHASE_CONFIG` in the orchestrate extension with an optional `auto_dispatch_after_transition` flag and a new banner helper, and insert a plannotator gate as Step 4 in `.pi/orchestrator/phases/design.md` (renumbering finalize to Step 5). Scope is `.pi/` only; the Claude command set is out of scope.
 
 **Tech Stack:** TypeScript (Pi extension, no tsc - runtime-loaded), Markdown (phase files), js-yaml workflow YAML, plannotator slash commands.
 
@@ -18,9 +18,8 @@
 |------|--------|----------------|
 | `.pi/extensions/orchestrate/index.ts` | Modify | Add `auto_dispatch_after_transition` to `PHASE_CONFIG` type and entries; add new design required field and history event; implement `emitPauseBanner`; gate `transition_phase` dispatch on the flag. |
 | `.pi/orchestrator/phases/design.md` | Modify | Insert Step 4 plannotator gate; renumber existing Step 4 finalize to Step 5; document idempotent re-entry on denial. |
-| `.claude/commands/task/phases/design.md` | Modify | Mirror the plannotator gate so the Claude side stays in schema parity. |
 
-No new test files: the orchestrate extension has no Node test harness (`package.json` `scripts: {}`). Verification is by smoke-loading the extension and running an end-to-end integration test on a throwaway CLO task. The integration test is Task 7.
+No new test files: the orchestrate extension has no Node test harness (`package.json` `scripts: {}`). Verification is by smoke-loading the extension and running an end-to-end integration test on a throwaway CLO task. The integration test is Task 6.
 
 ---
 
@@ -436,85 +435,14 @@ git commit -m "design phase: add plannotator human-review gate as Step 4 before 
 
 ---
 
-## Task 6: Mirror the plannotator gate in the Claude command set
+## Task 6: Manual integration test on a throwaway task
 
-**Files:**
-- Modify: `.claude/commands/task/phases/design.md`
-
-This file is the Claude-side mirror of the Pi phase markdown. Schema-parity rule (from `.pi/IMPLEMENTATION_SUMMARY.md`): every change to required exit state and history events on one side must mirror on the other.
-
-- [ ] **Step 6.1: Update the YAML checkpoint section**
-
-Find the YAML block (around lines 220-243). Add two new lines immediately before `phases.design.finalized: true`:
-
-```yaml
-phases.design.human_review_completed: <true|false>  # plannotator approved
-phases.design.plannotator_annotations: <string>     # only set on denial
-phases.design.finalized: true
-```
-
-- [ ] **Step 6.2: Insert plannotator review step before finalization in the checkpoint flow**
-
-Locate the section `## Status: checkpoint` (around line 158). Inside the `If approve` branch (currently around line 199), the existing flow goes straight to `/design-doc:finalize`. Replace step 6 with this expanded version:
-
-```markdown
-6. **If approve**:
-   - **Run plannotator gate**: Invoke `/plannotator-review docs/design-docs/clo-XX-*.md`
-   - **If plannotator approves:**
-     - Update state: `phases.design.human_review_completed: true`
-     - Update state: `phases.design.plannotator_annotations: ""`
-     - Add history entry: `design_human_review_complete`
-     - **Invoke**: `/design-doc:finalize CLO-XX`
-     - Update state:
-       - `phases.design.finalized: true`
-       - `phases.design.status: complete`
-       - `workflow.current_phase: plan`
-       - `workflow.status: in_progress`
-     - Add history entry: `design_finalized`
-     - **Continue to PLAN phase**
-   - **If plannotator denies with annotations:**
-     - Update state: `phases.design.human_review_completed: false`
-     - Update state: `phases.design.plannotator_annotations: <full annotation text>`
-     - Add history entry: `design_human_review_denied`
-     - Print the annotations to the user
-     - Tell the user: "Plannotator denied. Edit `docs/design-docs/clo-XX-*.md` by hand, then re-run `/task:orchestrate CLO-XX` to re-fire the gate."
-     - **STOP**. Do NOT advance to plan phase.
-   - **If plannotator is unavailable:**
-     - Treat as denial with annotations = "plannotator unavailable; manual review required"
-     - Same stop behavior as denial
-```
-
-- [ ] **Step 6.3: Sanity-check parity**
-
-```bash
-grep -c "human_review_completed\|design_human_review_complete\|plannotator_annotations" .claude/commands/task/phases/design.md
-```
-
-Expected: at least four matches.
-
-```bash
-grep -c "human_review_completed\|design_human_review_complete\|plannotator_annotations" .pi/orchestrator/phases/design.md
-```
-
-Expected: at least four matches. The two files should be in rough parity now.
-
-- [ ] **Step 6.4: Commit**
-
-```bash
-git add .claude/commands/task/phases/design.md
-git commit -m "design phase (claude): mirror plannotator gate for schema parity"
-```
-
----
-
-## Task 7: Manual integration test on a throwaway task
-
-This task has no automated test harness; verification is end-to-end on a real workflow YAML. Run this checklist after Tasks 1-6 are committed.
+This task has no automated test harness; verification is end-to-end on a real workflow YAML. Run this checklist after Tasks 1-5 are committed.
 
 **Files:**
 - Inspect (no edits): `docs/status/clo-99-workflow.yaml` (created by Pi during the test, deleted at the end)
 
-- [ ] **Step 7.1: Pick a throwaway task ID**
+- [ ] **Step 6.1: Pick a throwaway task ID**
 
 Use `CLO-99` (or any unused number). Confirm it is not in use:
 
@@ -522,11 +450,11 @@ Use `CLO-99` (or any unused number). Confirm it is not in use:
 ls docs/status/clo-99-workflow.yaml 2>/dev/null && echo "EXISTS - pick another number" || echo "OK - clo-99 free"
 ```
 
-- [ ] **Step 7.2: Smoke-load the orchestrate extension**
+- [ ] **Step 6.2: Smoke-load the orchestrate extension**
 
 In a fresh Pi session in this repo, run any orchestrator tool (e.g., `update_workflow_state`) on the throwaway task. The extension should load without error. If it fails to load, fix the syntax error before continuing.
 
-- [ ] **Step 7.3: Walk through init → discovery → pause**
+- [ ] **Step 6.3: Walk through init → discovery → pause**
 
 Run init and discovery for `CLO-99` (use any small fake spec). After `discovery_approved` and the `transition_phase(from=discovery, to=design)` call, verify:
 
@@ -534,7 +462,7 @@ Run init and discovery for `CLO-99` (use any small fake spec). After `discovery_
 - `docs/status/clo-99-workflow.yaml` shows `workflow.current_phase: design`.
 - The design phase markdown is **not** dispatched. There is no follow-up message containing `# Phase: design` or its instructions.
 
-- [ ] **Step 7.4: Resume into design and verify the plannotator gate**
+- [ ] **Step 6.4: Resume into design and verify the plannotator gate**
 
 Run `/task:orchestrate CLO-99`. Pi should now dispatch `design.md` and walk through Steps 1-3. At Step 4 it should run `/plannotator-review` on the draft.
 
@@ -545,9 +473,9 @@ Approve the doc in plannotator. Verify:
 - The phase advances to Step 5 (finalize), then `transition_phase(from=design, to=plan)` fires.
 - The pause banner prints again with `PAUSE: design -> plan boundary`.
 
-- [ ] **Step 7.5: Test the denial path**
+- [ ] **Step 6.5: Test the denial path**
 
-Repeat Step 7.3 for a fresh `CLO-98`, but this time at the plannotator gate, **deny** with annotations. Verify:
+Repeat Step 6.3 for a fresh `CLO-98`, but this time at the plannotator gate, **deny** with annotations. Verify:
 
 - `phases.design.human_review_completed: false` is in YAML.
 - `phases.design.plannotator_annotations` contains the annotation text.
@@ -557,11 +485,11 @@ Repeat Step 7.3 for a fresh `CLO-98`, but this time at the plannotator gate, **d
 
 Then edit the design doc by hand (any small change), re-run `/task:orchestrate CLO-98`, and confirm the phase re-enters at Step 4 (no redrafting, no AI re-review) and re-fires plannotator.
 
-- [ ] **Step 7.6: Test the validation_override escape hatch**
+- [ ] **Step 6.6: Test the validation_override escape hatch**
 
 Manually call `transition_phase(from=design, to=plan, validation_override=true)` while `human_review_completed: false`. Confirm the transition succeeds and the pause banner still prints (the override skips the required-field check but the auto-dispatch flag still applies).
 
-- [ ] **Step 7.7: Clean up**
+- [ ] **Step 6.7: Clean up**
 
 Delete the throwaway YAMLs:
 
@@ -569,23 +497,23 @@ Delete the throwaway YAMLs:
 rm -f docs/status/clo-98-workflow.yaml docs/status/clo-99-workflow.yaml
 ```
 
-- [ ] **Step 7.8: Commit a one-line note recording the integration result**
+- [ ] **Step 6.8: Commit a one-line note recording the integration result**
 
-If the test passed, no code changes are needed; just record completion. If you found bugs, fix them, then commit fixes and re-run Step 7.3-7.6 until clean. End with:
+If the test passed, no code changes are needed; just record completion. If you found bugs, fix them, then commit fixes and re-run Step 6.3-6.6 until clean. End with:
 
 ```bash
 git log --oneline -10
 ```
 
-Verify the six commits from Tasks 1-6 land in order, plus any fix commits from this task.
+Verify the five commits from Tasks 1-5 land in order, plus any fix commits from this task.
 
 ---
 
 ## Self-review checklist
 
-After all seven tasks complete, run this final check:
+After all six tasks complete, run this final check:
 
-- [ ] **Spec coverage.** Every Goal in the spec maps to a task: pause flag (Tasks 1, 2, 4), banner helper (Task 3), plannotator gate (Tasks 5, 6), schema parity (Task 6), banner text constraints (Task 3 banner text matches spec). Every Non-goal in the spec is preserved (no auto model switching, no auto-fix loop, no implement→pr pause, no reviewer-roster change, no `ctx.compact()` plumbing).
+- [ ] **Spec coverage.** Every Goal in the spec maps to a task: pause flag (Tasks 1, 2, 4), banner helper (Task 3), plannotator gate (Task 5), banner text constraints (Task 3 banner text matches spec). Every Non-goal in the spec is preserved (no auto model switching, no auto-fix loop, no implement→pr pause, no reviewer-roster change, no `ctx.compact()` plumbing).
 - [ ] **No placeholders.** Each task step contains exact file paths, exact code, and exact commands. No "TBD" or "implement appropriate handling".
-- [ ] **Type and naming consistency.** `auto_dispatch_after_transition` is spelled identically in the type, the entries, and the gate. `human_review_completed`, `plannotator_annotations`, `design_human_review_complete`, and `design_human_review_denied` are spelled identically across both phase markdown files and the orchestrate extension.
-- [ ] **Existing escape hatches preserved.** `validation_override` still bypasses the required-field check; the pause flag is independent and still applies on override (Task 7.6 confirms).
+- [ ] **Type and naming consistency.** `auto_dispatch_after_transition` is spelled identically in the type, the entries, and the gate. `human_review_completed`, `plannotator_annotations`, `design_human_review_complete`, and `design_human_review_denied` are spelled identically across the orchestrate extension and `.pi/orchestrator/phases/design.md`.
+- [ ] **Existing escape hatches preserved.** `validation_override` still bypasses the required-field check; the pause flag is independent and still applies on override (Task 6.6 confirms).

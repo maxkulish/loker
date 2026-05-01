@@ -1,7 +1,7 @@
 # Design: Pi orchestrator flow improvements
 
 **Date:** 2026-05-01
-**Scope:** loker `.pi/` (Pi extension) and `.claude/commands/task/` (Claude command set), schema parity between them.
+**Scope:** loker `.pi/` (Pi extension) only. The `.claude/commands/task/` command set is out of scope.
 **Status:** Draft for user review.
 
 ## Problem
@@ -18,7 +18,6 @@ Both problems share one fix surface: the orchestrator needs declarative pause po
 - Add per-phase pause flag in `PHASE_CONFIG`. When set, `transition_phase` records the transition but does **not** auto-dispatch the next phase. The orchestrator prints an instruction banner instead and exits. The user resumes manually via `/task:orchestrate CLO-XX`.
 - Wire two pause points: `discovery → design` and `design → plan`. These are the model-switch boundaries.
 - Add a plannotator review gate inside `design.md` between "apply AI feedback" and "finalize". On approval, design completes normally. On denial, orchestrator captures annotations to YAML, prints them, and stops the design phase.
-- Mirror all phase-markdown and YAML-schema changes in `.claude/commands/task/phases/design.md` so the Claude side stays in parity.
 - Print pause banners that name the boundary and the resume command, but do **not** name a specific model. The user is empirically discovering which model is "smart enough" for design.
 
 ## Non-goals
@@ -276,8 +275,6 @@ Add to whatever test harness already exists for the extension. If there is none,
 
 - Banner is readable in the Pi terminal UI (no markdown swallowing, line breaks correct).
 - `validation_override: true` still allows forcing the transition out of design even with `human_review_completed: false` (escape hatch must keep working).
-- `.claude/commands/task/phases/design.md` mirror produces the same YAML when run through Claude Code.
-- Schema-parity script (if one exists in the repo) does not flag the new fields as drift.
 
 ## Migration / rollout
 
