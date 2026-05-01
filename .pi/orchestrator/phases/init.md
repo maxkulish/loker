@@ -62,7 +62,7 @@ named in `workflow.current_phase`.
 
 Set `task_type` and write `classification_reason` describing the signal.
 
-### 2.4 Pre-create workflow file
+### 2.4 Record classification and Linear metadata
 
 Call:
 
@@ -70,10 +70,9 @@ Call:
 update_workflow_state({
   task_id: "CLO-42",
   phase: "init",
-  action: "workflow_started",
-  details: "Created from Linear issue CLO-42. Classified as <type>: <reason>",
+  action: "init_classified",
+  details: "Classified as <type>: <reason>",
   workflow_updates: {
-    current_phase: <first phase>,
     status: "active"
   },
   linear_updates: {
@@ -94,14 +93,9 @@ update_workflow_state({
 })
 ```
 
-First phase by task type:
-
-| Task type | First phase |
-|---|---|
-| `development` (default) | `discovery` |
-| `development` + `--skip-discovery` | `plan` |
-| `specification` | `spec` |
-| `operational` | `operational` |
+Do NOT set `workflow_updates.current_phase` here. The phase must stay
+`"init"` until Step 3's `transition_phase` call - otherwise the
+`from === currentPhase` check in the transition validator fails.
 
 ### 2.5 Project sync start
 
@@ -122,16 +116,36 @@ If those aggregation files are added later, update the equivalent Claude
 flow at `.claude/commands/task/phases/init.md` first - this pi script
 mirrors it.
 
-## Step 3 - Dispatch first phase
+## Step 3 - Transition to the first real phase
 
-The `task:orchestrate` slash command auto-dispatches the phase named in
-`workflow.current_phase`. Once `update_workflow_state` set it correctly
-in 2.4, no extra step is needed - the runtime sends the matching
-`.pi/orchestrator/phases/<phase>.md` as a follow-up prompt.
+Pick the first phase from the classified `task_type` and call
+`transition_phase`:
 
-Do NOT call `transition_phase` from `init`: there is no `init` entry in
-`ALLOWED_TRANSITIONS`. Init is a virtual phase that ends the moment the
-workflow file is written.
+| `task_type` | First phase |
+|---|---|
+| `development` | `discovery` |
+| `specification` | `spec` |
+| `operational` | `operational` |
+
+```ts
+transition_phase({
+  task_id: "CLO-42",
+  from_phase: "init",
+  to_phase: "<discovery|spec|operational>"
+})
+```
+
+`init` has no `PHASE_CONFIG` entry, so the validator skips the
+required-fields/history-events checks. The remaining gates are the
+`from === currentPhase` check (why Step 2.4 must not mutate
+`current_phase`) and `to_phase` being in the allowed sets:
+`ALLOWED_TRANSITIONS.init` and `TYPE_ALLOWED_PHASES[task_type]`. The
+runtime auto-dispatches the destination phase markdown as a follow-up
+prompt in the same session.
+
+(`--ops`, `--spec`, and `--skip-discovery` short-circuit init.md
+entirely - the slash command handler rewrites `current_phase` before
+dispatch, so a different phase file runs instead of this one.)
 
 ## Runtime contract for every later phase
 
