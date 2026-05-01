@@ -1103,6 +1103,30 @@ async function showStatus(pi: ExtensionAPI, taskId: string, ctx: ExtensionContex
   await dispatchPhase(pi, taskId, "status", state, statePath, workspaceRoot);
 }
 
+async function emitPauseBanner(
+  pi: ExtensionAPI,
+  taskId: string,
+  fromPhase: string,
+  toPhase: string,
+): Promise<void> {
+  const banner = [
+    "============================================================",
+    `PAUSE: ${fromPhase} -> ${toPhase} boundary`,
+    "============================================================",
+    `Phase ${fromPhase} is complete. Workflow YAML is updated;`,
+    `current_phase is now ${toPhase}.`,
+    "",
+    "This boundary is a model-switch point. Switch to your",
+    `preferred model for ${toPhase} work, then resume:`,
+    "",
+    `  /task:orchestrate ${taskId}`,
+    "",
+    "The next phase will not run until you do.",
+    "============================================================",
+  ].join("\n");
+  pi.sendUserMessage(banner, { deliverAs: "followUp" });
+}
+
 async function dispatchPhase(
   pi: ExtensionAPI,
   taskId: string,
