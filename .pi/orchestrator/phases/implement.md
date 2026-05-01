@@ -8,6 +8,12 @@ Mirrors `.claude/commands/task/phases/implement.md`.
 
 ## Required exit state
 
+**Every field below is mandatory.** `status: complete` is only legal once
+the validation gate (Step 4) has produced all three review files AND the
+synthesis verdict is `approve` or `approve_with_changes` with the single
+fix iteration applied. See Step 4.6 for the hard checklist that gates
+Step 5.
+
 ```yaml
 phases:
   implement:
@@ -24,6 +30,11 @@ phases:
 
 History events required: `implementation_complete`,
 `codex_validation_complete`.
+
+**Anti-pattern:** opening the PR before Step 4.6 passes. If you find
+yourself thinking "I'll just push the PR and address validation comments
+in review", stop. That is the failure mode this gate exists to prevent.
+Codex/Gemini findings are pre-PR blockers, not review-cycle suggestions.
 
 ## Step 1 - Land sub-tasks
 
@@ -66,11 +77,15 @@ update_workflow_state({
   phase: "implement",
   action: "implementation_complete",
   details: "All sub-tasks landed. make check green. <n> commits.",
-  phase_updates: { status: "complete" }
+  phase_updates: { status: "validating" }
 })
 ```
 
-Note: do NOT `transition_phase` yet. Run the validation gate first.
+Note: `status` is `validating`, NOT `complete`. The phase only completes
+after Step 4 produces all three review files and the synthesis verdict
+permits it (Step 4.5). Setting `status: complete` here would let an agent
+open a PR while skipping the validation gate - that is the bug this
+ordering prevents. Do NOT call `transition_phase` until Step 4.6 passes.
 
 ## Step 4 - Two-reviewer validation + synthesis gate (MANDATORY)
 
@@ -215,6 +230,12 @@ record them in the synthesis report and ask the user whether to continue.
 
 ### 4.5 Record validation result
 
+Only set `status: complete` when the synthesis verdict is `approve` or
+`approve_with_changes` AND (for `approve_with_changes`) the single fix
+iteration has been applied and `make check` is green again. For `pivot`
+or `rework`, leave `status: validating` and stop - the phase is not
+complete; jump to Step 4.4's escalation path.
+
 ```ts
 update_workflow_state({
   task_id: "CLO-XX",
@@ -222,6 +243,7 @@ update_workflow_state({
   action: "codex_validation_complete",
   details: "Codex: <verdict>. Gemini: <verdict>. Synthesis: <verdict>. <fixes> applied.",
   phase_updates: {
+    status: "complete",   // ONLY for approve / approve_with_changes (after fix)
     codex_validated: true,
     codex_verdict: "<approve|approve_with_changes|rework>",
     codex_report: "docs/reviews/clo-XX-codex-validation.md",
@@ -236,7 +258,62 @@ update_workflow_state({
 `codex_verdict` remains for backward compatibility. Use the synthesis
 verdict as the decision source for PR transition.
 
+### 4.6 Pre-transition checklist (MANDATORY)
+
+Before calling `transition_phase` in Step 5, every item below MUST hold.
+If any check fails, the validation gate has not passed - either return
+to Step 4.4 (apply the single permitted fix) or stop and escalate to the
+user. Do NOT open a PR, do NOT call `transition_phase`, do NOT mark the
+phase complete.
+
+Run the file-existence check verbatim:
+
+```bash
+TASK=clo-XX
+for f in \
+  docs/reviews/${TASK}-codex-validation.md \
+  docs/reviews/${TASK}-gemini-validation.md \
+  docs/reviews/${TASK}-validation-synthesis.md
+do
+  if [ ! -s "$f" ]; then
+    echo "GATE FAIL: missing or empty $f"
+    exit 1
+  fi
+done
+echo "GATE OK: all three validation reports present"
+```
+
+Then verify each item by reading the workflow YAML and the synthesis
+report:
+
+- [ ] `phases.implement.status == "complete"` (not `validating`,
+      `in_progress`, or unset).
+- [ ] `phases.implement.codex_validated == true`.
+- [ ] `phases.implement.codex_report` points to an existing,
+      non-empty file with a final `## Verdict` section.
+- [ ] `phases.implement.gemini_validation_report` points to an existing,
+      non-empty file with a final `## Verdict` section.
+- [ ] `phases.implement.validation_synthesis_report` points to an
+      existing, non-empty file.
+- [ ] `phases.implement.validation_synthesis_verdict` is `approve` or
+      `approve_with_changes`. Anything else is a stop.
+- [ ] If verdict is `approve_with_changes`,
+      `phases.implement.validation_fix_iteration_count == 1` AND every
+      "Must Fix Before PR" item from the synthesis report is reflected
+      in the diff (re-read the synthesis to confirm).
+- [ ] `make check` is green on the current HEAD (re-run if any commits
+      landed since the last green run).
+- [ ] History contains both `implementation_complete` and
+      `codex_validation_complete` events.
+
+If any synthesis "Must Fix" item is unaddressed, the gate fails -
+returning to it later as PR-review feedback is not acceptable. Codex and
+Gemini are pre-PR reviewers; the human and bot reviewers in Step 3.5 of
+`pr.md` are not a substitute.
+
 ## Step 5 - Transition to PR
+
+Only after every Step 4.6 box is checked:
 
 ```ts
 transition_phase({
