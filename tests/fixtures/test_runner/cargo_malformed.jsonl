@@ -1,0 +1,4 @@
+{"type":"test","event":"ok","name":"good_test","test_type":"unit"}
+this is not json at all
+{"type":"test","event":"ok","name":"another_test","test_type":"unit"}
+{"type":"test","event":"failed","name":"bad_test","test_type":"unit","stdout":"failure!"}
