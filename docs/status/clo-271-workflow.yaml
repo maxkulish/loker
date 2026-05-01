@@ -16,10 +16,10 @@ linear:
   blocked_by: []
   branch_actual: feat/clo-271-run-command-01
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-01T08:41:34.520Z'
-  updated_at: '2026-05-01T10:28:08.748Z'
+  updated_at: '2026-05-01T10:43:16.153Z'
 phases:
   discovery:
     status: complete
@@ -66,8 +66,15 @@ phases:
       - 3444c4f
       - 984095a
       - a29e85f
+    codex_report: docs/reviews/clo-271-codex-validation.md
+    codex_validated: true
+    codex_verdict: rework
+    gemini_validation_report: docs/reviews/clo-271-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-271-validation-synthesis.md
+    validation_synthesis_verdict: approve
   pr:
-    status: pending
+    status: in_progress
   complete:
     status: pending
 history:
@@ -162,3 +169,22 @@ history:
     details: >-
       Synced commits list: added 984095a (feat(verify): implement shell-command verify hook) and a29e85f
       (feat(strategy): add RunCommand verify hook)
+  - timestamp: '2026-05-01T10:42:24.662Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (1 major: secret redaction unused). Gemini: approve_with_changes (2 major: secret redaction +
+      Windows timeout; 1 nit: double redaction). Synthesis: approve_with_changes → 2 must-fix applied in commit 7b5bbcd.
+      Re-validation: approve. make check green.
+  - timestamp: '2026-05-01T10:42:30.898Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-01T10:42:37.844Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr. Validation gate complete. 1 fix iteration applied (7b5bbcd).
+  - timestamp: '2026-05-01T10:43:16.153Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (1176 tests, 0 failures, 0 warnings)'
