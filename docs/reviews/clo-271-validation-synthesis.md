@@ -7617,3 +7617,24 @@ rework
 
 ## Recommendation
 Apply one fix iteration before PR. The branch is close, but the pipe deadlock, implicit cwd inheritance, and missing cancellation cleanup are real in-scope defects in the new `RunCommand` hook and should be fixed together before proceeding.
+
+---
+
+## Re-validation (after fix iteration)
+
+Fixed in commit bf18bec:
+
+1. **Sequential stdout/stderr draining** — Changed to concurrent reads via `tokio::join!` in `execute_command()`. The two `read_stream` calls now run in parallel, eliminating the deadlock risk.
+
+2. **`cwd: None` inherits orchestrator cwd** — Added explicit `command.current_dir("/")` in the `else` branch when `cwd` is `None`. This guarantees the child never inherits the parent's working directory.
+
+3. **Cancellation safety** — Added `ChildGuard` RAII wrapper around `tokio::process::Child` that calls `kill_process_group()` on drop unless disarmed. Also set `command.kill_on_drop(true)` as an additional safety net. On successful completion, `child.disarm()` is called to prevent double-kill.
+
+4. **Tests** — All 13 existing unit tests continue to pass. The fixes maintain backward compatibility (no API surface changes).
+
+`make check` green: 640+529 unit tests + integration tests, 0 failures, 0 warnings.
+
+## Updated Verdict
+approve_with_changes
+
+All must-fix items addressed in one fix iteration. Proceed to PR.

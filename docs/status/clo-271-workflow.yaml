@@ -21,10 +21,10 @@ linear:
   priority: 3
   branch_actual: feat/clo-271-run-command
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: complete
   created_at: '2026-05-01T09:52:00Z'
-  updated_at: '2026-05-01T08:15:35.961Z'
+  updated_at: '2026-05-01T08:35:37.529Z'
 phases:
   discovery:
     status: complete
@@ -52,13 +52,22 @@ phases:
     status: complete
     commits:
       - b60373d
+      - bf18bec
     pre_flight_checks_passed: true
+    codex_report: docs/reviews/clo-271-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-271-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-271-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
-    pr_number: null
-    pr_url: null
+    status: in_progress
+    pr_number: 27
+    pr_url: https://github.com/maxkulish/loker/pull/27
     reviews_addressed: false
     approved: false
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -83,3 +92,25 @@ history:
     details: >-
       RunCommand verify hook implemented. 13 unit tests passing. make check green (1232 tests, 0 failures, 0 warnings).
       1 commit (b60373d).
+  - timestamp: '2026-05-01T08:30:01.103Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (sandbox/cwd/cancellation findings). Gemini: rework (same findings). Synthesis: approve_with_changes
+      after fix iteration. 3 must-fix items applied in commit bf18bec. make check green.
+  - timestamp: '2026-05-01T08:30:30.555Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-01T08:32:35.613Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (12 test suites, 0 failures)'
+  - timestamp: '2026-05-01T08:33:03.005Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #27 opened: https://github.com/maxkulish/loker/pull/27'
+  - timestamp: '2026-05-01T08:35:37.529Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required CI checks passing: format pass, clippy pass, test pass (2m5s)'

@@ -296,6 +296,8 @@ async fn execute_command(
             ChildGuard::kill(&child.inner);
             // Reap the child
             let _ = child.inner.wait().await;
+            // Disarm the guard to prevent double SIGKILL on drop
+            child.disarm();
 
             Ok(RunResult {
                 stdout_bytes: Vec::new(),
