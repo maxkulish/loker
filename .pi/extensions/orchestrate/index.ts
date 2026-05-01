@@ -1043,10 +1043,22 @@ export default function (pi: ExtensionAPI) {
         workflow_status: state.workflow?.status,
       });
       persistRuntimeState(params.task_id, state);
-      await dispatchPhase(pi, params.task_id, params.to_phase, state, statePath, workspaceRoot);
+
+      const fromConfig = PHASE_CONFIG[params.from_phase];
+      const shouldAutoDispatch = fromConfig?.auto_dispatch_after_transition !== false;
+
+      if (shouldAutoDispatch) {
+        await dispatchPhase(pi, params.task_id, params.to_phase, state, statePath, workspaceRoot);
+      } else {
+        await emitPauseBanner(pi, params.task_id, params.from_phase, params.to_phase);
+      }
+
+      const replyText = shouldAutoDispatch
+        ? `Transitioned to ${params.to_phase} phase and dispatched instructions`
+        : `Transitioned to ${params.to_phase} phase. Paused at model-switch boundary; user must resume via /task:orchestrate ${params.task_id}.`;
 
       return {
-        content: [{ type: "text", text: `Transitioned to ${params.to_phase} phase and dispatched instructions` }],
+        content: [{ type: "text", text: replyText }],
         details: {
           task_id: params.task_id,
           from_phase: params.from_phase,
