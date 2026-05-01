@@ -1,4 +1,9 @@
-//! Verification hook trait used by ladder strategies (`EscalatingRetry`).
+//! Core verification types and trait.
+//!
+//! This module defines the `VerifyHook` trait and supporting types
+//! (`VerifyResult`, `FailureReason`, `VerifyError`, `VerifyContext`).
+//! Concrete implementations live in sibling modules (`llm_verifier`,
+//! `run_command`).
 //!
 //! v0 hooks only need `Pass` and `Fail`. `Repair` and `Score` are reserved so
 //! later hook implementations can evolve without changing the public enum.
@@ -11,14 +16,25 @@
 //! reason into the next prompt. Hook implementations that log or persist
 //! `FailureReason` fields directly must apply their own redaction.
 
-use std::collections::HashMap;
-use std::path::Path;
-use std::sync::Arc;
+/// Sandbox-level signal captured from command execution failures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SandboxViolation {
+    /// Wall-clock timeout expired while the command was running.
+    Timeout,
+    /// Process exited due to an OS signal (Unix-only).
+    Signal { signal: i32 },
+    /// Non-zero process exit code.
+    NonZeroExit { code: i32 },
+}
+
+// ── FailureReason ────────────────────────────────────────────
+
 use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::backend::{Backend, QueryOutput};
+use crate::backend::QueryOutput;
+
 // ── FailureReason ────────────────────────────────────────────
 
 /// Structured reason a verification hook returned `Fail`.
@@ -35,6 +51,7 @@ use crate::backend::{Backend, QueryOutput};
 /// path runs `redact_secrets()` on the reason before flowing it into
 /// the next prompt. Hook implementations that log or persist
 /// `FailureReason` fields directly must apply their own redaction.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FailureReason {
     /// Human-readable summary (e.g. "test `it_adds` failed").
@@ -50,6 +67,8 @@ pub struct FailureReason {
     /// Exit code if the verifier ran as a process. `None` for in‑process
     /// verifiers (e.g. `LLMVerifier`).
     pub exit_code: Option<i32>,
+    /// Optional sandbox signal that further explains process termination.
+    pub sandbox_violation: Option<SandboxViolation>,
 }
 
 impl FailureReason {
@@ -62,6 +81,7 @@ impl FailureReason {
             stderr: String::new(),
             truncated: false,
             exit_code: None,
+            sandbox_violation: None,
         }
     }
 
@@ -86,6 +106,12 @@ impl FailureReason {
     /// Attach an exit code (builder-pattern).
     pub fn with_exit_code(mut self, exit_code: i32) -> Self {
         self.exit_code = Some(exit_code);
+        self
+    }
+
+    /// Attach sandbox metadata (builder-pattern).
+    pub fn with_sandbox_violation(mut self, sandbox_violation: SandboxViolation) -> Self {
+        self.sandbox_violation = Some(sandbox_violation);
         self
     }
 }
@@ -269,135 +295,6 @@ pub trait VerifyHook: Send + Sync {
     fn name(&self) -> &str;
 
     async fn verify(&self, ctx: &VerifyContext) -> Result<VerifyResult, VerifyError>;
-}
-
-// ── LLMVerifier ────────────────────────────────────────────
-
-/// Concrete verify hook that delegates to a backend and parses a
-/// deterministic yes/no verdict from the backend response.
-pub struct LLMVerifier {
-    /// Identifier used for observability/debugging.
-    pub backend: String,
-    backend_client: Arc<dyn Backend>,
-    /// Optional model override passed to the backend.
-    pub model: Option<String>,
-    /// Prompt template used for verification. `{candidate}` is replaced with
-    /// the candidate text under test; any `{key}` present in `params`
-    /// is also substituted.
-    pub prompt_template: String,
-    /// Optional system-level context prepended to the candidate prompt.
-    pub system_prompt: Option<String>,
-    /// Temperature hint used when available. `0.0` is deterministic default.
-    pub temperature: f32,
-    params: HashMap<String, String>,
-}
-
-impl LLMVerifier {
-    pub const DEFAULT_TEMPERATURE: f32 = 0.0;
-
-    /// Construct a verifier bound to a backend object.
-    pub fn new(
-        backend: impl Into<String>,
-        backend_client: Arc<dyn Backend>,
-        prompt_template: impl Into<String>,
-    ) -> Self {
-        Self {
-            backend: backend.into(),
-            backend_client,
-            model: None,
-            prompt_template: prompt_template.into(),
-            system_prompt: None,
-            temperature: Self::DEFAULT_TEMPERATURE,
-            params: HashMap::new(),
-        }
-    }
-
-    /// Set deterministic temperature hint (used where backend support exists).
-    pub fn with_temperature(mut self, temperature: f32) -> Self {
-        self.temperature = temperature;
-        self
-    }
-
-    /// Set a model override.
-    pub fn with_model(mut self, model: impl Into<String>) -> Self {
-        self.model = Some(model.into());
-        self
-    }
-
-    /// Set system prompt prepended to candidate prompt.
-    pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
-        self.system_prompt = Some(prompt.into());
-        self
-    }
-
-    /// Add one user-supplied template parameter.
-    pub fn with_param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.params.insert(key.into(), value.into());
-        self
-    }
-
-    fn rendered_prompt(&self, candidate: &str) -> String {
-        let mut prompt = self.prompt_template.clone();
-
-        // Sort params by key length descending so that longer, more specific
-        // keys (e.g. {env_name}) are replaced before shorter substrings (e.g. {env}).
-        // HashMap iteration order is non-deterministic, so we must sort explicitly
-        // for reproducible prompt rendering.
-        let mut sorted_params: Vec<(&String, &String)> = self.params.iter().collect();
-        sorted_params.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
-        for (key, value) in sorted_params {
-            let needle = format!("{{{key}}}");
-            prompt = prompt.replace(&needle, value);
-        }
-
-        let prompt = prompt.replace("{candidate}", candidate);
-
-        match &self.system_prompt {
-            Some(system) => format!("{system}\n\n{prompt}"),
-            None => prompt,
-        }
-    }
-
-    fn parse_response(raw: &str) -> VerifyResult {
-        let first = raw
-            .split_whitespace()
-            .next()
-            .map(|token| token.trim().trim_matches(|c: char| !c.is_alphanumeric()))
-            .map(|token| token.to_ascii_lowercase())
-            .unwrap_or_default();
-
-        if first == "yes" {
-            return VerifyResult::pass();
-        }
-
-        if first == "no" {
-            return VerifyResult::fail_with(FailureReason::new("no").with_stdout(raw.to_string()));
-        }
-
-        VerifyResult::fail_with(
-            FailureReason::new("unparseable verifier response").with_stdout(raw.to_string()),
-        )
-    }
-}
-
-#[async_trait]
-impl VerifyHook for LLMVerifier {
-    fn name(&self) -> &str {
-        "LLMVerifier"
-    }
-
-    async fn verify(&self, ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
-        let prompt = self.rendered_prompt(&ctx.stdout);
-
-        match self
-            .backend_client
-            .query(&prompt, Path::new("."), self.model.as_deref())
-            .await
-        {
-            Ok(query) => Ok(Self::parse_response(&query.stdout)),
-            Err(err) => Err(VerifyError::new(format!("backend error: {err}"))),
-        }
-    }
 }
 
 // ── Tests ────────────────────────────────────────────────────

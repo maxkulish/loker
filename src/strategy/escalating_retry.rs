@@ -19,9 +19,8 @@ use crate::strategy::{
     VerifyOutcome, VerifyResult, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 /// 4 KiB excerpt fits inside an 8 KiB envelope while leaving headroom for
 /// verifier reason and backend error class.
@@ -133,25 +132,6 @@ fn backend_error_class(err: &BackendError) -> String {
     .to_string()
 }
 
-/// AWS access keys.
-static AWS_KEY_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"AKIA[0-9A-Z]{16}").expect("valid regex"));
-
-/// Generic `key=value` shapes (case-insensitive; redacts only the value side).
-static KEY_VALUE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)((?:api[_-]?key|secret|token|password)\s*[=:]\s*)[^\s'\"]+"#)
-        .expect("valid regex")
-});
-
-/// Bearer tokens in `Authorization` headers.
-static BEARER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)Bearer\s+[A-Za-z0-9._\-~+/=]+").expect("valid regex"));
-
-/// Heuristic: long base64-ish blob preceded by key/secret/token.
-static SECRET_HEURISTIC_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b(key|secret|token)[\s:=]+([A-Za-z0-9+/=_\-]{32,})").expect("valid regex")
-});
-
 /// Redact common secret shapes from text before they reach the next rung's
 /// prompt envelope. Applied to *every* byte of `FailureContext` text
 /// (verify_reason, response_excerpt, and the final assembled header).
@@ -160,15 +140,7 @@ static SECRET_HEURISTIC_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// future centralised secret-scrubbing service should absorb this function
 /// rather than invent a second one.
 pub(crate) fn redact_secrets(input: &str) -> String {
-    let mut result = AWS_KEY_RE.replace_all(input, "[REDACTED]").into_owned();
-    result = KEY_VALUE_RE
-        .replace_all(&result, "${1}[REDACTED]")
-        .into_owned();
-    result = BEARER_RE.replace_all(&result, "[REDACTED]").into_owned();
-    result = SECRET_HEURISTIC_RE
-        .replace_all(&result, "$1 [REDACTED]")
-        .into_owned();
-    result
+    crate::utils::redact_secrets(input)
 }
 
 /// Truncate `s` to at most `max_bytes` total (including the suffix),

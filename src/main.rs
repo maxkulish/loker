@@ -1,3 +1,9 @@
+// Scoped allow(dead_code): some modules (e.g. verify hook types) are
+// defined for the trait surface but have no live callers yet. The allow
+// avoids churn during feature development; remove when all modules have
+// active callers.
+#![allow(dead_code)]
+
 mod apply_verify;
 mod backend;
 mod cache;
