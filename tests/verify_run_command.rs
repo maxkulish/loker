@@ -130,7 +130,7 @@ async fn runcommand_env_allowlist() {
 #[tokio::test]
 async fn runcommand_secret_redaction_in_output() {
     let key = "CLO271_SECRET_TOKEN";
-    let value = "AKIAABCDEFGHIJKLMN1234";
+    let value = "plain-secret-value-that-should-be-redacted";
     let original = env::var_os(key);
     env::set_var(key, value);
 

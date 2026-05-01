@@ -156,7 +156,13 @@ impl RunCommand {
             command.current_dir(cwd);
         }
 
-        for (key, value) in self.build_environment() {
+        let env_vars = self.build_environment();
+        let secret_values: Vec<String> = env_vars
+            .iter()
+            .filter(|(name, _)| is_secret_like_env_key(name))
+            .map(|(_, value)| value.clone())
+            .collect();
+        for (key, value) in env_vars {
             command.env(key, value);
         }
 
@@ -212,6 +218,7 @@ impl RunCommand {
             }
             Err(_) => {
                 kill_process_group(child.id());
+                let _ = child.kill().await;
                 let status = child.wait().await.map_err(|err| {
                     VerifyError::new(format!(
                         "failed to reap timed-out command '{}': {err}",
@@ -234,6 +241,7 @@ impl RunCommand {
             timed_out,
             stdout,
             stderr,
+            secret_values,
             elapsed_ms: start.elapsed().as_millis() as u64,
         })
     }
@@ -245,6 +253,7 @@ struct CommandRun {
     timed_out: bool,
     stdout: CapturedOutput,
     stderr: CapturedOutput,
+    secret_values: Vec<String>,
     elapsed_ms: u64,
 }
 
@@ -264,8 +273,19 @@ impl CapturedOutput {
                 self.elided_bytes
             ));
         }
-        redact_secrets(&text)
+        text
     }
+}
+
+/// Redact known secret patterns and specific allowlisted secret values from text.
+fn redact_output(text: &str, secret_values: &[String]) -> String {
+    let mut result = redact_secrets(text);
+    for secret in secret_values {
+        if !secret.is_empty() && result.contains(secret.as_str()) {
+            result = result.replace(secret.as_str(), "[REDACTED]");
+        }
+    }
+    result
 }
 
 async fn read_stream_bounded<R: AsyncRead + Unpin + Send + 'static>(
@@ -372,8 +392,8 @@ impl VerifyHook for RunCommand {
     async fn verify(&self, _ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
         let run = self.run().await?;
 
-        let stdout = redact_secrets(&run.stdout.to_reason_text());
-        let stderr = redact_secrets(&run.stderr.to_reason_text());
+        let stdout = redact_output(&run.stdout.to_reason_text(), &run.secret_values);
+        let stderr = redact_output(&run.stderr.to_reason_text(), &run.secret_values);
         let truncated = run.stdout.truncated || run.stderr.truncated;
         let signal = status_signal(&run.status);
 

@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-01T08:41:34.520Z'
-  updated_at: '2026-05-01T09:45:57.044Z'
+  updated_at: '2026-05-01T10:28:08.748Z'
 phases:
   discovery:
     status: complete
@@ -64,6 +64,8 @@ phases:
       - 97c6a08
       - f2a38e7
       - 3444c4f
+      - 984095a
+      - a29e85f
   pr:
     status: pending
   complete:
@@ -154,3 +156,9 @@ history:
     action: implementation_complete
     phase: implement
     details: All 7 sub-tasks landed. make check green (636 lib + 532 bin + all integration tests pass). 3 commits.
+  - timestamp: '2026-05-01T10:28:08.748Z'
+    action: commits_synced
+    phase: implement
+    details: >-
+      Synced commits list: added 984095a (feat(verify): implement shell-command verify hook) and a29e85f
+      (feat(strategy): add RunCommand verify hook)
