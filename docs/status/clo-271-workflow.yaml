@@ -16,10 +16,10 @@ linear:
   blocked_by: []
   branch_actual: feat/clo-271-run-command-01
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-01T08:41:34.520Z'
-  updated_at: '2026-05-01T11:00:59.559Z'
+  updated_at: '2026-05-01T12:48:42.534Z'
 phases:
   discovery:
     status: complete
@@ -74,12 +74,19 @@ phases:
     validation_synthesis_report: docs/reviews/clo-271-validation-synthesis.md
     validation_synthesis_verdict: approve
   pr:
-    status: in_progress
+    status: complete
     pr_number: 28
     pr_url: https://github.com/maxkulish/loker/pull/28
     ci_passed: true
+    reviews_addressed: true
+    merge_commit: 2723696ce1407c2d8b4a66f4286d4550f014e7ed
+    merged_at: '2026-05-01T11:11:36Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 2723696ce1407c2d8b4a66f4286d4550f014e7ed
+    merged_at: '2026-05-01T11:11:36Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-01T08:41:34.520Z'
     action: workflow_started
@@ -199,3 +206,38 @@ history:
     action: ci_passed
     phase: pr
     details: 'All required checks passing: format (16s ✅), clippy (28s ✅), test (2m10s ✅)'
+  - timestamp: '2026-05-01T11:10:42.358Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      5 review threads: 4 resolved (1 gemini-code-assist heuristic fix + STALE ANSI resolved + 1 dead_code comment fixed
+      + 1 absolute paths fixed), 1 declined with rationale (flaky test). Gemini re-reviewed and approved all fixes. CI
+      green on all checks.
+  - timestamp: '2026-05-01T11:11:06.109Z'
+    action: phase_transition
+    phase: pr
+    details: >-
+      PR phase complete. CI green, 4/5 threads resolved, 1 declined with rationale. Gemni re-reviewed and approved all
+      fix iterations.
+  - timestamp: '2026-05-01T11:11:08.801Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-01T11:12:12.384Z'
+    action: pr_merged
+    phase: complete
+    details: 'PR #28 merged via squash. Merge commit 2723696c.'
+  - timestamp: '2026-05-01T11:12:36.192Z'
+    action: pr_merged
+    phase: pr
+    details: Merge commit 2723696c
+  - timestamp: '2026-05-01T11:13:04.082Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
+  - timestamp: '2026-05-01T12:48:42.534Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-271 fully completed. PR #28 merged in 2723696c. Unblocks: CLO-273 (TestRunner verify hook), T-029 (phase
+      runner).
