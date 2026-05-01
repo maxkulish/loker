@@ -24,7 +24,7 @@ workflow:
   current_phase: implement
   status: complete
   created_at: '2026-05-01T09:52:00Z'
-  updated_at: '2026-05-01T09:52:00Z'
+  updated_at: '2026-05-01T08:15:35.961Z'
 phases:
   discovery:
     status: complete
@@ -51,7 +51,7 @@ phases:
   implement:
     status: complete
     commits:
-      - null
+      - b60373d
     pre_flight_checks_passed: true
   pr:
     status: pending
@@ -73,3 +73,13 @@ history:
       RunCommand verify hook implemented in src/strategy/run_command.rs. 12 unit tests all passing. make check green
       (1172 tests). Re-exported from src/strategy/mod.rs. All sandboxing NFRs addressed: cwd, env default-deny, wall
       timeout, cpu timeout (unix), stdout/stderr byte caps, signal cleanup (process group), secret redaction.
+  - timestamp: '2026-05-01T08:15:23.029Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: RunCommand verify hook implementation. Commit b60373d'
+  - timestamp: '2026-05-01T08:15:35.961Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      RunCommand verify hook implemented. 13 unit tests passing. make check green (1232 tests, 0 failures, 0 warnings).
+      1 commit (b60373d).

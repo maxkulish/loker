@@ -222,9 +222,11 @@ async fn execute_command(
         }
     }
 
-    // Set cwd if provided
+    // Set cwd if provided; otherwise use root to avoid inheriting orchestrator cwd
     if let Some(dir) = cwd {
         command.current_dir(dir);
+    } else {
+        command.current_dir("/");
     }
 
     // Capture stdout and stderr
@@ -256,14 +258,26 @@ async fn execute_command(
         }
     }
 
-    let mut child = command.spawn()?;
+    // Kill child on drop for cancellation safety (tokio kills just the child).
+    // Our ChildGuard handles the process group.
+    command.kill_on_drop(true);
+
+    let child = command.spawn()?;
+    let mut child = ChildGuard::new(child);
 
     // ── Read output with caps, wall timeout wraps it ─────────
 
     match timeout(wall_timeout, async {
-        let (stdout_bytes, stdout_capped) = read_stream(child.stdout.take(), stdout_cap).await;
-        let (stderr_bytes, stderr_capped) = read_stream(child.stderr.take(), stderr_cap).await;
-        let exit_status = child.wait().await?;
+        // Read stdout and stderr concurrently to avoid deadlock when
+        // the child fills one pipe while blocking on the other.
+        let ((stdout_bytes, stdout_capped), (stderr_bytes, stderr_capped)) = tokio::join!(
+            read_stream(child.inner.stdout.take(), stdout_cap),
+            read_stream(child.inner.stderr.take(), stderr_cap),
+        );
+        let exit_status = child.inner.wait().await?;
+
+        // Disarm the drop guard since we successfully reaped the child
+        child.disarm();
 
         Ok(RunResult {
             stdout_bytes,
@@ -279,9 +293,9 @@ async fn execute_command(
         Ok(result) => result,
         Err(_elapsed) => {
             // Wall timeout: kill the process group
-            kill_process_group(&child);
+            ChildGuard::kill(&child.inner);
             // Reap the child
-            let _ = child.wait().await;
+            let _ = child.inner.wait().await;
 
             Ok(RunResult {
                 stdout_bytes: Vec::new(),
@@ -291,6 +305,44 @@ async fn execute_command(
                 exit_status: None,
                 timed_out: true,
             })
+        }
+    }
+}
+
+/// RAII guard that kills the process group when dropped.
+///
+/// This handles cancellation safety: if the `verify()` future is dropped
+/// mid-execution (e.g. phase runner cancels the step), the guard ensures
+/// the child process and its descendants are killed.
+struct ChildGuard {
+    inner: tokio::process::Child,
+    disarmed: bool,
+}
+
+impl ChildGuard {
+    fn new(child: tokio::process::Child) -> Self {
+        Self {
+            inner: child,
+            disarmed: false,
+        }
+    }
+
+    /// Disarm the guard so the child is NOT killed on drop.
+    /// Call this after successfully reaping the child via `wait()`.
+    fn disarm(&mut self) {
+        self.disarmed = true;
+    }
+
+    /// Kill the process group of a child (static method, usable after take()).
+    fn kill(child: &tokio::process::Child) {
+        kill_process_group(child);
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if !self.disarmed {
+            kill_process_group(&self.inner);
         }
     }
 }
