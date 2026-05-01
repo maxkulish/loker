@@ -1,0 +1,75 @@
+task_id: CLO-271
+task_type: specification
+classification_reason: >-
+  Title "Implement RunCommand verify hook with sandboxing" — implementing a concrete VerifyHook with mechanical
+  acceptance criteria (test contract, sandboxing NFRs). Specification task.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks:
+    - CLO-273
+  blocked_by:
+    - CLO-270
+  priority: 3
+  branch_actual: feat/clo-271-run-command
+workflow:
+  current_phase: implement
+  status: complete
+  created_at: '2026-05-01T09:52:00Z'
+  updated_at: '2026-05-01T09:52:00Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: Implement RunCommand verify hook as new module src/strategy/run_command.rs
+    approaches_identified: 1
+    approved: true
+    baseline_score: null
+    discovery_debt: []
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-270-hook.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions: []
+    flagged_suggestions: []
+    review_completed: true
+    review_verdict: approve
+    finalized: true
+  plan:
+    status: complete
+    plan_file: null
+    approved: true
+  implement:
+    status: complete
+    commits:
+      - null
+    pre_flight_checks_passed: true
+  pr:
+    status: pending
+    pr_number: null
+    pr_url: null
+    reviews_addressed: false
+    approved: false
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-01T09:52:00Z'
+    action: workflow_started
+    phase: implement
+    details: Workflow initialized for CLO-271. Branch feat/clo-271-run-command exists, clean from main. CLO-270 merged.
+  - timestamp: '2026-05-01T10:11:00Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      RunCommand verify hook implemented in src/strategy/run_command.rs. 12 unit tests all passing. make check green
+      (1172 tests). Re-exported from src/strategy/mod.rs. All sandboxing NFRs addressed: cwd, env default-deny, wall
+      timeout, cpu timeout (unix), stdout/stderr byte caps, signal cleanup (process group), secret redaction.

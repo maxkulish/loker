@@ -24,11 +24,13 @@ use std::sync::Arc;
 
 pub mod escalating_retry;
 pub mod parallel_fanout;
+pub mod run_command;
 pub mod single_model;
 pub mod verify;
 
 pub use escalating_retry::EscalatingRetry;
 pub use parallel_fanout::{ParallelFanOut, TargetSpec};
+pub use run_command::RunCommand;
 pub use single_model::SingleModel;
 pub use verify::{
     FailureReason, LLMVerifier, VerifyContext, VerifyError, VerifyHook, VerifyResult,
