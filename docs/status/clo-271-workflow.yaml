@@ -1,0 +1,131 @@
+task_id: clo-271
+task_type: development
+classification_reason: ''
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_actual: feat/clo-271-run-command-01
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-01T08:41:34.520Z'
+  updated_at: '2026-05-01T09:06:20.192Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: New RunCommand VerifyHook in src/strategy/verify/run_command.rs
+    approaches_identified: 3
+    approved: true
+    baseline_score: 6
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-271.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-271-run-command.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-271-run-command.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - A1 PATH resolution with which crate
+      - A2 unsafe pre_exec for RLIMIT_CPU
+      - A3 FailureReason non_exhaustive check
+      - A4 redaction scope shared helper
+      - A5 CPU test Unix-only
+      - A6 Windows process-group best-effort
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-271-design-gemini.md
+    review_synthesis: docs/reviews/clo-271-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-271-run-command.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-01T08:41:34.520Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-271 as development
+  - timestamp: '2026-05-01T08:42:04.484Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-01T08:44:19.264Z'
+    action: branch_created
+    phase: discovery
+    details: Already on branch feat/clo-271-run-command-01 (matches Linear suggestion)
+  - timestamp: '2026-05-01T08:46:15.022Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: New RunCommand VerifyHook in src/strategy/verify/run_command.rs. Baseline 6/10. 3 approaches considered
+      (new module, refactor verification.rs, adapter pattern).
+  - timestamp: '2026-05-01T08:46:17.366Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-01T08:49:46.676Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Draft generated manually (lok workflow timed out). 186 lines at docs/designs/clo-271-run-command.md. 7 sections
+      verified: Problem, Goals/Non-goals, Architecture, Public API, Test plan, Migration, Open questions.
+  - timestamp: '2026-05-01T08:57:19.711Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_suggestions. 6 applied (PATH resolution, unsafe pre_exec, FailureReason
+      non_exhaustive, redaction scope, CPU test platform, Windows process-group), 0 flagged.
+  - timestamp: '2026-05-01T09:03:29.659Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator review approved. No annotations.
+  - timestamp: '2026-05-01T09:04:01.380Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. 282 lines, 7 sections, 6 open questions documented. Public API signatures: RunCommand
+      struct + VerifyHook impl + SandboxViolation enum. Test plan: 6 unit tests + 8 integration tests.
+  - timestamp: '2026-05-01T09:04:04.471Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-01T09:06:13.811Z'
+    action: plan_created
+    phase: plan
+    details: >-
+      Plan with 7 sub-tasks at docs/plans/clo-271-run-command.md. Ordered: ST1 structural (S), ST2 scaffold (S), ST3
+      core execution (M), ST4 sandboxing (M), ST5 trait mapping (M), ST6 integration tests (M), ST7 pre-merge gate (S).
+  - timestamp: '2026-05-01T09:06:17.590Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 7 sub-tasks queued: ST1 directory conversion (S), ST2 scaffold (S), ST3 core execution (M), ST4
+      sandboxing (M), ST5 trait mapping (M), ST6 integration tests (M), ST7 pre-merge gate (S).
+  - timestamp: '2026-05-01T09:06:20.192Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
