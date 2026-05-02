@@ -25,8 +25,7 @@ fn read_fixture(name: &str) -> String {
 }
 
 /// Convert fixture content to a JSON‑lines string that the cargo parser
-/// would see on stdout. `.jsonl` files contain a JSON array — we flatten
-/// each element to one JSON-per-line.
+/// would see on stdout. `.jsonl` fixtures are already JSON‑per-line.
 fn fixture_to_cargo_stdout(fixture: &str) -> String {
     // Cargo JSON-lines fixtures are raw JSON-per-line content.
     fixture.to_string()

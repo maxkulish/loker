@@ -17,7 +17,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::de::Deserialize;
 
-use super::run_command::RunCommand;
+use super::run_command::{redact_output, RunCommand};
 use super::{FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult};
 
 /// Supported test runner kinds.
@@ -302,8 +302,14 @@ impl TestRunner {
         run_command_run: super::run_command::CommandRun,
         result: TestResult,
     ) -> VerifyResult {
-        let runner_stdout = run_command_run.stdout.to_reason_text();
-        let runner_stderr = run_command_run.stderr.to_reason_text();
+        let runner_stdout = redact_output(
+            &run_command_run.stdout.to_reason_text(),
+            &run_command_run.secret_values,
+        );
+        let runner_stderr = redact_output(
+            &run_command_run.stderr.to_reason_text(),
+            &run_command_run.secret_values,
+        );
         let truncated = run_command_run.stdout.truncated || run_command_run.stderr.truncated;
         let exit_code = run_command_run.status.code();
         let signal = run_command_run
@@ -702,6 +708,42 @@ this is not json at all
         match vr {
             VerifyResult::Fail { reason } => {
                 assert!(reason.summary.contains("no tests ran"));
+            }
+            other => panic!("expected Fail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn verify_result_timed_out() {
+        let stdout = r#"{"type":"test","event":"ok","name":"test_a","test_type":"unit"}
+"#;
+        let result = TestRunner::parse_cargo_output(stdout);
+        let mut run = fake_command_run(stdout);
+        run.timed_out = true;
+        let vr = TestRunner::to_verify_result(run, result);
+        match vr {
+            VerifyResult::Fail { reason } => {
+                assert!(reason.summary.contains("timed out"));
+                assert!(reason.sandbox_violation.is_some());
+            }
+            other => panic!("expected Fail, got {other:?}"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verify_result_killed_by_signal() {
+        let stdout = r#"{"type":"test","event":"ok","name":"test_a","test_type":"unit"}
+"#;
+        let result = TestRunner::parse_cargo_output(stdout);
+        let mut run = fake_command_run(stdout);
+        use std::os::unix::process::ExitStatusExt;
+        run.status = std::process::ExitStatus::from_raw(9); // SIGKILL
+        let vr = TestRunner::to_verify_result(run, result);
+        match vr {
+            VerifyResult::Fail { reason } => {
+                assert!(reason.summary.contains("killed by signal"));
+                assert!(reason.sandbox_violation.is_some());
             }
             other => panic!("expected Fail, got {other:?}"),
         }

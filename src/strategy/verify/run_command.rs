@@ -257,7 +257,7 @@ pub struct CommandRun {
     pub elapsed_ms: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CapturedOutput {
     pub data: Vec<u8>,
     pub truncated: bool,
@@ -278,7 +278,7 @@ impl CapturedOutput {
 }
 
 /// Redact known secret patterns and specific allowlisted secret values from text.
-fn redact_output(text: &str, secret_values: &[String]) -> String {
+pub(crate) fn redact_output(text: &str, secret_values: &[String]) -> String {
     let mut result = redact_secrets(text);
     for secret in secret_values {
         if !secret.is_empty() && result.contains(secret.as_str()) {

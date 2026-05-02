@@ -1,45 +1,36 @@
-YOLO mode is enabled. All tool calls will be automatically approved.
-YOLO mode is enabled. All tool calls will be automatically approved.
+# Gemini design / implementation review - CLO-273
+
+## Context
+- Branch: feat-clo-273-test-runner
+- Design: docs/designs/clo-273-test-runner.md
+- Plan / Spec: docs/discovery/clo-273.md
+
+## Findings
+### F1 [minor] Pytest parser fallback is fragile to early JSON logs
+**Where:** `src/strategy/verify/test_runner.rs` (in `parse_pytest_output`)
+**What:** The fallback for parsing pytest output searches for the first `{` and assumes that block is the pytest report. If `stdout` contains any valid JSON dictionary *before* the actual pytest report (e.g., `INFO: loaded config {"verbose": true}`), the deserializer will successfully parse it, fail to find the `"summary"` field, and return an empty failure immediately without checking subsequent lines.
+**Why it matters:** The design doc (§4.3) explicitly specifies "fallback to line-by-line JSON candidate parsing" to handle noisy output. The current approach will break if tests emit a JSON-like log line before pytest's JSON report.
+**Suggested fix:** Implement a true line-by-line scan (or search for subsequent `{` boundaries) and only return upon successfully finding a payload with a `"summary"` field, rather than halting at the first successfully parsed JSON block.
+
+### F2 [nit] Unnecessary intermediate allocation in `truncate_excerpt`
+**Where:** `src/strategy/verify/test_runner.rs` (`truncate_excerpt` function)
+**What:** The truncation logic collects characters into a `String`, immediately converts it back to `chars()`, chains the ellipsis, and collects into a `String` a second time: `normalized.chars().take(max_chars).collect::<String>().chars().chain(Some('…')).collect()`.
+**Why it matters:** It is an unidiomatic way to append a character and causes an unnecessary intermediate heap allocation.
+**Suggested fix:** Simplify to avoid the intermediate `String`: `let mut s: String = normalized.chars().take(max_chars).collect(); s.push('…'); s`
+
+### F3 [nit] Missing `timed_out` integration test
+**Where:** `tests/verify_test_runner.rs`
+**What:** The integration tests cover `Pass`, `Fail`, malformed outputs, and non-zero exits, but lack a test simulating a `timed_out: true` state on the `CommandRun` mock.
+**Why it matters:** Section 4.4 of the design doc mandates specific `SandboxViolation::Timeout` handling, which is implemented but untested locally in the parser integration layer.
+**Suggested fix:** Add a short test case injecting a `timed_out = true` mock and asserting the returned `VerifyResult::Fail` carries a `SandboxViolation::Timeout`.
+
+## Strengths
+- The `TestRunner` builder ergonomics are extremely clean and fit well within the existing orchestration abstractions.
+- The cargo JSON-lines parsing accurately maps to the cargo test format, specifically handling the `ignored: true` and compiler message edge cases seamlessly.
+- Reusing the `RunCommand` internals strictly respects the established sandbox guarantees (timeouts, capabilities, wall limits) while keeping `TestRunner` focused purely on test output parsing.
+- Excellent separation of parser logic from execution overhead, allowing `verify_test_runner.rs` to comprehensively test the parsing paths via fixture-style mock runs without shelling out.
+
 ## Verdict
-`approve_with_changes`
+approve_with_changes
 
-## Findings with severity
-
-- **High**: The test runner hook ignores a non-zero exit status if the test suite parses some passing tests but fails to report them as `failed` test cases. 
-  - In `src/strategy/verify/test_runner.rs`, `to_verify_result()` checks for `timed_out` and `signal`, but completely skips verifying `exit_code != 0`.
-  - If a test runner successfully runs a few tests (so `passed > 0`) but subsequently crashes, panics in teardown, or fails to compile a subsequent test binary, the parser sees `passed > 0` and `failed == 0`.
-  - The current logic falls through to `VerifyResult::Pass`, falsely passing the verification hook despite the underlying runner command failing. 
-  - This directly violates the ST3 plan requirement: *`signal/non-zero status → Fail with structured reason and signal/non-zero context`*.
-
-- **Minor**: Missing test case for non-zero exit validation with partially passed tests.
-  - The `pytest_non_json_exit` test in `tests/verify_test_runner.rs` simulates a `1` exit code, but it results in `passed = 0`, `failed = 0`, which hits the "no tests ran" condition.
-  - There is no test that verifies the behavior when `passed > 0`, `failed == 0`, and the `CommandRun` status is non-zero.
-
-*(Note: The failure on `test_retry_workflow` in `make check` is a false positive local to the macOS Seatbelt sandbox blocking access to `/tmp/lok_retry_test_counter`. It is unrelated to your PR.)*
-
-## Missing Items
-- `TestRunner::to_verify_result` is missing the generic non-zero exit status check when `failed == 0`.
-- Missing a unit test in `tests/verify_test_runner.rs` exercising `passed > 0`, `failed == 0`, with a non-zero process exit code.
-
-## Recommendations
-1. **Fix non-zero exit code mapping**:
-Add the following guard in `TestRunner::to_verify_result` (after checking for signals and timeouts, but before parsing the counts):
-
-```rust
-        // If command failed but parsed 0 explicit failures, we must fail
-        let code = exit_code.unwrap_or(1);
-        if code != 0 && result.failed == 0 {
-            return VerifyResult::Fail {
-                reason: FailureReason::new(format!("test runner exited with status {}", code))
-                    .with_stdout(runner_stdout)
-                    .with_stderr(runner_stderr)
-                    .with_truncated(truncated)
-                    .with_exit_code(code),
-            };
-        }
-```
-
-2. **Add a test case in `tests/verify_test_runner.rs`**:
-Create a test case (e.g. `verify_result_non_zero_exit_with_passing_tests`) that manually constructs a `CommandRun` with `status: exit_status(1)` and a `TestResult` with `passed: 2, failed: 0`, asserting that `to_verify_result` yields `VerifyResult::Fail`.
-
-Once the missing exit status check is added, the implementation is rock-solid and cleanly executes the stated design!
+The implementation strongly aligns with the CLO-273 design document and safely leverages the existing `RunCommand` sandboxing primitives. Resolving the pytest parsing fallback to be a true line-by-line candidate scan will ensure it remains robust against noisy logger output, after which the implementation is fully sound and ready to merge.
