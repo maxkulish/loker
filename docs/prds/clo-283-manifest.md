@@ -82,6 +82,7 @@ pub enum Producer {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ManifestEntry {
     pub name: String,
     pub kind: Kind,
@@ -90,11 +91,12 @@ pub struct ManifestEntry {
     pub producer: Producer,
     pub phase: Option<String>,
     pub attempt: Option<u32>,
-    #[serde(with = "chrono::serde::iso8601")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Manifest {
     #[serde(rename = "loker.run_id")]
     pub run_id: String,
