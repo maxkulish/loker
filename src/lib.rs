@@ -8,6 +8,7 @@
 pub mod aggregator;
 pub mod backend;
 pub mod family;
+pub mod manifest;
 pub mod strategy;
 pub mod template;
 

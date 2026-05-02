@@ -144,6 +144,9 @@ pub enum PhaseError {
 
     #[error("judge unavailable: {detail}")]
     JudgeUnavailable { detail: String },
+
+    #[error("artefact schema/version/hash mismatch: {detail}")]
+    ArtefactSchemaMismatch { detail: String },
 }
 
 /// Verify that every backend in `targets` resolves to a *different*

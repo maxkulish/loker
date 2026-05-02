@@ -141,14 +141,48 @@ The AI review iterations in Steps 2-3 caught what models can catch. This step
 is the human gate on the post-AI-review design before code starts landing.
 
 Print a one-line summary of what changed in Step 3 (count of applied vs
-flagged suggestions), then run:
+flagged suggestions).
+
+**Step 4a - Pre-flight: confirm plannotator is installed.**
+
+Run via the Bash tool:
 
 ```bash
-/plannotator-review docs/designs/clo-XX-<slug>.md
+command -v plannotator
 ```
 
-Read the result. Plannotator returns either approved, or denied with
-inline annotations.
+- **Exit 0 (binary found)**: continue to Step 4b.
+- **Exit non-zero (binary missing)**: do NOT call `update_workflow_state`,
+  do NOT auto-degrade to a manual-review fallback. Halt with this message
+  and stop the phase:
+
+  ```
+  plannotator is required for the design human-review gate but is not
+  installed on this machine. Install it from
+  https://github.com/anthropics/plannotator (or your team's mirror), then
+  re-run /task:orchestrate CLO-XX.
+
+  If you intentionally want to skip this gate for THIS task only, re-run
+  with validation_override: true on the next transition_phase.
+  ```
+
+**Step 4b - Invoke plannotator directly via Bash.**
+
+Do not route through the `/plannotator-review` slash command - call the
+binary so the exit code and stdout are deterministic:
+
+```bash
+plannotator review docs/designs/clo-XX-<slug>.md
+```
+
+Capture stdout and the exit code. Plannotator returns either approved
+(exit 0, no annotations), or denied (non-zero or annotation block in
+stdout).
+
+If the output is genuinely unparseable (binary ran but returned
+unexpected format - not the same as "not installed"), surface the raw
+stdout/stderr to the user and **STOP** the phase. Do not coerce it into
+a denial. This is a real bug to fix, not a workflow state to record.
 
 **On approval:**
 
@@ -194,14 +228,8 @@ docs/designs/clo-XX-<slug>.md by hand, then re-run
 **Re-entry on resume.** When the user re-runs `/task:orchestrate CLO-XX`
 after editing, the design phase will dispatch again. At that point
 `draft_ready: true` and `review_completed: true` are already set, so
-skip Steps 1-3 and re-enter at Step 4 (re-fire plannotator on the
-edited doc).
-
-If `/plannotator-review` is unavailable or returns an unparseable
-result, treat it as a denial with annotations =
-`"plannotator unavailable; manual review required"`. The user can
-either install plannotator and resume, or pass `validation_override:
-true` on the next `transition_phase` to bypass.
+skip Steps 1-3 and re-enter at Step 4 (re-run pre-flight, then re-fire
+plannotator on the edited doc).
 
 ## Step 5 - Finalize
 
