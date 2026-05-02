@@ -1,6 +1,6 @@
 use loker::run_state::{
-    next_attempt, CompletedMarker, FailedMarker, MarkerWriter, PhaseOrderGuard, PhaseState,
-    StartedMarker,
+    is_stale, next_attempt, CompletedMarker, FailedMarker, HeartbeatBody, HeartbeatConfig,
+    HeartbeatWriter, MarkerWriter, PhaseOrderGuard, PhaseState, StartedMarker,
 };
 
 // ---------------------------------------------------------------------------
@@ -263,4 +263,104 @@ fn phase_order_guard_invalid_skip() {
     // Attempt Idle → Completed directly — should panic in debug.
     let mut guard = PhaseOrderGuard::new("design".to_string(), 0);
     guard.mark_completed();
+}
+
+// ---------------------------------------------------------------------------
+// Heartbeat and is_stale tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn heartbeat_file_gets_created_and_contains_valid_json() {
+    let tmp = tempfile::tempdir().unwrap();
+    let markers_dir = tmp.path().join("markers");
+
+    let config = HeartbeatConfig::new(markers_dir.clone());
+    let _handle = HeartbeatWriter::spawn(config);
+
+    // Give the task time to create the directory and write one tick.
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+
+    let heartbeat_path = markers_dir.join("heartbeat.json");
+    assert!(heartbeat_path.exists(), "heartbeat file should exist after a tick");
+
+    let content = std::fs::read_to_string(&heartbeat_path).unwrap();
+    let body: HeartbeatBody = serde_json::from_str(&content).unwrap();
+    assert!(body.writer_pid > 0);
+    assert!(!body.writer_host.is_empty());
+}
+
+#[tokio::test]
+async fn heartbeat_file_updated_on_subsequent_ticks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let markers_dir = tmp.path().join("markers");
+
+    // Use a very short interval so we get multiple ticks quickly.
+    let mut config = HeartbeatConfig::new(markers_dir.clone());
+    config.interval_seconds = 1; // 1 second
+    let _handle = HeartbeatWriter::spawn(config);
+
+    // Wait long enough for 2 ticks.
+    tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
+
+    let heartbeat_path = markers_dir.join("heartbeat.json");
+    assert!(heartbeat_path.exists());
+
+    let content = std::fs::read_to_string(&heartbeat_path).unwrap();
+    let body: HeartbeatBody = serde_json::from_str(&content).unwrap();
+    // The tick_at should be recent (within the last 2 seconds).
+    let now = chrono::Utc::now();
+    let age = now - body.tick_at;
+    assert!(
+        age.num_seconds() < 5,
+        "heartbeat tick should be recent, but age is {}s",
+        age.num_seconds()
+    );
+}
+
+#[test]
+fn is_stale_returns_true_when_expired() {
+    let now = chrono::Utc::now();
+    let ttl_seconds = 300;
+
+    // Heartbeat from T-1s → not stale.
+    let recent = chrono::Utc::now() - chrono::Duration::seconds(ttl_seconds as i64 - 1);
+    let body = HeartbeatBody {
+        writer_pid: 12345,
+        writer_host: "host-a".to_string(),
+        tick_at: recent,
+    };
+    assert!(!is_stale(&body, &now, ttl_seconds), "not stale at T-1s");
+
+    // Heartbeat from T+1s → stale.
+    let old = chrono::Utc::now() - chrono::Duration::seconds(ttl_seconds as i64 + 1);
+    let body = HeartbeatBody {
+        writer_pid: 12345,
+        writer_host: "host-a".to_string(),
+        tick_at: old,
+    };
+    assert!(is_stale(&body, &now, ttl_seconds), "stale at T+1s");
+}
+
+#[test]
+fn is_stale_boundary_exact_ttl() {
+    let ttl_seconds: u64 = 300;
+    let now = chrono::Utc::now();
+
+    // At exactly ttl seconds of age → not stale yet.
+    let exactly_ttl_ago = now - chrono::Duration::seconds(ttl_seconds as i64);
+    let body = HeartbeatBody {
+        writer_pid: 12345,
+        writer_host: "host-a".to_string(),
+        tick_at: exactly_ttl_ago,
+    };
+    assert!(!is_stale(&body, &now, ttl_seconds), "not stale at exactly TTL");
+
+    // At ttl + 1s → stale.
+    let one_second_over = now - chrono::Duration::seconds(ttl_seconds as i64 + 1);
+    let body = HeartbeatBody {
+        writer_pid: 12345,
+        writer_host: "host-a".to_string(),
+        tick_at: one_second_over,
+    };
+    assert!(is_stale(&body, &now, ttl_seconds), "stale at TTL+1s");
 }
