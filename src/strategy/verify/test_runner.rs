@@ -585,8 +585,8 @@ this is not json at all
 
         assert_eq!(excerpt.chars().count(), 201);
         assert!(excerpt.ends_with('…'));
-        assert!(excerpt.as_bytes().len() > 200);
-        assert!(excerpt.as_bytes().len() < 810);
+        assert!(excerpt.len() > 200);
+        assert!(excerpt.len() < 810);
     }
 
     // ── Pytest parser ───────────────────────────────────────

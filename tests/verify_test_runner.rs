@@ -249,7 +249,7 @@ fn verify_result_non_zero_exit_with_passing_tests_fails() {
                 reason.summary
             );
             assert!(
-                matches!(reason.sandbox_violation, Some(_)),
+                reason.sandbox_violation.is_some(),
                 "expected sandbox violation for non-zero exit"
             );
         }
