@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 
-use crate::manifest::{dir_digest, Manifest, ManifestEntry, Kind};
+use crate::manifest::{dir_digest, Kind, Manifest, ManifestEntry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PhaseStatus {
@@ -17,7 +17,10 @@ pub enum PhaseStatus {
 #[derive(Debug, Clone)]
 pub enum HeartbeatStatus {
     Live(Heartbeat),
-    Stale { last_tick: DateTime<Utc>, ttl_seconds: u64 },
+    Stale {
+        last_tick: DateTime<Utc>,
+        ttl_seconds: u64,
+    },
     Missing,
 }
 
@@ -154,7 +157,9 @@ impl RunState {
         Ok(manifest)
     }
 
-    fn load_markers(run_dir: &Path) -> Result<(HashMap<String, PhaseStatus>, HashSet<String>), LoadError> {
+    fn load_markers(
+        run_dir: &Path,
+    ) -> Result<(HashMap<String, PhaseStatus>, HashSet<String>), LoadError> {
         let mut status = HashMap::new();
         let mut completed = HashSet::new();
         let markers_dir = run_dir.join("markers");
@@ -180,11 +185,7 @@ impl RunState {
                         completed.insert(marker.manifest_entry_sha256);
                     }
                 }
-                let _ = update_phase_status(
-                    &mut status,
-                    phase.clone(),
-                    PhaseStatus::Completed,
-                );
+                let _ = update_phase_status(&mut status, phase.clone(), PhaseStatus::Completed);
                 continue;
             }
 
@@ -206,8 +207,7 @@ impl RunState {
             let path = run_dir.join(&entry.name);
             match entry.kind {
                 Kind::ChangesDir => {
-                    let computed =
-                        dir_digest(&path).map_err(|err| LoadError::Io(err))?;
+                    let computed = dir_digest(&path).map_err(LoadError::Io)?;
                     if computed != entry.sha256 {
                         return Err(LoadError::ArtefactCorrupt {
                             path: entry.name.clone(),

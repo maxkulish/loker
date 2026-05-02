@@ -15,7 +15,11 @@ fn marker_completed(run_dir: &Path, phase: &str, sha: &str) {
         "manifest_entry_sha256": sha,
         "artefact_paths": [format!("{phase}/out")],
     });
-    fs::write(markers_dir.join(format!("{phase}.completed")), payload.to_string()).unwrap();
+    fs::write(
+        markers_dir.join(format!("{phase}.completed")),
+        payload.to_string(),
+    )
+    .unwrap();
 }
 
 fn marker_started(run_dir: &Path, phase: &str) {
@@ -29,7 +33,11 @@ fn marker_started(run_dir: &Path, phase: &str) {
         "writer_host": "localhost",
         "heartbeat_ttl_seconds": 300,
     });
-    fs::write(markers_dir.join(format!("{phase}.started")), payload.to_string()).unwrap();
+    fs::write(
+        markers_dir.join(format!("{phase}.started")),
+        payload.to_string(),
+    )
+    .unwrap();
 }
 
 fn build_entry_payload(name: &str, payload: &[u8]) -> (loker::manifest::ManifestEntry, Vec<u8>) {
@@ -47,8 +55,11 @@ fn build_entry_payload(name: &str, payload: &[u8]) -> (loker::manifest::Manifest
     )
 }
 
-fn write_manifest_with_run_state(tmp: &std::path::Path, entries: Vec<(loker::manifest::ManifestEntry, Vec<u8>)>,
-                                   run_id: &str) -> Manifest {
+fn write_manifest_with_run_state(
+    tmp: &std::path::Path,
+    entries: Vec<(loker::manifest::ManifestEntry, Vec<u8>)>,
+    run_id: &str,
+) -> Manifest {
     let mut manifest = Manifest::new(run_id);
     for (entry, bytes) in entries {
         let relpath = Path::new(&entry.name);
@@ -72,7 +83,11 @@ fn happy_path_load_returns_surviving_entries() {
     let (entry1, payload1) = build_entry_payload("design/design.md", b"hello design");
     let (entry2, payload2) = build_entry_payload("review/review.md", b"hello review");
 
-    let manifest = write_manifest_with_run_state(tmp.path(), vec![(entry1.clone(), payload1), (entry2.clone(), payload2)], run_id);
+    let manifest = write_manifest_with_run_state(
+        tmp.path(),
+        vec![(entry1.clone(), payload1), (entry2.clone(), payload2)],
+        run_id,
+    );
 
     marker_completed(tmp.path(), "design", &entry1.sha256);
     marker_completed(tmp.path(), "review", &entry2.sha256);
@@ -94,7 +109,9 @@ fn schema_mismatch_returns_artefact_schema_mismatch() {
 
     let err = RunState::load(tmp.path(), 300).unwrap_err();
     match err {
-        LoadError::ArtefactSchemaMismatch { expected, found, .. } => {
+        LoadError::ArtefactSchemaMismatch {
+            expected, found, ..
+        } => {
             assert_eq!(expected, 1);
             assert_eq!(found, 2);
         }
@@ -113,7 +130,11 @@ fn corrupt_entry_returns_artefact_corrupt() {
 
     let err = RunState::load(tmp.path(), 300).unwrap_err();
     match err {
-        LoadError::ArtefactCorrupt { path, expected, found } => {
+        LoadError::ArtefactCorrupt {
+            path,
+            expected,
+            found,
+        } => {
             assert!(path.ends_with("design/design.md"));
             assert_eq!(expected, entry.sha256);
             assert_ne!(found, expected);
@@ -174,7 +195,10 @@ fn stale_heartbeat_is_reported() {
     fs::write(tmp.path().join("heartbeat.json"), heartbeat.to_string()).unwrap();
 
     match RunState::load(tmp.path(), 60).unwrap_err() {
-        LoadError::StaleWriter { last_tick, ttl_seconds } => {
+        LoadError::StaleWriter {
+            last_tick,
+            ttl_seconds,
+        } => {
             assert_eq!(ttl_seconds, 60);
             assert!(last_tick <= stale);
         }
@@ -196,7 +220,10 @@ fn live_heartbeat_is_reported() {
     fs::write(tmp.path().join("heartbeat.json"), heartbeat.to_string()).unwrap();
 
     match RunState::load(tmp.path(), 300).unwrap_err() {
-        LoadError::LiveWriter { writer_pid, writer_host } => {
+        LoadError::LiveWriter {
+            writer_pid,
+            writer_host,
+        } => {
             assert_eq!(writer_pid, 77);
             assert_eq!(writer_host, "host-x");
         }
@@ -208,7 +235,11 @@ fn live_heartbeat_is_reported() {
 fn empty_manifest_loads_empty_runstate() {
     let tmp = tempfile::tempdir().unwrap();
     let manifest = Manifest::new("run-008");
-    fs::write(tmp.path().join("manifest.json"), manifest.to_json().unwrap()).unwrap();
+    fs::write(
+        tmp.path().join("manifest.json"),
+        manifest.to_json().unwrap(),
+    )
+    .unwrap();
 
     let run_state = RunState::load(tmp.path(), 300).unwrap();
     assert_eq!(run_state.entries.len(), 0);
@@ -220,14 +251,24 @@ fn empty_manifest_loads_empty_runstate() {
 fn phase_status_is_derived_from_markers() {
     let tmp = tempfile::tempdir().unwrap();
     let (design_entry, design_payload) = build_entry_payload("design/design.md", b"done now");
-    write_manifest_with_run_state(tmp.path(), vec![(design_entry.clone(), design_payload)], "run-009");
+    write_manifest_with_run_state(
+        tmp.path(),
+        vec![(design_entry.clone(), design_payload)],
+        "run-009",
+    );
 
     marker_completed(tmp.path(), "design", &design_entry.sha256);
     marker_started(tmp.path(), "review");
 
     let run_state = RunState::load(tmp.path(), 300).unwrap();
-    assert_eq!(run_state.phase_status.get("design"), Some(&PhaseStatus::Completed));
-    assert_eq!(run_state.phase_status.get("review"), Some(&PhaseStatus::Started));
+    assert_eq!(
+        run_state.phase_status.get("design"),
+        Some(&PhaseStatus::Completed)
+    );
+    assert_eq!(
+        run_state.phase_status.get("review"),
+        Some(&PhaseStatus::Started)
+    );
 }
 
 #[test]
@@ -258,7 +299,11 @@ fn changes_dir_entry_is_verified_with_digest() {
         schema_version: 1,
         entries: vec![manifest_entry.clone()],
     };
-    fs::write(tmp.path().join("manifest.json"), manifest.to_json().unwrap()).unwrap();
+    fs::write(
+        tmp.path().join("manifest.json"),
+        manifest.to_json().unwrap(),
+    )
+    .unwrap();
     marker_completed(tmp.path(), "design", &manifest_entry.sha256);
 
     let run_state = RunState::load(tmp.path(), 300).unwrap();
