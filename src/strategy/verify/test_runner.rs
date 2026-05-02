@@ -183,7 +183,7 @@ impl TestRunner {
                 ("ok", true) => {
                     // ignored test — not counted
                 }
-                ("failed", _) => {
+                ("failed" | "timeout", _) => {
                     failed += 1;
                     if first_failure_name.is_none() {
                         first_failure_name = value
@@ -257,27 +257,24 @@ impl TestRunner {
         };
 
         let passed = summary.get("passed").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-        let failed = summary.get("failed").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let failed = summary.get("failed").and_then(|v| v.as_u64()).unwrap_or(0) as u32
+            + summary.get("error").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
-        let first_failure_name = value
+        let first_failed_test = value
             .get("tests")
             .and_then(|v| v.as_array())
             .and_then(|tests| {
-                tests
-                    .iter()
-                    .find(|t| t.get("outcome").and_then(|o| o.as_str()) == Some("failed"))
-            })
+                tests.iter().find(|t| {
+                    let outcome = t.get("outcome").and_then(|o| o.as_str());
+                    outcome == Some("failed") || outcome == Some("error")
+                })
+            });
+
+        let first_failure_name = first_failed_test
             .and_then(|t| t.get("nodeid").and_then(|n| n.as_str()))
             .map(|s| s.to_string());
 
-        let first_failure_excerpt = value
-            .get("tests")
-            .and_then(|v| v.as_array())
-            .and_then(|tests| {
-                tests
-                    .iter()
-                    .find(|t| t.get("outcome").and_then(|o| o.as_str()) == Some("failed"))
-            })
+        let first_failure_excerpt = first_failed_test
             .and_then(|t| {
                 t.get("call")
                     .and_then(|c| c.get("longrepr"))
@@ -446,18 +443,12 @@ pub struct TestResult {
 fn truncate_excerpt(text: &str, max_chars: usize) -> String {
     let normalized = text.trim();
 
-    let char_count = normalized.chars().count();
-    if char_count <= max_chars {
-        return normalized.to_string();
+    let mut chars = normalized.chars();
+    let mut result: String = chars.by_ref().take(max_chars).collect();
+    if chars.next().is_some() {
+        result.push('…');
     }
-
-    normalized
-        .chars()
-        .take(max_chars)
-        .collect::<String>()
-        .chars()
-        .chain(Some('…'))
-        .collect()
+    result
 }
 
 #[cfg(test)]
