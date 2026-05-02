@@ -144,8 +144,6 @@ pub fn dir_digest(root: &Path) -> Result<String, std::io::Error> {
     Ok(hex)
 }
 
-
-
 impl ManifestEntry {
     /// Create a ManifestEntry from a byte payload (auto-computes sha256).
     pub fn from_payload(

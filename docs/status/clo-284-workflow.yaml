@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-02T14:06:19.560Z'
-  updated_at: '2026-05-02T17:09:20.582Z'
+  updated_at: '2026-05-02T17:15:02.015Z'
 phases:
   discovery:
     status: complete
@@ -70,6 +70,7 @@ phases:
       - b2b914b
       - 9d2f6a7
       - 2dd6624
+      - 6d8cdca
   pr:
     status: pending
   complete:
@@ -153,5 +154,9 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: PhaseOrderGuard state machine. 2 tests pass (valid transitions + invalid skip). Commit 2dd6624'
+  - timestamp: '2026-05-02T17:15:02.015Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: HeartbeatWriter, Clock trait, is_stale. 4 tests pass. Commit 6d8cdca'
 task_title: Implement phase status markers (started/completed/failed) with atomic write
 task_url: https://linear.app/cloud-ai/issue/CLO-284/implement-phase-status-markers-startedcompletedfailed-with-atomic

@@ -97,7 +97,10 @@ fn atomic_rename_crash_between_tmp_and_rename() {
 
     // Now verify the marker path exists (it was renamed successfully).
     let path = writer.markers_dir().join("design.started");
-    assert!(path.exists(), "marker file should exist after completed write");
+    assert!(
+        path.exists(),
+        "marker file should exist after completed write"
+    );
 
     // Also verify no .tmp files remain.
     let has_tmp = std::fs::read_dir(writer.markers_dir())
@@ -215,7 +218,10 @@ fn markers_dir_created_automatically() {
     let writer = MarkerWriter::new(tmp.path());
     writer.write_started("design", 0).unwrap();
 
-    assert!(markers_dir.exists(), "markers dir should be created on first write");
+    assert!(
+        markers_dir.exists(),
+        "markers dir should be created on first write"
+    );
     assert!(markers_dir.join("design.started").exists());
 }
 
@@ -281,7 +287,10 @@ async fn heartbeat_file_gets_created_and_contains_valid_json() {
     tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
     let heartbeat_path = markers_dir.join("heartbeat.json");
-    assert!(heartbeat_path.exists(), "heartbeat file should exist after a tick");
+    assert!(
+        heartbeat_path.exists(),
+        "heartbeat file should exist after a tick"
+    );
 
     let content = std::fs::read_to_string(&heartbeat_path).unwrap();
     let body: HeartbeatBody = serde_json::from_str(&content).unwrap();
@@ -353,7 +362,10 @@ fn is_stale_boundary_exact_ttl() {
         writer_host: "host-a".to_string(),
         tick_at: exactly_ttl_ago,
     };
-    assert!(!is_stale(&body, &now, ttl_seconds), "not stale at exactly TTL");
+    assert!(
+        !is_stale(&body, &now, ttl_seconds),
+        "not stale at exactly TTL"
+    );
 
     // At ttl + 1s → stale.
     let one_second_over = now - chrono::Duration::seconds(ttl_seconds as i64 + 1);
