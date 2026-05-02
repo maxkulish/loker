@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-02T12:30:08.918Z'
-  updated_at: '2026-05-02T13:10:47.468Z'
+  updated_at: '2026-05-02T13:12:00.293Z'
 phases:
   discovery:
     status: complete
@@ -65,6 +65,7 @@ phases:
     commits:
       - 1d93eda
       - 2ca4206
+      - bcaab09
   pr:
     status: pending
   complete:
@@ -145,5 +146,9 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: Kind, Producer, ManifestEntry, Manifest with round-trip test. Commit 2ca4206'
+  - timestamp: '2026-05-02T13:12:00.293Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: sha256_hex, dir_digest, atomic_write, Manifest::append, Manifest::verify. Commit bcaab09'
 task_title: Implement append-only manifest writer with crash-safe rewrite
 task_url: https://linear.app/cloud-ai/issue/CLO-283/implement-append-only-manifest-writer-with-crash-safe-rewrite

@@ -8,9 +8,9 @@
 pub mod aggregator;
 pub mod backend;
 pub mod family;
+pub mod manifest;
 pub mod strategy;
 pub mod template;
-pub mod manifest;
 
 mod apply_verify;
 mod cache;

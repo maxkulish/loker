@@ -8,6 +8,12 @@ use sha2::{Digest, Sha256};
 
 use crate::family::PhaseError;
 
+/// Completed marker — subset of the marker file schema, just enough for orphan sweep.
+#[derive(Debug, Clone, Deserialize)]
+struct CompletedMarker {
+    manifest_entry_sha256: String,
+}
+
 #[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum ManifestError {
@@ -111,7 +117,11 @@ pub fn dir_digest(root: &Path) -> Result<String, std::io::Error> {
             // recurse — stack-based walk is fine for expected sizes
             let sub = dir_digest(&path)?;
             entries.push((
-                path.strip_prefix(root).unwrap_or(&path).to_string_lossy().into_owned() + "/",
+                path.strip_prefix(root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .into_owned()
+                    + "/",
                 sub,
             ));
         }
@@ -188,6 +198,73 @@ impl Manifest {
         serde_json::from_str(s)
     }
 
+    /// Load a manifest file from disk, validate schema version, run orphan sweep.
+    pub fn load(path: &Path) -> Result<Self, ManifestError> {
+        let content = std::fs::read_to_string(path)?;
+        let mut manifest: Manifest = Self::from_json(&content)?;
+
+        if manifest.schema_version != 1 {
+            return Err(PhaseError::ArtefactSchemaMismatch {
+                detail: format!(
+                    "manifest schema_version is {}; only v1 is supported",
+                    manifest.schema_version
+                ),
+            }
+            .into());
+        }
+
+        // Orphan sweep: drop entries whose sha256 is not referenced by any
+        // markers/<phase>.completed file under the run directory.
+        // Only sweep when the markers directory exists; if it doesn't, this is
+        // a normal load (not crash recovery) and all entries are valid.
+        let run_dir = path.parent().unwrap_or(Path::new("."));
+        let markers_dir = run_dir.join("markers");
+        let mut referenced = std::collections::HashSet::<String>::new();
+        let markers_exist = markers_dir.exists();
+        if markers_exist {
+            if let Ok(entries) = std::fs::read_dir(&markers_dir) {
+                for entry in entries.flatten() {
+                    let file_name = entry.file_name();
+                    let Some(name) = file_name.to_str() else {
+                        continue;
+                    };
+                    if !name.ends_with(".completed") {
+                        continue;
+                    }
+                    let Ok(text) = std::fs::read_to_string(entry.path()) else {
+                        continue;
+                    };
+                    if let Ok(marker) = serde_json::from_str::<CompletedMarker>(&text) {
+                        referenced.insert(marker.manifest_entry_sha256);
+                    }
+                }
+            }
+        }
+
+        if markers_exist {
+            let original_len = manifest.entries.len();
+            manifest.entries.retain(|e| {
+                if referenced.contains(&e.sha256) {
+                    true
+                } else {
+                    // TODO(T-029): replace eprintln with injected log sink once trace writer lands
+                    eprintln!("orphan manifest entry dropped: {} ({})", e.name, e.sha256);
+                    false
+                }
+            });
+            let dropped = original_len - manifest.entries.len();
+            if dropped > 0 {
+                // TODO(T-029): replace eprintln with injected log sink
+                eprintln!(
+                    "orphan sweep dropped {} entries from manifest {}",
+                    dropped, manifest.run_id
+                );
+            }
+        }
+
+        Ok(manifest)
+    }
+
     /// Append an entry and atomically rewrite the manifest file on disk.
     pub fn append(&mut self, entry: ManifestEntry, path: &Path) -> Result<(), ManifestError> {
         self.entries.push(entry);
@@ -198,7 +275,10 @@ impl Manifest {
 
     /// Look up the sha256 of an entry by its name.  O(N) — fine for v0 sizes.
     pub fn sha256_for(&self, name: &str) -> Option<&str> {
-        self.entries.iter().find(|e| e.name == name).map(|e| e.sha256.as_str())
+        self.entries
+            .iter()
+            .find(|e| e.name == name)
+            .map(|e| e.sha256.as_str())
     }
 
     /// Content-addressed verification: does the payload match the recorded sha256?
