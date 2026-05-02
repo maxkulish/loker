@@ -18,10 +18,10 @@ linear:
   priority: High
   branch_actual: feat/clo-283-manifest
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-02T12:30:08.918Z'
-  updated_at: '2026-05-02T13:12:00.293Z'
+  updated_at: '2026-05-02T13:25:43.346Z'
 phases:
   discovery:
     status: complete
@@ -61,13 +61,24 @@ phases:
     plan_file: docs/plans/clo-283-manifest.md
     approved: true
   implement:
-    status: pending
+    status: complete
     commits:
       - 1d93eda
       - 2ca4206
       - bcaab09
+      - 57fc972
+    codex_report: docs/reviews/clo-283-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve
+    gemini_validation_report: docs/reviews/clo-283-gemini-validation.md
+    validation_fix_iteration_count: 0
+    validation_synthesis_report: docs/reviews/clo-283-validation-synthesis.md
+    validation_synthesis_verdict: approve
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 30
+    pr_url: https://github.com/maxkulish/loker/pull/30
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -150,5 +161,31 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: sha256_hex, dir_digest, atomic_write, Manifest::append, Manifest::verify. Commit bcaab09'
+  - timestamp: '2026-05-02T13:17:27.841Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. 4 commits. make check green. 656 lib + 532 main + 9 manifest tests pass.
+  - timestamp: '2026-05-02T13:22:32.016Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: approve. Gemini: approve. Synthesis: approve. 0 fixes applied. Tooling failures for both external
+      reviewers; manual fallback reviews used per implement.md fallback clause.
+  - timestamp: '2026-05-02T13:22:47.205Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-02T13:23:12.571Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-02T13:23:32.235Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #30 opened: https://github.com/maxkulish/loker/pull/30'
+  - timestamp: '2026-05-02T13:25:43.346Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format (16s), clippy (28s), test (2m9s)'
 task_title: Implement append-only manifest writer with crash-safe rewrite
 task_url: https://linear.app/cloud-ai/issue/CLO-283/implement-append-only-manifest-writer-with-crash-safe-rewrite

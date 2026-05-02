@@ -67,6 +67,7 @@ pub enum Producer {
 
 /// A single entry in the manifest — one artefact produced by one phase.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ManifestEntry {
     pub name: String,
     pub kind: Kind,
@@ -81,6 +82,7 @@ pub struct ManifestEntry {
 
 /// Manifest envelope — the artefact registry for a single run.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Manifest {
     #[serde(rename = "loker.run_id")]
     pub run_id: String,
@@ -100,41 +102,47 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 
 /// Deterministic directory digest for `kind: changes/`.
 /// Walks the directory recursively, collects (relative_path, sha256_hex(content))
-/// for every regular file, sorts by path, produces "<path>\t<sha256>\n" per line,
-/// then sha256_hex of the whole concatenation.
+/// for every regular file (flattened including subdirs), sorts by path,
+/// produces "<path>\t<sha256>\n" per line, then sha256_hex of the whole
+/// concatenation.
 pub fn dir_digest(root: &Path) -> Result<String, std::io::Error> {
-    let mut entries = Vec::new();
-    for entry in std::fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        let metadata = entry.metadata()?;
-        if metadata.is_file() {
-            let rel = path.strip_prefix(root).unwrap_or(&path);
-            let content = std::fs::read(&path)?;
-            let hash = sha256_hex(&content);
-            entries.push((rel.to_string_lossy().into_owned(), hash));
-        } else if metadata.is_dir() {
-            // recurse — stack-based walk is fine for expected sizes
-            let sub = dir_digest(&path)?;
-            entries.push((
-                path.strip_prefix(root)
-                    .unwrap_or(&path)
-                    .to_string_lossy()
-                    .into_owned()
-                    + "/",
-                sub,
-            ));
+    fn walk<'a>(
+        root: &'a Path,
+        prefix: &'a Path,
+        out: &mut Vec<(String, String)>,
+    ) -> Result<(), std::io::Error> {
+        for entry in std::fs::read_dir(root)? {
+            let entry = entry?;
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_file() {
+                let rel = path.strip_prefix(prefix).unwrap_or(&path);
+                let content = std::fs::read(&path)?;
+                let hash = sha256_hex(&content);
+                out.push((rel.to_string_lossy().into_owned(), hash));
+            } else if file_type.is_dir() {
+                walk(&path, prefix, out)?;
+            }
         }
+        Ok(())
     }
+
+    let mut entries = Vec::new();
+    walk(root, root, &mut entries)?;
     entries.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut concat = String::new();
+    let mut hasher = Sha256::new();
     for (rel, hash) in entries {
-        concat.push_str(&rel);
-        concat.push('\t');
-        concat.push_str(&hash);
-        concat.push('\n');
+        hasher.update(rel.as_bytes());
+        hasher.update(b"\t");
+        hasher.update(hash.as_bytes());
+        hasher.update(b"\n");
     }
-    Ok(sha256_hex(concat.as_bytes()))
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for b in digest {
+        let _ = write!(hex, "{:02x}", b);
+    }
+    Ok(hex)
 }
 
 /// Atomic write helper: tmp → fsync → rename → parent-fsync.
@@ -145,10 +153,13 @@ fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
     tmp.as_file().sync_all()?;
     let _final_path = tmp.persist(path)?;
 
-    // Parent-directory fsync is POSIX-only and a no-op on Windows.
-    // The rename itself is atomic; the extra fsync improves crash recovery.
-    if let Ok(parent_file) = File::open(parent) {
-        let _ = parent_file.sync_all();
+    // Parent-directory fsync on Unix ensures the directory entry update
+    // is durable; on Windows this is a no-op (directories can't be opened
+    // as regular files).
+    #[cfg(unix)]
+    {
+        let parent_file = File::open(parent)?;
+        parent_file.sync_all()?;
     }
 
     Ok(())
@@ -219,29 +230,26 @@ impl Manifest {
         // a normal load (not crash recovery) and all entries are valid.
         let run_dir = path.parent().unwrap_or(Path::new("."));
         let markers_dir = run_dir.join("markers");
-        let mut referenced = std::collections::HashSet::<String>::new();
-        let markers_exist = markers_dir.exists();
-        if markers_exist {
-            if let Ok(entries) = std::fs::read_dir(&markers_dir) {
-                for entry in entries.flatten() {
-                    let file_name = entry.file_name();
-                    let Some(name) = file_name.to_str() else {
-                        continue;
-                    };
-                    if !name.ends_with(".completed") {
-                        continue;
-                    }
-                    let Ok(text) = std::fs::read_to_string(entry.path()) else {
-                        continue;
-                    };
-                    if let Ok(marker) = serde_json::from_str::<CompletedMarker>(&text) {
-                        referenced.insert(marker.manifest_entry_sha256);
-                    }
+        if markers_dir.is_dir() {
+            let mut referenced = std::collections::HashSet::<String>::new();
+            for entry in std::fs::read_dir(&markers_dir)? {
+                let entry = entry?;
+                let file_name = entry.file_name();
+                let Some(name) = file_name.to_str() else {
+                    continue;
+                };
+                if !name.ends_with(".completed") {
+                    continue;
                 }
+                let Ok(text) = std::fs::read_to_string(entry.path()) else {
+                    continue;
+                };
+                let Ok(marker) = serde_json::from_str::<CompletedMarker>(&text) else {
+                    continue;
+                };
+                referenced.insert(marker.manifest_entry_sha256);
             }
-        }
 
-        if markers_exist {
             let original_len = manifest.entries.len();
             manifest.entries.retain(|e| {
                 if referenced.contains(&e.sha256) {
@@ -262,15 +270,39 @@ impl Manifest {
             }
         }
 
+        // Validate per-entry schema_version
+        for entry in &manifest.entries {
+            if entry.schema_version != 1 {
+                return Err(PhaseError::ArtefactSchemaMismatch {
+                    detail: format!(
+                        "entry '{}' has schema_version {}; only v1 is supported",
+                        entry.name, entry.schema_version
+                    ),
+                }
+                .into());
+            }
+        }
+
         Ok(manifest)
     }
 
     /// Append an entry and atomically rewrite the manifest file on disk.
     pub fn append(&mut self, entry: ManifestEntry, path: &Path) -> Result<(), ManifestError> {
         self.entries.push(entry);
-        let json = self.to_json()?;
-        atomic_write(path, json.as_bytes())?;
-        Ok(())
+        let json = self.to_json();
+        match json {
+            Ok(json_str) => match atomic_write(path, json_str.as_bytes()) {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    self.entries.pop(); // rollback on write failure
+                    Err(e.into())
+                }
+            },
+            Err(e) => {
+                self.entries.pop(); // rollback on serialization failure
+                Err(e.into())
+            }
+        }
     }
 
     /// Look up the sha256 of an entry by its name.  O(N) — fine for v0 sizes.

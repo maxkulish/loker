@@ -34,10 +34,9 @@ fn empty_manifest_roundtrips() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("manifest.json");
     let manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
-    manifest.to_json().unwrap().as_bytes().to_vec();
-    // Write via atomic_write equivalent
+    // Write via simple fs write for empty manifest test
     let json = manifest.to_json().unwrap();
-    fs::write(&path, json).unwrap(); // simple write for empty manifest test
+    fs::write(&path, json).unwrap();
     let loaded = Manifest::load(&path).unwrap();
     assert_eq!(manifest.run_id, loaded.run_id);
     assert_eq!(manifest.schema_version, loaded.schema_version);
@@ -210,6 +209,28 @@ fn changes_dir_digest_is_deterministic() {
     assert_ne!(
         digest_a, digest_b2,
         "changed content should produce different digest"
+    );
+}
+
+#[test]
+fn changes_dir_digest_flattens_subdirs() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("changes");
+    fs::create_dir(&root).unwrap();
+    fs::create_dir(root.join("sub")).unwrap();
+
+    fs::write(root.join("top.txt"), "top").unwrap();
+    fs::write(root.join("sub/inner.txt"), "inner").unwrap();
+
+    let digest = dir_digest(&root).unwrap();
+    assert!(!digest.is_empty());
+
+    // Changing nested file should change digest
+    fs::write(root.join("sub/inner.txt"), "modified").unwrap();
+    let digest2 = dir_digest(&root).unwrap();
+    assert_ne!(
+        digest, digest2,
+        "modifying nested file should change digest"
     );
 }
 
