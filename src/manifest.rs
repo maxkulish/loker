@@ -1,4 +1,25 @@
+use std::fmt::Write as _;
+use std::fs::File;
+use std::io::{self, Write as _};
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use crate::family::PhaseError;
+
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
+pub enum ManifestError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("{0}")]
+    Phase(#[from] PhaseError),
+}
 
 /// Artefact kind. Serialises to the bare strings defined in manifest.schema.json.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,6 +82,92 @@ pub struct Manifest {
     pub entries: Vec<ManifestEntry>,
 }
 
+/// sha256 hex string of arbitrary bytes.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for b in digest {
+        let _ = write!(hex, "{:02x}", b);
+    }
+    hex
+}
+
+/// Deterministic directory digest for `kind: changes/`.
+/// Walks the directory recursively, collects (relative_path, sha256_hex(content))
+/// for every regular file, sorts by path, produces "<path>\t<sha256>\n" per line,
+/// then sha256_hex of the whole concatenation.
+pub fn dir_digest(root: &Path) -> Result<String, std::io::Error> {
+    let mut entries = Vec::new();
+    for entry in std::fs::read_dir(root)? {
+        let entry = entry?;
+        let path = entry.path();
+        let metadata = entry.metadata()?;
+        if metadata.is_file() {
+            let rel = path.strip_prefix(root).unwrap_or(&path);
+            let content = std::fs::read(&path)?;
+            let hash = sha256_hex(&content);
+            entries.push((rel.to_string_lossy().into_owned(), hash));
+        } else if metadata.is_dir() {
+            // recurse — stack-based walk is fine for expected sizes
+            let sub = dir_digest(&path)?;
+            entries.push((
+                path.strip_prefix(root).unwrap_or(&path).to_string_lossy().into_owned() + "/",
+                sub,
+            ));
+        }
+    }
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut concat = String::new();
+    for (rel, hash) in entries {
+        concat.push_str(&rel);
+        concat.push('\t');
+        concat.push_str(&hash);
+        concat.push('\n');
+    }
+    Ok(sha256_hex(concat.as_bytes()))
+}
+
+/// Atomic write helper: tmp → fsync → rename → parent-fsync.
+fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(contents)?;
+    tmp.as_file().sync_all()?;
+    let _final_path = tmp.persist(path)?;
+
+    // Parent-directory fsync is POSIX-only and a no-op on Windows.
+    // The rename itself is atomic; the extra fsync improves crash recovery.
+    if let Ok(parent_file) = File::open(parent) {
+        let _ = parent_file.sync_all();
+    }
+
+    Ok(())
+}
+
+impl ManifestEntry {
+    /// Create a ManifestEntry from a byte payload (auto-computes sha256).
+    pub fn from_payload(
+        name: impl Into<String>,
+        kind: Kind,
+        schema_version: u32,
+        producer: Producer,
+        phase: Option<String>,
+        attempt: Option<u32>,
+        payload: &[u8],
+    ) -> Self {
+        Self {
+            name: name.into(),
+            kind,
+            schema_version,
+            sha256: sha256_hex(payload),
+            producer,
+            phase,
+            attempt,
+            created_at: Some(chrono::Utc::now()),
+        }
+    }
+}
+
 impl Manifest {
     /// Create an empty manifest for a given run id.
     pub fn new(run_id: impl Into<String>) -> Self {
@@ -80,6 +187,38 @@ impl Manifest {
     pub fn from_json(s: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(s)
     }
+
+    /// Append an entry and atomically rewrite the manifest file on disk.
+    pub fn append(&mut self, entry: ManifestEntry, path: &Path) -> Result<(), ManifestError> {
+        self.entries.push(entry);
+        let json = self.to_json()?;
+        atomic_write(path, json.as_bytes())?;
+        Ok(())
+    }
+
+    /// Look up the sha256 of an entry by its name.  O(N) — fine for v0 sizes.
+    pub fn sha256_for(&self, name: &str) -> Option<&str> {
+        self.entries.iter().find(|e| e.name == name).map(|e| e.sha256.as_str())
+    }
+
+    /// Content-addressed verification: does the payload match the recorded sha256?
+    pub fn verify(&self, name: &str, payload: &[u8]) -> Result<(), PhaseError> {
+        let recorded = self
+            .sha256_for(name)
+            .ok_or_else(|| PhaseError::ArtefactSchemaMismatch {
+                detail: format!("entry '{}' not found in manifest", name),
+            })?;
+        let computed = sha256_hex(payload);
+        if recorded != computed {
+            return Err(PhaseError::ArtefactSchemaMismatch {
+                detail: format!(
+                    "sha256 mismatch for '{}': recorded {} vs computed {}",
+                    name, recorded, computed
+                ),
+            });
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -94,5 +233,23 @@ mod tests {
         assert_eq!(manifest.run_id, loaded.run_id);
         assert_eq!(manifest.schema_version, loaded.schema_version);
         assert_eq!(manifest.entries, loaded.entries);
+    }
+
+    #[test]
+    fn sha256_hex_matches_known_vector() {
+        let data = b"hello world";
+        let got = sha256_hex(data);
+        let expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
+        assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn atomic_write_and_read() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("manifest.json");
+        let contents = b"{\"loker.run_id\":\"r1\",\"schema_version\":1,\"entries\":[]}";
+        atomic_write(&path, contents).unwrap();
+        let read = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(read.as_bytes(), contents);
     }
 }
