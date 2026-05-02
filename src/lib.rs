@@ -10,6 +10,7 @@ pub mod backend;
 pub mod family;
 pub mod strategy;
 pub mod template;
+pub mod manifest;
 
 mod apply_verify;
 mod cache;
