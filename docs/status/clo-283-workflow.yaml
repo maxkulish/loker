@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-02T12:30:08.918Z'
-  updated_at: '2026-05-02T13:08:34.638Z'
+  updated_at: '2026-05-02T13:10:25.157Z'
 phases:
   discovery:
     status: complete
@@ -62,6 +62,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - 1d93eda
   pr:
     status: pending
   complete:
@@ -134,5 +136,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-02T13:10:25.157Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: PhaseError::ArtefactSchemaMismatch, pub mod manifest, tempfile promoted to deps. Commit 1d93eda'
 task_title: Implement append-only manifest writer with crash-safe rewrite
 task_url: https://linear.app/cloud-ai/issue/CLO-283/implement-append-only-manifest-writer-with-crash-safe-rewrite

@@ -70,4 +70,29 @@ impl Manifest {
             entries: Vec::new(),
         }
     }
+
+    /// Serialize to a JSON string (pretty-printed).
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Deserialize from a JSON string.
+    pub fn from_json(s: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_manifest_roundtrips() {
+        let manifest = Manifest::new("run-001");
+        let json = manifest.to_json().unwrap();
+        let loaded: Manifest = Manifest::from_json(&json).unwrap();
+        assert_eq!(manifest.run_id, loaded.run_id);
+        assert_eq!(manifest.schema_version, loaded.schema_version);
+        assert_eq!(manifest.entries, loaded.entries);
+    }
 }
