@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-02T14:06:19.560Z'
-  updated_at: '2026-05-02T17:15:02.015Z'
+  updated_at: '2026-05-02T17:16:04.866Z'
 phases:
   discovery:
     status: complete
@@ -64,13 +64,14 @@ phases:
     plan_file: docs/plans/clo-284-plan.md
     approved: true
   implement:
-    status: pending
+    status: validating
     commits:
       - 2b228a6
       - b2b914b
       - 9d2f6a7
       - 2dd6624
       - 6d8cdca
+      - 71aee95
   pr:
     status: pending
   complete:
@@ -158,5 +159,15 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST4 landed: HeartbeatWriter, Clock trait, is_stale. 4 tests pass. Commit 6d8cdca'
+  - timestamp: '2026-05-02T17:15:49.423Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 landed: make check green. 5 sub-tasks complete. Commit 71aee95'
+  - timestamp: '2026-05-02T17:16:04.866Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All 5 sub-tasks landed. make check green. 6 commits: ST1 (atomic_write extraction), ST2 (MarkerWriter), ST3
+      (PhaseOrderGuard), ST4 (HeartbeatWriter), ST5 (finalize). Ready for validation gate.
 task_title: Implement phase status markers (started/completed/failed) with atomic write
 task_url: https://linear.app/cloud-ai/issue/CLO-284/implement-phase-status-markers-startedcompletedfailed-with-atomic

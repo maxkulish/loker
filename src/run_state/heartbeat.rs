@@ -42,7 +42,7 @@ impl FakeClock {
     /// Advance the clock by `delta`.
     pub fn advance(&self, delta: chrono::Duration) {
         let mut time = self.current.lock().unwrap();
-        *time = *time + delta;
+        *time += delta;
     }
 }
 
