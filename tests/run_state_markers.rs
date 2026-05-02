@@ -1,5 +1,6 @@
 use loker::run_state::{
-    next_attempt, CompletedMarker, FailedMarker, MarkerWriter, StartedMarker,
+    next_attempt, CompletedMarker, FailedMarker, MarkerWriter, PhaseOrderGuard, PhaseState,
+    StartedMarker,
 };
 
 // ---------------------------------------------------------------------------
@@ -232,4 +233,34 @@ fn different_phases_do_not_interfere() {
     assert_eq!(n_design, 1);
     assert_eq!(n_implement, 1);
     assert_eq!(n_review, 1);
+}
+
+// ---------------------------------------------------------------------------
+// PhaseOrderGuard tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn phase_order_guard_valid_transitions() {
+    let mut guard = PhaseOrderGuard::new("design".to_string(), 0);
+    assert_eq!(*guard.state(), PhaseState::Idle);
+
+    guard.mark_started();
+    assert_eq!(*guard.state(), PhaseState::Started);
+
+    guard.mark_artefact_written();
+    assert_eq!(*guard.state(), PhaseState::ArtefactWritten);
+
+    guard.mark_manifest_appended();
+    assert_eq!(*guard.state(), PhaseState::ManifestAppended);
+
+    guard.mark_completed();
+    assert_eq!(*guard.state(), PhaseState::Completed);
+}
+
+#[test]
+#[should_panic(expected = "invalid transition")]
+fn phase_order_guard_invalid_skip() {
+    // Attempt Idle → Completed directly — should panic in debug.
+    let mut guard = PhaseOrderGuard::new("design".to_string(), 0);
+    guard.mark_completed();
 }
