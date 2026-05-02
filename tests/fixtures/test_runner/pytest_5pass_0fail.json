@@ -1,0 +1,16 @@
+{
+  "created": 1234567890,
+  "duration": 0.15,
+  "exitcode": 0,
+  "root": "/tmp",
+  "environment": {"python_version": "3.12"},
+  "summary": {"passed": 5, "failed": 0, "total": 5, "collected": 5},
+  "collectors": [],
+  "tests": [
+    {"nodeid": "test_foo.py::test_a", "outcome": "passed", "duration": 0.01},
+    {"nodeid": "test_foo.py::test_b", "outcome": "passed", "duration": 0.02},
+    {"nodeid": "test_bar.py::test_c", "outcome": "passed", "duration": 0.01},
+    {"nodeid": "test_bar.py::test_d", "outcome": "passed", "duration": 0.03},
+    {"nodeid": "test_baz.py::test_e", "outcome": "passed", "duration": 0.01}
+  ]
+}

@@ -1,0 +1,3 @@
+{"type":"compiler","message":"compiling foo v0.1.0","level":"note"}
+{"type":"artifact","target":"foo","profile":"test"}
+{"type":"test","event":"ignored","name":"ignored_integration","test_type":"integration"}

@@ -141,7 +141,7 @@ impl RunCommand {
             .collect()
     }
 
-    async fn run(&self) -> Result<CommandRun, VerifyError> {
+    pub async fn run(&self) -> Result<CommandRun, VerifyError> {
         let command_path = self.resolve_command()?;
 
         let mut command = Command::new(&command_path);
@@ -248,24 +248,24 @@ impl RunCommand {
 }
 
 #[derive(Debug)]
-struct CommandRun {
-    status: std::process::ExitStatus,
-    timed_out: bool,
-    stdout: CapturedOutput,
-    stderr: CapturedOutput,
-    secret_values: Vec<String>,
-    elapsed_ms: u64,
+pub struct CommandRun {
+    pub status: std::process::ExitStatus,
+    pub timed_out: bool,
+    pub stdout: CapturedOutput,
+    pub stderr: CapturedOutput,
+    pub secret_values: Vec<String>,
+    pub elapsed_ms: u64,
 }
 
-#[derive(Debug)]
-struct CapturedOutput {
-    data: Vec<u8>,
-    truncated: bool,
-    elided_bytes: usize,
+#[derive(Debug, Clone)]
+pub struct CapturedOutput {
+    pub data: Vec<u8>,
+    pub truncated: bool,
+    pub elided_bytes: usize,
 }
 
 impl CapturedOutput {
-    fn to_reason_text(&self) -> String {
+    pub fn to_reason_text(&self) -> String {
         let mut text = String::from_utf8_lossy(&self.data).into_owned();
         if self.truncated {
             text.push_str(&format!(
@@ -278,7 +278,7 @@ impl CapturedOutput {
 }
 
 /// Redact known secret patterns and specific allowlisted secret values from text.
-fn redact_output(text: &str, secret_values: &[String]) -> String {
+pub(crate) fn redact_output(text: &str, secret_values: &[String]) -> String {
     let mut result = redact_secrets(text);
     for secret in secret_values {
         if !secret.is_empty() && result.contains(secret.as_str()) {

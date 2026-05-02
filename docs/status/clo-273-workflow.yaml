@@ -1,0 +1,209 @@
+task_id: clo-273
+task_type: development
+classification_reason: Title starts with "Implement" with mostly mechanical ACs.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by:
+    - CLO-271
+    - CLO-270
+  priority: Medium
+  branch_suggested: kmamemo/clo-273-implement-testrunner-verify-hook-parsing-cargo-pytest-json
+  branch_actual: feat/clo-273-test-runner
+workflow:
+  current_phase: pr
+  status: in_progress
+  created_at: '2026-05-01T14:40:59.518Z'
+  updated_at: '2026-05-02T07:06:51.659Z'
+phases:
+  discovery:
+    status: complete
+    approved: true
+    problem_framed: true
+    prd_exists: true
+    prd_file: docs/prds/clo-273-test-runner.md
+    prd_created: true
+    discovery_report: docs/discovery/clo-273.md
+    discovery_debt: []
+    baseline_score: 7
+    approaches_identified: 3
+    approach_chosen: Approach A
+  design:
+    status: complete
+    design_doc: docs/designs/clo-273-test-runner.md
+    discovery_context_used: true
+    draft_ready: true
+    review_completed: false
+    review_gemini: null
+    review_ollama: null
+    review_synthesis: null
+    review_verdict: null
+    review_skip_reason: AI review tooling unavailable in environment; design manually approved by maintainer.
+    review_applied: false
+    applied_suggestions: []
+    flagged_suggestions: []
+    finalized: true
+    human_review_completed: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-273-test-runner.md
+    approved: true
+  implement:
+    status: complete
+    commits:
+      - d10d83b
+      - 5c6651b
+      - 72b5c11
+    codex_report: docs/reviews/clo-273-codex-validation.md
+    codex_validated: true
+    codex_verdict: rework
+    gemini_validation_report: docs/reviews/clo-273-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-273-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+  pr:
+    status: in_progress
+    pr_number: 29
+    pr_url: https://github.com/maxkulish/loker/pull/29
+    ci_passed: true
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-01T14:40:59.518Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-273 as development
+  - timestamp: '2026-05-01T15:04:21.915Z'
+    action: init_classified
+    phase: init
+    details: 'Classified as development: title is an implementation task with mechanical acceptance-criteria scope.'
+  - timestamp: '2026-05-01T15:04:37.188Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-01T15:04:38.653Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-01T15:05:31.008Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-273-test-runner checked out (existing local branch pre-created)
+  - timestamp: '2026-05-01T15:05:50.773Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: dedicated TestRunner hook module using RunCommand + structured parsers. Baseline 7/10. 3 approaches
+      considered.
+  - timestamp: '2026-05-01T15:05:52.123Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-01T15:06:45.335Z'
+    action: design_draft_ready
+    phase: design
+    details: Draft created at docs/designs/clo-273-test-runner.md using discovery+PRD context; discovery_context_used=true.
+  - timestamp: '2026-05-01T15:06:48.025Z'
+    action: design_review_complete
+    phase: design
+    details: AI review unavailable in this environment. Proceeding with manual checkpoint; no auto-applicable suggestions.
+  - timestamp: '2026-05-01T15:06:50.097Z'
+    action: design_finalized
+    phase: design
+    details: Design approved for implementation. No conflicts detected. Proceeding to plan phase.
+  - timestamp: '2026-05-01T15:07:03.345Z'
+    action: design_human_review_complete
+    phase: design
+    details: >-
+      Manual review path used; no conflicts. Review artifacts recorded as unavailable/skipped in workflow for
+      environment constraints.
+  - timestamp: '2026-05-01T15:09:12.620Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-273-test-runner.md
+  - timestamp: '2026-05-01T15:09:17.126Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 6 sub-tasks queued.
+  - timestamp: '2026-05-01T15:09:18.460Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-01T15:10:53.238Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST1 landed: consolidated TestRunner construction/API and added core test_runner module + exports + parser tests.
+      Commit d10d83b
+  - timestamp: '2026-05-01T15:10:57.884Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: parser behavior locked to fixtures and soft-fail malformed/no-summary lines. Commit d10d83b.'
+  - timestamp: '2026-05-01T15:11:00.532Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST3 landed: `to_verify_result` maps timeout/signal/non-zero/no-tests/pass/fail semantics per contract. Commit
+      d10d83b.
+  - timestamp: '2026-05-01T15:11:01.926Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: VerifyHook integration via RunCommand and exports complete. Commit d10d83b.'
+  - timestamp: '2026-05-01T15:11:03.344Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST5 landed: full focused test suite (`cargo test --test verify_test_runner`) is green on current code. Commit
+      d10d83b.
+  - timestamp: '2026-05-01T15:11:04.899Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST6 pre-merge sanity run complete: make check green. Commit d10d83b.'
+  - timestamp: '2026-05-01T15:11:06.835Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 1 commit.
+  - timestamp: '2026-05-02T06:31:07.577Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      Minor follow-up: clippy-safe string assertions and explicit sandbox-violation assertion style in tests. Commit
+      72b5c11.
+  - timestamp: '2026-05-02T06:31:08.740Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 3 commits.
+  - timestamp: '2026-05-02T07:03:15.270Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (findings classified as false positives/out-of-scope in synthesis). Gemini: approve_with_changes.
+      Synthesis: approve_with_changes. One fix iteration applied (non-zero exit handling, excerpt truncation, pytest
+      parser fallback). make check re-run green.
+  - timestamp: '2026-05-02T07:03:49.058Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-02T07:04:12.991Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-02T07:04:33.767Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #29 opened: https://github.com/maxkulish/loker/pull/29'
+  - timestamp: '2026-05-02T07:06:51.659Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format (16s), clippy (27s), test (2m11s)'
+task_title: Implement TestRunner verify hook parsing cargo + pytest JSON
+task_url: https://linear.app/cloud-ai/issue/CLO-273/implement-testrunner-verify-hook-parsing-cargo-pytest-json

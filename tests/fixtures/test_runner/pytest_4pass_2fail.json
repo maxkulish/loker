@@ -1,0 +1,17 @@
+{
+  "created": 1234567891,
+  "duration": 0.32,
+  "exitcode": 1,
+  "root": "/tmp",
+  "environment": {"python_version": "3.12"},
+  "summary": {"passed": 4, "failed": 2, "total": 6, "collected": 6},
+  "collectors": [],
+  "tests": [
+    {"nodeid": "test_foo.py::test_a", "outcome": "passed", "duration": 0.01},
+    {"nodeid": "test_bar.py::test_bad", "outcome": "failed", "duration": 0.05, "call": {"longrepr": "AssertionError: expected 5 got 3\nassert 5 == 3"}},
+    {"nodeid": "test_baz.py::test_c", "outcome": "passed", "duration": 0.02},
+    {"nodeid": "test_baz.py::test_d", "outcome": "passed", "duration": 0.01},
+    {"nodeid": "test_qux.py::test_bad2", "outcome": "failed", "duration": 0.03, "call": {"longrepr": "TypeError: unsupported operand type(s) for +: 'int' and 'str'"}},
+    {"nodeid": "test_qux.py::test_e", "outcome": "passed", "duration": 0.02}
+  ]
+}

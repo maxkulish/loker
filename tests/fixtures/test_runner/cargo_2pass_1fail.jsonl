@@ -1,0 +1,3 @@
+{"type":"test","event":"ok","name":"test_add","test_type":"unit"}
+{"type":"test","event":"ok","name":"test_subtract","test_type":"unit"}
+{"type":"test","event":"failed","name":"test_bad_divide","test_type":"unit","stdout":"thread 'test_bad_divide' panicked at src/lib.rs:15:\nassertion `left == right` failed\n  left: 3\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"}
