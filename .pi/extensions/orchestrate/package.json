@@ -6,8 +6,8 @@
   "main": "index.ts",
   "scripts": {},
   "dependencies": {
-    "@mariozechner/pi-ai": "^0.70.5",
-    "@mariozechner/pi-coding-agent": "^0.70.5",
+    "@mariozechner/pi-ai": "^0.72.1",
+    "@mariozechner/pi-coding-agent": "^0.72.1",
     "@mariozechner/pi-tui": "^0.70.5",
     "js-yaml": "^4.1.0",
     "typebox": "^1.1.24"
