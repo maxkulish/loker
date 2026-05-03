@@ -1,12 +1,11 @@
 use std::fmt::Write as _;
-use std::fs::File;
-use std::io::{self, Write as _};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::family::PhaseError;
+use crate::run_state::atomic_write;
 
 /// Completed marker — subset of the marker file schema, just enough for orphan sweep.
 #[derive(Debug, Clone, Deserialize)]
@@ -143,26 +142,6 @@ pub fn dir_digest(root: &Path) -> Result<String, std::io::Error> {
         let _ = write!(hex, "{:02x}", b);
     }
     Ok(hex)
-}
-
-/// Atomic write helper: tmp → fsync → rename → parent-fsync.
-fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
-    let parent = path.parent().unwrap_or(Path::new("."));
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
-    tmp.write_all(contents)?;
-    tmp.as_file().sync_all()?;
-    let _final_path = tmp.persist(path)?;
-
-    // Parent-directory fsync on Unix ensures the directory entry update
-    // is durable; on Windows this is a no-op (directories can't be opened
-    // as regular files).
-    #[cfg(unix)]
-    {
-        let parent_file = File::open(parent)?;
-        parent_file.sync_all()?;
-    }
-
-    Ok(())
 }
 
 impl ManifestEntry {
