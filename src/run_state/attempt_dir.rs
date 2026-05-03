@@ -35,7 +35,7 @@ impl AttemptDir {
     /// Atomically promote the attempt directory to the canonical phase path.
     ///
     /// On the same filesystem this is a single `rename(2)` — atomic and
-    /// crash-safe.  If the rename fails for any reason (e.g. cross-device),
+    /// crash-safe.  If the rename fails for cross-device,
     /// we fall back to a recursive copy + remove.
     pub fn promote_to_canonical(&self, canonical_dir: &Path) -> io::Result<()> {
         // Ensure canonical parent exists
@@ -63,6 +63,10 @@ impl AttemptDir {
                 #[cfg(unix)]
                 if e.raw_os_error() == Some(18) {
                     // libc::EXDEV = 18
+                    // Remove any existing canonical dir to avoid merging stale files
+                    if canonical_dir.exists() {
+                        std::fs::remove_dir_all(canonical_dir)?;
+                    }
                     Self::copy_tree(&self.path, canonical_dir)?;
                     std::fs::remove_dir_all(&self.path)?;
                     return Ok(());

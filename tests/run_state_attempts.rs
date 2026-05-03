@@ -1,4 +1,4 @@
-use loker::manifest::{Kind, Manifest, ManifestEntry, Producer};
+use loker::manifest::{Kind, ManifestEntry, Producer};
 use loker::run_state::{next_attempt, AttemptDir, LatestPointer, MarkerWriter};
 
 // ---------------------------------------------------------------------------
@@ -63,10 +63,10 @@ fn second_attempt_after_failure() {
     std::fs::create_dir_all(attempt_0.path()).unwrap();
     std::fs::write(attempt_0.path().join("design.md"), b"attempt 0 debris").unwrap();
 
-    // Re-derive next_attempt — should still be 1 (max of markers=1, dirs=1 → max=1, but +1 applied)
-    // Wait: marker says attempt 0 started, so next_attempt_from_markers returns 1.
-    // dirs has 0 and 1, so next_attempt_from_dirs returns 2.
-    // max(1, 2) = 2. So next_attempt returns 2 after we created attempt-1 dir.
+    // After creating attempt-0 dir and attempt-1 dir:
+    // - markers: started.0 exists → next_attempt_from_markers returns 1
+    // - dirs: 0 and 1 exist → next_attempt_from_dirs returns 2
+    // - max(1, 2) = 2
     let n2 = next_attempt(tmp.path(), "design").unwrap();
     assert_eq!(n2, 2, "dirs show attempt 1 exists → next is 2");
 

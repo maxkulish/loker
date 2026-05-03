@@ -355,7 +355,7 @@ Matches the issue-body TDD spec with D3 Approach A semantics:
 1. **First attempt**: with no prior markers, `next_attempt("design")` returns 0, attempt dir created at `attempts/design/0/`, producer writes there.
 2. **Second attempt after failure**: write `design.failed` for attempt 0, then `next_attempt("design")` returns 1, producer writes to `attempts/design/1/`, attempt-0 files are untouched.
 3. **Manifest entry pins attempt**: after producer completes attempt 1, the manifest entry has `attempt: 1` and `name: "design/design.md"` (canonical path, attempt as metadata).
-4. **Latest pointer**: after attempts 0,1,2 with 2 completing successfully, `latest` resolves to `attempts/design/2/` (symlink or json pointer).
+4. **Latest pointer**: after attempts 0,1,2 with 2 completing successfully, `latest` resolves to the canonical `design/` path (via `latest.json`, since the attempt dir was promoted). For in-progress or failed attempts, `latest` points to `attempts/design/<n>/` (symlink or json).
 5. **Attempt counter survives restart**: simulate process restart by re-deriving `next_attempt` from disk only (no in-memory state); result matches markers + attempt dirs. Test creates attempt dirs without markers and vice versa.
 6. **Cross-phase isolation**: design and review attempts are numbered independently.
 7. **Promotion is atomic**: attempt-0 file exists at `attempts/design/0/design.md`, after promotion, canonical `design/design.md` exists and attempt-0 file is gone.

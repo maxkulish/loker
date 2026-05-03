@@ -19,7 +19,7 @@ fn temp_run_dir() -> (tempfile::TempDir, MarkerWriter) {
 
 #[test]
 fn marker_roundtrip_started() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     let phase = "design";
     let attempt = 0;
 
@@ -39,7 +39,7 @@ fn marker_roundtrip_started() {
 
 #[test]
 fn marker_roundtrip_completed() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     let phase = "design";
     let attempt = 0;
     let sha = "abc123deadbeef";
@@ -62,7 +62,7 @@ fn marker_roundtrip_completed() {
 
 #[test]
 fn marker_roundtrip_failed() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     let phase = "design";
     let attempts_made = 3;
     let error_class = "PhaseError::ArtefactSchemaMismatch";
@@ -90,7 +90,7 @@ fn marker_roundtrip_failed() {
 #[test]
 fn atomic_write_leaves_no_temporary_files_on_success() {
     // Verify that after a successful atomic write, no temporary files are left behind.
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     // Write a marker normally.
     writer.write_started("design", 0).unwrap();
 
@@ -110,7 +110,7 @@ fn atomic_write_leaves_no_temporary_files_on_success() {
 
 #[test]
 fn atomic_rename_tmp_cleaned_after_success() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     writer.write_started("design", 0).unwrap();
     writer.write_completed("design", 0, "sha", &[]).unwrap();
     writer.write_failed("design", 1, "err", "path").unwrap();
@@ -137,29 +137,29 @@ fn next_attempt_zero_markers() {
 
 #[test]
 fn next_attempt_single_marker() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     writer.write_started("design", 0).unwrap();
-    let n = next_attempt(_tmp.path(), "design").unwrap();
+    let n = next_attempt(tmp.path(), "design").unwrap();
     assert_eq!(n, 1, "one marker at attempt 0 → next is 1");
 }
 
 #[test]
 fn next_attempt_three_markers() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     writer.write_started("design", 0).unwrap();
     writer.write_started("design", 1).unwrap();
     writer.write_started("design", 2).unwrap();
-    let n = next_attempt(_tmp.path(), "design").unwrap();
+    let n = next_attempt(tmp.path(), "design").unwrap();
     assert_eq!(n, 3, "three markers (0,1,2) → next is 3");
 }
 
 #[test]
 fn next_attempt_with_gaps() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     // Markers for attempt 0 and 2 (missing 1 → simulates partial cleanup).
     writer.write_started("design", 0).unwrap();
     writer.write_started("design", 2).unwrap();
-    let n = next_attempt(_tmp.path(), "design").unwrap();
+    let n = next_attempt(tmp.path(), "design").unwrap();
     assert_eq!(n, 3, "gaps: max attempt is 2 → next is 3");
 }
 
@@ -225,14 +225,14 @@ fn markers_dir_created_automatically() {
 
 #[test]
 fn different_phases_do_not_interfere() {
-    let (_tmp, writer) = temp_run_dir();
+    let (tmp, writer) = temp_run_dir();
     writer.write_started("design", 0).unwrap();
     writer.write_started("implement", 0).unwrap();
     writer.write_started("review", 0).unwrap();
 
-    let n_design = next_attempt(_tmp.path(), "design").unwrap();
-    let n_implement = next_attempt(_tmp.path(), "implement").unwrap();
-    let n_review = next_attempt(_tmp.path(), "review").unwrap();
+    let n_design = next_attempt(tmp.path(), "design").unwrap();
+    let n_implement = next_attempt(tmp.path(), "implement").unwrap();
+    let n_review = next_attempt(tmp.path(), "review").unwrap();
 
     assert_eq!(n_design, 1);
     assert_eq!(n_implement, 1);

@@ -16,9 +16,9 @@ pub struct LatestPointer;
 impl LatestPointer {
     /// Update the latest pointer for `phase` to point at `attempt`.
     ///
-    /// This is best-effort: errors are logged (via `eprintln`) and returned
-    /// but do **not** block the caller.  A phase can complete successfully
-    /// even if the convenience pointer cannot be created.
+    /// This is best-effort: errors are returned but should **not** be
+    /// propagated by callers.  A phase can complete successfully even if the
+    /// convenience pointer cannot be created.
     ///
     /// # Note
     /// If the attempt directory was promoted (no longer exists), the pointer
