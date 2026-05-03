@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T06:24:24.357Z'
-  updated_at: '2026-05-03T06:51:33.333Z'
+  updated_at: '2026-05-03T06:52:52.157Z'
 phases:
   discovery:
     status: complete
@@ -65,6 +65,7 @@ phases:
       - 39cb57a
       - 786e94e
       - 338470e
+      - 80ddc07
   pr:
     status: pending
   complete:
@@ -191,3 +192,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST4 landed: persistence helpers acceptance passed for commit_success and terminal failure markers. Commit 338470e'
+  - timestamp: '2026-05-03T06:52:52.157Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 landed: single/first/no-verify path writes artefact, manifest entry, and completed marker. Commit 80ddc07'

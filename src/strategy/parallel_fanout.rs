@@ -137,6 +137,7 @@ impl Strategy for ParallelFanOut {
                         .unwrap_or_default();
                     let model = pick_model_override(&query, prompt, target);
                     let output_path = format!("{}/attempts/{}-parallel.txt", ctx.phase_name, idx);
+                    write_branch_output(&ctx.cwd, &output_path, &query.stdout).await?;
 
                     if is_any_fail {
                         if let Err(reason) = crate::aggregator::any_fail_evaluate(&query.stdout) {
@@ -461,6 +462,30 @@ impl Strategy for ParallelFanOut {
 
 /// Build the `model` field that lands in an attempt, applying the priority:
 /// backend-reported > target.model > prompt.model > "default".
+async fn write_branch_output(
+    cwd: &Path,
+    output_path: &str,
+    text: &str,
+) -> Result<(), StrategyError> {
+    let path = cwd.join(output_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).await.map_err(|err| {
+                StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                    message: format!("failed to create branch output parent {}: {err}", parent.display()),
+                    exit_code: None,
+                })
+            })?;
+        }
+    }
+    fs::write(&path, text).await.map_err(|err| {
+        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+            message: format!("failed to write branch output {}: {err}", path.display()),
+            exit_code: None,
+        })
+    })
+}
+
 fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec) -> String {
     query
         .model
