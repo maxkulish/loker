@@ -19,10 +19,10 @@ linear:
   priority: High
   branch_actual: feat/clo-287-toml
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-03T06:27:40.051Z'
-  updated_at: '2026-05-03T06:56:04.446Z'
+  updated_at: '2026-05-03T07:03:45.758Z'
 phases:
   discovery:
     status: pending
@@ -42,13 +42,19 @@ phases:
     validation_synthesis_report: null
     validation_synthesis_verdict: approve
   pr:
-    status: in_progress
+    status: complete
     pr_number: 35
     pr_url: https://github.com/maxkulish/loker/pull/35
     ci_passed: true
     reviews_addressed: true
+    merge_commit: 5d7df9d7b5dc54cc4b2c59fd6554efd57f301542
+    merged_at: '2026-05-03T07:01:56Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 5d7df9d7b5dc54cc4b2c59fd6554efd57f301542
+    merged_at: '2026-05-03T07:01:56Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
   spec:
     spec_file: specs/2026-05-03-clo-287-toml-workflow-grammar-parser.md
     status: complete
@@ -150,5 +156,35 @@ history:
     details: >-
       8 Copilot threads + 2 Gemini high-severity threads resolved. 10 replies posted; /gemini review trailer verified on
       every reply.
+  - timestamp: '2026-05-03T07:01:23.096Z'
+    action: pr_ready
+    phase: pr
+    details: >-
+      All CI green (format, clippy, test). 8 Copilot + 2 Gemini threads resolved. Merge state CLEAN. Transitioning to
+      complete.
+  - timestamp: '2026-05-03T07:01:41.626Z'
+    action: phase_completed
+    phase: pr
+    details: 'PR #35 complete: all CI green, all review threads resolved, merge state CLEAN'
+  - timestamp: '2026-05-03T07:01:45.227Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-03T07:02:41.734Z'
+    action: pr_merged
+    phase: complete
+    details: 'PR #35 merged. Merge commit 5d7df9d7b5dc54cc4b2c59fd6554efd57f301542.'
+  - timestamp: '2026-05-03T07:02:47.405Z'
+    action: pr_merged
+    phase: pr
+    details: Merge commit 5d7df9d7b5dc54cc4b2c59fd6554efd57f301542
+  - timestamp: '2026-05-03T07:03:31.408Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
+  - timestamp: '2026-05-03T07:03:45.758Z'
+    action: workflow_complete
+    phase: complete
+    details: 'Task CLO-287 fully completed. PR #35 merged (5d7df9d). Unblocks CLO-288 (design-doc-tdd workflow file).'
 task_title: Implement TOML workflow grammar parser
 task_url: https://linear.app/cloud-ai/issue/CLO-287/implement-toml-workflow-grammar-parser
