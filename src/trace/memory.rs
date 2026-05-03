@@ -4,6 +4,14 @@ use super::TraceSink;
 use serde_json::Value;
 use std::sync::Mutex;
 
+fn inject_common(map: &mut serde_json::Map<String, Value>, ctx: &super::PhaseSpanContext) {
+    map.insert(
+        "loker.run_id".to_string(),
+        Value::String(ctx.trace_id.to_string()),
+    );
+    map.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
+}
+
 /// Captures all emitted spans into a `Vec<Value>` behind a mutex.
 ///
 /// Safe to share across threads / async tasks. Each `TraceSink` method
@@ -51,7 +59,7 @@ impl TraceSink for InMemorySink {
             None,
             &format!("phase.{}", ctx.phase),
         );
-        map.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
+        inject_common(&mut map, ctx);
         map.insert(
             "loker.strategy".to_string(),
             Value::String(ctx.strategy.clone()),
@@ -78,6 +86,7 @@ impl TraceSink for InMemorySink {
             Some(&ctx.span_id),
             &format!("backend.{}", attempt.backend),
         );
+        inject_common(&mut map, ctx);
         map.insert(
             "loker.attempt".to_string(),
             Value::Number(attempt.attempt.into()),
@@ -134,6 +143,7 @@ impl TraceSink for InMemorySink {
             Some(&ctx.span_id),
             &format!("aggregator.{kind}"),
         );
+        inject_common(&mut map, ctx);
         map.insert(
             "loker.aggregator".to_string(),
             Value::String(kind.to_string()),
@@ -153,6 +163,7 @@ impl TraceSink for InMemorySink {
             Some(&ctx.span_id),
             &format!("verify.{hook_name}"),
         );
+        inject_common(&mut map, ctx);
         map.insert(
             "loker.outcome".to_string(),
             Value::String(if result.passed {
@@ -178,6 +189,7 @@ impl TraceSink for InMemorySink {
             Some(&ctx.span_id),
             &format!("phase.{}.finished", ctx.phase),
         );
+        inject_common(&mut map, ctx);
         map.insert(
             "loker.outcome".to_string(),
             Value::String(outcome.to_string()),
@@ -193,6 +205,7 @@ impl TraceSink for InMemorySink {
             Some(&ctx.span_id),
             &format!("phase.{}.error", ctx.phase),
         );
+        inject_common(&mut map, ctx);
         map.insert("error.kind".to_string(), Value::String(kind.to_string()));
         map.insert(
             "error.message".to_string(),
@@ -222,6 +235,7 @@ mod tests {
         let spans = sink.spans();
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0]["name"], "phase.design");
+        assert!(spans[0].as_object().unwrap().contains_key("timestamp"));
     }
 
     #[test]
@@ -269,7 +283,7 @@ mod tests {
             phase: "x".to_string(),
             strategy: "single".to_string(),
             aggregator: "first".to_string(),
-            verify_hook: Some("RunCommand".to_string()),
+            verify_hook: Some("run_command".to_string()),
         };
         sink.phase_started(&ctx);
         let attempt = super::super::AttemptSpanContext {
@@ -292,7 +306,7 @@ mod tests {
         sink.aggregator_fold(&ctx, "first", 1);
         sink.verify_result(
             &ctx,
-            "RunCommand",
+            "run_command",
             &super::super::VerifySpanResult {
                 passed: true,
                 message: None,
@@ -307,7 +321,7 @@ mod tests {
         assert_eq!(spans[0]["name"], "phase.x");
         assert_eq!(spans[1]["name"], "backend.mock");
         assert_eq!(spans[2]["name"], "aggregator.first");
-        assert_eq!(spans[3]["name"], "verify.RunCommand");
+        assert_eq!(spans[3]["name"], "verify.run_command");
         assert_eq!(spans[4]["name"], "phase.x.finished");
         assert_eq!(spans[5]["name"], "phase.x.error");
     }

@@ -244,11 +244,6 @@ impl PhaseRunner {
                         &phase_err.to_string(),
                         phase_start.elapsed().as_millis() as u64,
                     );
-                    t.phase_finished(
-                        &trace_ctx,
-                        phase_err.error_class(),
-                        phase_start.elapsed().as_millis() as u64,
-                    );
                 }
                 if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
@@ -302,11 +297,6 @@ impl PhaseRunner {
                             &trace_ctx,
                             err.error_class(),
                             &err.to_string(),
-                            phase_start.elapsed().as_millis() as u64,
-                        );
-                        t.phase_finished(
-                            &trace_ctx,
-                            err.error_class(),
                             phase_start.elapsed().as_millis() as u64,
                         );
                     }
@@ -370,7 +360,7 @@ impl PhaseRunner {
                     },
                     duration_ms: vdur,
                 };
-                t.verify_result(&trace_ctx, hook.name(), &vresult);
+                t.verify_result(&trace_ctx, verify_hook_name(cfg.verify), &vresult);
             }
             if !result.is_pass() {
                 let phase_err = PhaseError::VerifyFailed {
@@ -383,11 +373,6 @@ impl PhaseRunner {
                         &trace_ctx,
                         phase_err.error_class(),
                         &phase_err.to_string(),
-                        phase_start.elapsed().as_millis() as u64,
-                    );
-                    t.phase_finished(
-                        &trace_ctx,
-                        phase_err.error_class(),
                         phase_start.elapsed().as_millis() as u64,
                     );
                 }

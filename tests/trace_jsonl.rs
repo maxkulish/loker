@@ -69,7 +69,7 @@ fn context(tmp: &tempfile::TempDir, phase: &str) -> PhaseContext {
 }
 
 #[tokio::test]
-async fn single_phase_two_spans_parented() {
+async fn single_phase_four_spans_parented() {
     let tmp = tempfile::tempdir().unwrap();
     let sink = Arc::new(InMemorySink::new());
     let cfg = PhaseConfig::single("design", "mock", "hello", "design.md");
@@ -109,7 +109,7 @@ async fn single_phase_two_spans_parented() {
 }
 
 #[tokio::test]
-async fn parallel_three_replicas_five_spans() {
+async fn parallel_three_replicas_six_spans() {
     let tmp = tempfile::tempdir().unwrap();
     let sink = Arc::new(InMemorySink::new());
     let mut cfg = PhaseConfig::single("review", "unused", "hello", "review.md");
@@ -280,11 +280,11 @@ async fn verify_failure_outcome() {
         .await;
 
     let spans = sink.spans();
-    let finished = spans
+    let error_span = spans
         .iter()
-        .find(|s| s["name"].as_str().unwrap_or("").ends_with(".finished"))
-        .expect("finished span exists");
-    assert_eq!(finished["loker.outcome"], "verify_failed");
+        .find(|s| s["name"].as_str().unwrap_or("").ends_with(".error"))
+        .expect("error span exists");
+    assert_eq!(error_span["error.kind"], "verify_failed");
 
     let verify_span = spans
         .iter()
