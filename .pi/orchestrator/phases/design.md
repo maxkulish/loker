@@ -135,10 +135,14 @@ update_workflow_state({
 })
 ```
 
-## Step 4 - Human review via plannotator
+## Step 4 - Human review via Plannotator annotate
 
 The AI review iterations in Steps 2-3 caught what models can catch. This step
-is the human gate on the post-AI-review design before code starts landing.
+opens a Plannotator browser UI so a human can view the design doc and leave
+inline annotations before code starts landing.
+
+`/plannotator-annotate` opens the design doc in a browser, making it human
+readable (proper formatting, syntax highlighting, clickable annotations).
 
 Print a one-line summary of what changed in Step 3 (count of applied vs
 flagged suggestions).
@@ -166,48 +170,30 @@ command -v plannotator
   with validation_override: true on the next transition_phase.
   ```
 
-**Step 4b - Invoke plannotator directly via Bash.**
+**Step 4b - Invoke plannotator annotate (browser UI).**
 
-Do not route through the `/plannotator-review` slash command - call the
-binary so the exit code and stdout are deterministic:
+The `/plannotator-annotate` skill runs this under the hood. Call the binary
+directly so stdout and exit code are deterministic:
 
 ```bash
-plannotator review docs/designs/clo-XX-<slug>.md
+plannotator annotate docs/designs/clo-XX-<slug>.md
 ```
 
-Capture stdout and the exit code. Plannotator returns either approved
-(exit 0, no annotations), or denied (non-zero or annotation block in
-stdout).
+Behavior:
 
-If the output is genuinely unparseable (binary ran but returned
-unexpected format - not the same as "not installed"), surface the raw
-stdout/stderr to the user and **STOP** the phase. Do not coerce it into
-a denial. This is a real bug to fix, not a workflow state to record.
+1. A browser tab opens with the rendered design doc.
+2. The human reviewer reads it and leaves annotations inline.
+3. Wait for the browser session to complete.
+4. Capture any returned annotations.
 
-**On approval:**
+**If the session returns annotations:**
 
 ```ts
 update_workflow_state({
   task_id: "CLO-XX",
   phase: "design",
-  action: "design_human_review_complete",
-  details: "Plannotator review approved.",
-  phase_updates: {
-    human_review_completed: true
-  }
-})
-```
-
-Then proceed to Step 5.
-
-**On denial with annotations:**
-
-```ts
-update_workflow_state({
-  task_id: "CLO-XX",
-  phase: "design",
-  action: "design_human_review_denied",
-  details: "<one-line summary, max 200 chars>",
+  action: "design_human_review_annotated",
+  details: "<one-line summary of annotations, max 200 chars>",
   phase_updates: {
     human_review_completed: false,
     plannotator_annotations: "<full annotation text>"
@@ -219,17 +205,33 @@ Then print the full annotations to the user and **STOP**. Do not call
 `transition_phase`. Tell the user:
 
 ```
-Plannotator denied the design. Annotations recorded in
+Plannotator returned annotations on the design. See
 phases.design.plannotator_annotations. Edit
 docs/designs/clo-XX-<slug>.md by hand, then re-run
 /task:orchestrate CLO-XX to re-fire the gate.
 ```
 
+**If the session closes without feedback (no annotations):**
+
+```ts
+update_workflow_state({
+  task_id: "CLO-XX",
+  phase: "design",
+  action: "design_human_review_complete",
+  details: "Plannotator annotate session closed with no annotations.",
+  phase_updates: {
+    human_review_completed: true
+  }
+})
+```
+
+Then proceed to Step 5.
+
 **Re-entry on resume.** When the user re-runs `/task:orchestrate CLO-XX`
 after editing, the design phase will dispatch again. At that point
 `draft_ready: true` and `review_completed: true` are already set, so
 skip Steps 1-3 and re-enter at Step 4 (re-run pre-flight, then re-fire
-plannotator on the edited doc).
+plannotator annotate on the edited doc).
 
 ## Step 5 - Finalize
 
