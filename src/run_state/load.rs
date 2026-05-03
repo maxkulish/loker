@@ -41,6 +41,7 @@ pub struct Heartbeat {
 }
 
 /// Typed errors emitted while loading run state from a run directory.
+#[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     #[error("manifest schema mismatch: expected {expected}, found {found} at {path}")]
@@ -77,7 +78,7 @@ pub enum LoadError {
 /// - `phase_status` maps phase names to the highest-severity marker found.
 /// - `heartbeat` is `None` when no heartbeat file exists, otherwise classifies
 ///   the writer as live or stale.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RunState {
     pub run_id: String,
     pub entries: Vec<ManifestEntry>,
@@ -191,9 +192,6 @@ impl RunState {
             let Some(phase) = marker_phase(file_name) else {
                 continue;
             };
-            if file_name.ends_with(".completed") {
-                has_completed_markers = true;
-            }
 
             if file_name.ends_with(".completed") {
                 let text = std::fs::read_to_string(&path)?;

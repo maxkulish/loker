@@ -38,7 +38,7 @@ Implement a typed resume-ready loader for `runs/<id>/manifest.json` that validat
 
 ## 3. Acceptance Criteria
 
-1. `LoadError` enum exists with typed variants covering at least schema mismatch, corrupted artefact bytes, missing artefact, stale writer, and live writer.
+1. `LoadError` enum exists with typed variants covering at least schema mismatch, corrupted artefact bytes, and missing artefact. Writer heartbeat state (stale/live) is surfaced via `RunState.heartbeat: Option<HeartbeatStatus>` rather than error variants, so resume orchestration can decide how to act on a live writer.
 2. `RunState` is returned from a typed loader method and includes both surviving entries and dropped-orphan list.
 3. Loader verifies entries against actual artefacts and fails with typed error variants for missing/corrupt values.
 4. Orphan sweep is deterministic and logs each dropped entry with phase/kind/sha256.
