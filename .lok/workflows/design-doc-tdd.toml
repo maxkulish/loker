@@ -29,7 +29,7 @@ output = "design.md"
 name = "review"
 strategy = { parallel = { min_responses = 2 } }
 backends = ["claude/", "gemini/", "codex/", "ollama/qwen3-coder-next"]
-prompt_template = "You are a senior code reviewer.\n\nReview the design document at {{ phase:design }} and produce a structured review.\n\nRead docs/handoff.md for project intent, constraints, and conventions.\n\nOUTPUT FORMAT:\n\n## 1. Completeness Check\n[sections present/missing]\n\n## 2. Architecture Assessment\n**Strengths**: [...]\n**Concerns**: [...]\n\n## 3. Alignment with Handoff & Roadmap\n[fit with docs/handoff.md]\n\n## 4. Security Review\n[assessment]\n\n## 5. Implementation Concerns\n[feedback on plan]\n\n## 6. Blind Spots\n[missing edge cases, failure modes]\n\n## 7. Verdict\n[APPROVE | APPROVE_WITH_SUGGESTIONS | NEEDS_REVISION]\n\n## 8. Actionable Feedback\n[prioritized list]"
+prompt_template = "You are a senior code reviewer.\n\nReview the design document at {{ steps.design.output }} and produce a structured review.\n\nRead docs/handoff.md for project intent, constraints, and conventions.\n\nOUTPUT FORMAT:\n\n## 1. Completeness Check\n[sections present/missing]\n\n## 2. Architecture Assessment\n**Strengths**: [...]\n**Concerns**: [...]\n\n## 3. Alignment with Handoff & Roadmap\n[fit with docs/handoff.md]\n\n## 4. Security Review\n[assessment]\n\n## 5. Implementation Concerns\n[feedback on plan]\n\n## 6. Blind Spots\n[missing edge cases, failure modes]\n\n## 7. Verdict\n[APPROVE | APPROVE_WITH_SUGGESTIONS | NEEDS_REVISION]\n\n## 8. Actionable Feedback\n[prioritized list]"
 inputs = ["phase:design"]
 output = "review.md"
 [phases.contract]
@@ -40,7 +40,7 @@ output = "review.md"
 name = "implement"
 strategy = { escalating = { pass_failure_context = true } }
 backends = ["ollama/qwen3-coder-next", "claude/", "codex/"]
-prompt_template = "You are a senior Rust engineer.\n\nRead the design at {{ phase:design }} and the review at {{ phase:review }}.\n\nImplement the changes described. Follow the project conventions:\n- `make fmt` before committing\n- `cargo clippy -- -D warnings` passes\n- Write tests for every new function/method\n- Update docs/ and tests/ as needed\n\nOutput: file edits with clear `// BEFORE` / `// AFTER` markers."
+prompt_template = "You are a senior Rust engineer.\n\nRead the design at {{ steps.design.output }} and the review at {{ steps.review.output }}.\n\nImplement the changes described. Follow the project conventions:\n- `make fmt` before committing\n- `cargo clippy -- -D warnings` passes\n- Write tests for every new function/method\n- Update docs/ and tests/ as needed\n\nOutput: file edits with clear `// BEFORE` / `// AFTER` markers."
 inputs = ["phase:design", "phase:review"]
 output = "changes"
 # FR-31 forward-compat: test_runner hook goes here when grammar supports it.
@@ -50,8 +50,8 @@ output = "changes"
 name = "verify"
 strategy = { parallel = { min_responses = 1 } }
 backends = ["codex/", "gemini/"]
-prompt_template = "You are a build and quality gate.\n\nVerify the changes at {{ phase:implement }} satisfy the design at {{ phase:design }}.\n\nRun: cargo test --test workflows_design_doc_tdd && cargo clippy -- -D warnings && cargo fmt --check\n\nOUTPUT FORMAT: JSON\n{\n  \"build_ok\": true|false,\n  \"tests_ok\": true|false,\n  \"clippy_ok\": true|false,\n  \"fmt_ok\": true|false,\n  \"issues\": [\"file:line: description\"]\n}"
-inputs = ["phase:implement"]
+prompt_template = "You are a build and quality gate.\n\nVerify the changes at {{ steps.implement.output }} satisfy the design at {{ steps.design.output }}.\n\nRun: cargo test --test workflows_design_doc_tdd && cargo clippy -- -D warnings && cargo fmt --check\n\nOUTPUT FORMAT: JSON\n{\n  \"build_ok\": true|false,\n  \"tests_ok\": true|false,\n  \"clippy_ok\": true|false,\n  \"fmt_ok\": true|false,\n  \"issues\": [\"file:line: description\"]\n}"
+inputs = ["phase:implement", "phase:design"]
 output = "verify.json"
 # FR-31 forward-compat: run_command and llm_verifier hooks go here when grammar supports them.
 # run_command = "cargo build && cargo test"

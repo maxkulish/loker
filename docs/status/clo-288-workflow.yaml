@@ -23,7 +23,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-03T12:34:50.115Z'
-  updated_at: '2026-05-03T13:34:50.506Z'
+  updated_at: '2026-05-03T13:40:27.695Z'
 phases:
   discovery:
     status: complete
@@ -87,17 +87,18 @@ phases:
     codex_validated: true
     codex_verdict: approve_with_changes
     commits:
-      - 1879403
-      - e04c3a6
+      - '1879403'
+      - c2ff429
     gemini_validation_report: docs/reviews/clo-288-gemini-validation.md
     validation_fix_iteration_count: 1
     validation_synthesis_report: docs/reviews/clo-288-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending_review
+    status: in_progress
     pr_number: 41
     pr_url: https://github.com/maxkulish/loker/pull/41
     pr_status: open
+    ci_status: green
   complete:
     status: pending
 history:
@@ -217,5 +218,21 @@ history:
       Codex: REVIEW_FAILED (tooling heredoc bug). Gemini: REVIEW_FAILED (tooling heredoc bug). Synthesis:
       approve_with_changes. F1+F2 applied (fixture replaced, [phases.contract] fixed). Max 1 fix iteration used. Gate
       passed.
+  - timestamp: '2026-05-03T13:36:10.439Z'
+    action: fix_iteration_committed
+    phase: implement
+    details: >-
+      Fix iteration committed: c2ff429 (F1 fixture replacement + F2 contract block fix). make check green. Gate passed —
+      proceeding to PR phase.
+  - timestamp: '2026-05-03T13:39:52.754Z'
+    action: pr_ready_to_merge
+    phase: pr
+    details: >-
+      CI green (test+format+clippy SUCCESS). Fix iteration committed. 2 bot comment reviews (non-blocking). PR
+      MERGEABLE. Awaiting human approval or merge.
+  - timestamp: '2026-05-03T13:40:27.695Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
 task_title: Author design-doc-tdd workflow file at .lok/workflows/design-doc-tdd.toml
 task_url: https://linear.app/cloud-ai/issue/CLO-288/author-design-doc-tdd-workflow-file-at-lokworkflowsdesign-doc-tddtoml
