@@ -30,4 +30,7 @@ pub use phase_runner::{
     AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRung, PhaseRunner,
     StrategyName, VerifyHookName,
 };
-pub use trace::{AttemptSpanContext, BackendSpanResult, InMemorySink, PhaseSpanContext, TraceSink, TraceWriter, VerifySpanResult};
+pub use trace::{
+    AttemptSpanContext, BackendSpanResult, InMemorySink, PhaseSpanContext, TraceSink, TraceWriter,
+    VerifySpanResult,
+};

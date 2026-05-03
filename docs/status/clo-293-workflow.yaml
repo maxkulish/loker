@@ -22,7 +22,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T09:42:05.276Z'
-  updated_at: '2026-05-03T10:10:39.555Z'
+  updated_at: '2026-05-03T10:14:17.787Z'
 phases:
   discovery:
     status: complete
@@ -59,6 +59,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - 1c33a50
   pr:
     status: pending
   complete:
@@ -136,5 +138,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-03T10:14:17.787Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1+ST2 landed: TraceSink trait, InMemorySink, TraceWriter. 11 unit tests pass. Commit 1c33a50.'
 task_title: '[T-029] Implement trace.jsonl writer with OpenTelemetry GenAI semantic conventions'
 task_url: https://linear.app/cloud-ai/issue/CLO-293/t-029-implement-tracejsonl-writer-with-opentelemetry-genai-semantic

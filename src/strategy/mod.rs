@@ -339,6 +339,18 @@ pub enum FinishReason {
     Error,
 }
 
+impl FinishReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Stop => "stop",
+            Self::Length => "length",
+            Self::ToolCalls => "tool_calls",
+            Self::ContentFilter => "content_filter",
+            Self::Error => "error",
+        }
+    }
+}
+
 /// Token counts using the schema's wire names (`input_tokens`,
 /// `output_tokens`), distinct from `crate::backend::TokenUsage` which
 /// follows the OpenAI shape (`prompt_tokens`, `completion_tokens`).

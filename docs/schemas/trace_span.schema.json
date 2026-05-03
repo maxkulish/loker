@@ -122,7 +122,7 @@
     }
   },
   "patternProperties": {
-    "^loker\.[a-z][a-z0-9_]*$": {}
+    "^loker\\.[a-z][a-z0-9_]*$": {}
   },
   "additionalProperties": false
 }

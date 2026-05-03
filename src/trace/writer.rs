@@ -20,17 +20,15 @@ impl TraceWriter {
     /// `fsync` controls whether every line is flushed + fsynced before
     /// returning. Default `false` for speed; set `true` in tests.
     pub fn new(path: &Path, fsync: bool) -> std::io::Result<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).append(true).open(path)?;
         Ok(Self {
             writer: Mutex::new(BufWriter::new(file)),
             fsync,
         })
     }
 
-    fn write_line(&self,
+    fn write_line(
+        &self,
         trace_id: uuid::Uuid,
         span_id: &str,
         parent_span_id: Option<&str>,
@@ -80,7 +78,13 @@ impl TraceSink for TraceWriter {
         if let Some(ref hook) = ctx.verify_hook {
             extras.insert("loker.verify_hook".to_string(), Value::String(hook.clone()));
         }
-        self.write_line(ctx.trace_id, &ctx.span_id, None, &format!("phase.{}", ctx.phase), extras);
+        self.write_line(
+            ctx.trace_id,
+            &ctx.span_id,
+            None,
+            &format!("phase.{}", ctx.phase),
+            extras,
+        );
     }
 
     fn backend_call(
@@ -125,7 +129,12 @@ impl TraceSink for TraceWriter {
             extras.insert(
                 "gen_ai.response.finish_reasons".to_string(),
                 Value::Array(
-                    result.finish_reasons.iter().cloned().map(Value::String).collect(),
+                    result
+                        .finish_reasons
+                        .iter()
+                        .cloned()
+                        .map(Value::String)
+                        .collect(),
                 ),
             );
         }
@@ -148,7 +157,10 @@ impl TraceSink for TraceWriter {
             Value::String(ctx.trace_id.to_string()),
         );
         extras.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
-        extras.insert("loker.aggregator".to_string(), Value::String(kind.to_string()));
+        extras.insert(
+            "loker.aggregator".to_string(),
+            Value::String(kind.to_string()),
+        );
         extras.insert(
             "loker.input_count".to_string(),
             Value::Number(input_count.into()),
@@ -207,7 +219,10 @@ impl TraceSink for TraceWriter {
             Value::String(ctx.trace_id.to_string()),
         );
         extras.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
-        extras.insert("loker.outcome".to_string(), Value::String(outcome.to_string()));
+        extras.insert(
+            "loker.outcome".to_string(),
+            Value::String(outcome.to_string()),
+        );
         let span_id = super::new_span_id();
         self.write_line(
             ctx.trace_id,
@@ -226,7 +241,10 @@ impl TraceSink for TraceWriter {
         );
         extras.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
         extras.insert("error.kind".to_string(), Value::String(kind.to_string()));
-        extras.insert("error.message".to_string(), Value::String(message.to_string()));
+        extras.insert(
+            "error.message".to_string(),
+            Value::String(message.to_string()),
+        );
         let span_id = super::new_span_id();
         self.write_line(
             ctx.trace_id,

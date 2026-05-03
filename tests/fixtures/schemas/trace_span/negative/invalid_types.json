@@ -1,0 +1,6 @@
+{
+  "trace_id": "not-a-uuid",
+  "span_id": "short",
+  "timestamp": "bad-date",
+  "name": 42
+}

@@ -11,6 +11,9 @@ use crate::strategy::verify::{VerifyError, VerifyHook, VerifyResult};
 use crate::strategy::{
     PhaseContext, Prompt, StrategyError, StrategyKind, StrategyOutput, TargetSpec, Tier,
 };
+use crate::trace::{
+    AttemptSpanContext, BackendSpanResult, PhaseSpanContext, TraceSink, VerifySpanResult,
+};
 
 pub mod dispatch;
 pub mod persist;
@@ -111,6 +114,7 @@ pub struct PhaseInputs<'a> {
     pub ctx: PhaseContext,
     pub verify: Option<Arc<dyn VerifyHook>>,
     pub run_dir: PathBuf,
+    pub trace: Option<&'a dyn TraceSink>,
 }
 
 /// Result of a successful phase run.
@@ -193,12 +197,31 @@ impl PhaseRunner {
         inputs: PhaseInputs<'_>,
     ) -> Result<PhaseOutcome, PhaseError> {
         validate_config(cfg)?;
+        let trace_sink = inputs.trace;
         let markers = crate::run_state::markers::MarkerWriter::new(&inputs.run_dir);
         persist::start_attempt(&markers, &cfg.phase, 0)?;
 
         let mut ctx = inputs.ctx;
         ctx.cwd = inputs.run_dir.clone();
         let run_id = ctx.run_id;
+
+        let phase_span_id = crate::trace::new_span_id();
+        let trace_ctx = PhaseSpanContext {
+            trace_id: run_id,
+            span_id: phase_span_id.clone(),
+            phase: cfg.phase.clone(),
+            strategy: strategy_name(cfg.strategy).to_string(),
+            aggregator: aggregator_name(cfg.aggregator).to_string(),
+            verify_hook: if matches!(cfg.verify, VerifyHookName::None) {
+                None
+            } else {
+                Some(verify_hook_name(cfg.verify).to_string())
+            },
+        };
+
+        if let Some(t) = trace_sink {
+            t.phase_started(&trace_ctx);
+        }
 
         let strategy = dispatch::resolve_strategy(cfg, inputs.verify.clone())?;
         let strategy_output = match strategy
@@ -213,6 +236,10 @@ impl PhaseRunner {
                     ),
                     other => PhaseError::StrategyFailed(other),
                 };
+                if let Some(t) = trace_sink {
+                    t.error(&trace_ctx, phase_err.error_class(), &phase_err.to_string());
+                    t.phase_finished(&trace_ctx, phase_err.error_class());
+                }
                 if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
                     &inputs.run_dir,
@@ -226,6 +253,31 @@ impl PhaseRunner {
             }
         };
 
+        // Emit backend spans for each attempt
+        if let Some(t) = trace_sink {
+            for (idx, attempt) in strategy_output.attempts.iter().enumerate() {
+                let attempt_span_id = crate::trace::new_span_id();
+                let attempt_ctx = AttemptSpanContext {
+                    span_id: attempt_span_id,
+                    attempt: idx,
+                    backend: attempt.backend.clone(),
+                    model: Some(attempt.model.clone()),
+                };
+                let result = BackendSpanResult {
+                    duration_ms: 0,
+                    usage_input_tokens: Some(attempt.usage.input_tokens as u64),
+                    usage_output_tokens: Some(attempt.usage.output_tokens as u64),
+                    finish_reasons: attempt
+                        .finish_reasons
+                        .iter()
+                        .map(|f| f.as_str().to_string())
+                        .collect(),
+                    error: None,
+                };
+                t.backend_call(&trace_ctx, &attempt_ctx, &result);
+            }
+        }
+
         for attempt in 1..strategy_output.attempts.len() {
             persist::start_attempt(&markers, &cfg.phase, attempt as u32)?;
         }
@@ -235,6 +287,10 @@ impl PhaseRunner {
             match dispatch::canonical_bytes(&inputs.run_dir, &strategy_output, &aggregator) {
                 Ok(bytes) => bytes,
                 Err(err) => {
+                    if let Some(t) = trace_sink {
+                        t.error(&trace_ctx, err.error_class(), &err.to_string());
+                        t.phase_finished(&trace_ctx, err.error_class());
+                    }
                     if let Err(persist_err) = persist::record_terminal_failure(
                         &markers,
                         &inputs.run_dir,
@@ -248,6 +304,15 @@ impl PhaseRunner {
                 }
             };
 
+        // Emit aggregator span
+        if let Some(t) = trace_sink {
+            t.aggregator_fold(
+                &trace_ctx,
+                aggregator_name(cfg.aggregator),
+                strategy_output.attempts.len(),
+            );
+        }
+
         let verify_result = if matches!(cfg.verify, VerifyHookName::None) {
             None
         } else {
@@ -259,7 +324,7 @@ impl PhaseRunner {
                 ))
             })?;
             let selected = strategy_output.attempts.get(selected_attempt as usize);
-            let ctx = crate::strategy::VerifyContext {
+            let vctx = crate::strategy::VerifyContext {
                 stdout: String::from_utf8_lossy(&bytes).into_owned(),
                 stderr: None,
                 exit_code: None,
@@ -270,13 +335,34 @@ impl PhaseRunner {
                 structured: None,
                 duration: std::time::Duration::ZERO,
             };
-            let result = hook.verify(&ctx).await?;
+            let vstart = std::time::Instant::now();
+            let result = hook.verify(&vctx).await?;
+            let vdur = vstart.elapsed().as_millis() as u64;
+            if let Some(t) = trace_sink {
+                let vresult = VerifySpanResult {
+                    passed: result.is_pass(),
+                    message: if result.is_pass() {
+                        None
+                    } else {
+                        match &result {
+                            VerifyResult::Fail { reason } => Some(reason.summary.clone()),
+                            _ => None,
+                        }
+                    },
+                    duration_ms: vdur,
+                };
+                t.verify_result(&trace_ctx, hook.name(), &vresult);
+            }
             if !result.is_pass() {
                 let phase_err = PhaseError::VerifyFailed {
                     phase: cfg.phase.clone(),
                     attempt: selected_attempt,
                     result,
                 };
+                if let Some(t) = trace_sink {
+                    t.error(&trace_ctx, phase_err.error_class(), &phase_err.to_string());
+                    t.phase_finished(&trace_ctx, phase_err.error_class());
+                }
                 if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
                     &inputs.run_dir,
@@ -300,6 +386,10 @@ impl PhaseRunner {
             &manifest_entry.sha256,
             std::slice::from_ref(&cfg.artefact_name),
         )?;
+
+        if let Some(t) = trace_sink {
+            t.phase_finished(&trace_ctx, "success");
+        }
 
         let strategy_kind = strategy_output.strategy;
         Ok(PhaseOutcome {
@@ -325,6 +415,32 @@ fn validate_config(cfg: &PhaseConfig) -> Result<(), PhaseError> {
         )));
     }
     Ok(())
+}
+
+fn strategy_name(name: StrategyName) -> &'static str {
+    match name {
+        StrategyName::Single => "single",
+        StrategyName::Parallel => "parallel",
+        StrategyName::EscalatingRetry => "escalating_retry",
+    }
+}
+
+fn aggregator_name(name: AggregatorName) -> &'static str {
+    match name {
+        AggregatorName::First => "first",
+        AggregatorName::Concat => "concat",
+        AggregatorName::Vote => "vote",
+        AggregatorName::AnyFail => "any_fail",
+        AggregatorName::AllPass => "all_pass",
+    }
+}
+
+fn verify_hook_name(name: VerifyHookName) -> &'static str {
+    match name {
+        VerifyHookName::None => "none",
+        VerifyHookName::RunCommand => "run_command",
+        VerifyHookName::LlmVerifier => "llm_verifier",
+    }
 }
 
 #[cfg(test)]

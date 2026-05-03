@@ -30,7 +30,10 @@ impl InMemorySink {
     }
 
     fn push(&self, value: Value) {
-        self.spans.lock().unwrap_or_else(|e| e.into_inner()).push(value);
+        self.spans
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(value);
     }
 }
 
@@ -43,12 +46,24 @@ impl Default for InMemorySink {
 impl TraceSink for InMemorySink {
     fn phase_started(&self, ctx: &super::PhaseSpanContext) {
         let mut map = serde_json::Map::new();
-        map.insert("trace_id".to_string(), Value::String(ctx.trace_id.to_string()));
+        map.insert(
+            "trace_id".to_string(),
+            Value::String(ctx.trace_id.to_string()),
+        );
         map.insert("span_id".to_string(), Value::String(ctx.span_id.clone()));
-        map.insert("name".to_string(), Value::String(format!("phase.{}", ctx.phase)));
+        map.insert(
+            "name".to_string(),
+            Value::String(format!("phase.{}", ctx.phase)),
+        );
         map.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
-        map.insert("loker.strategy".to_string(), Value::String(ctx.strategy.clone()));
-        map.insert("loker.aggregator".to_string(), Value::String(ctx.aggregator.clone()));
+        map.insert(
+            "loker.strategy".to_string(),
+            Value::String(ctx.strategy.clone()),
+        );
+        map.insert(
+            "loker.aggregator".to_string(),
+            Value::String(ctx.aggregator.clone()),
+        );
         if let Some(ref hook) = ctx.verify_hook {
             map.insert("loker.verify_hook".to_string(), Value::String(hook.clone()));
         }
@@ -62,8 +77,14 @@ impl TraceSink for InMemorySink {
         result: &super::BackendSpanResult,
     ) {
         let mut map = serde_json::Map::new();
-        map.insert("trace_id".to_string(), Value::String(ctx.trace_id.to_string()));
-        map.insert("span_id".to_string(), Value::String(attempt.span_id.clone()));
+        map.insert(
+            "trace_id".to_string(),
+            Value::String(ctx.trace_id.to_string()),
+        );
+        map.insert(
+            "span_id".to_string(),
+            Value::String(attempt.span_id.clone()),
+        );
         map.insert(
             "parent_span_id".to_string(),
             Value::String(ctx.span_id.clone()),
@@ -72,10 +93,19 @@ impl TraceSink for InMemorySink {
             "name".to_string(),
             Value::String(format!("backend.{}", attempt.backend)),
         );
-        map.insert("loker.attempt".to_string(), Value::Number(attempt.attempt.into()));
-        map.insert("gen_ai.system".to_string(), Value::String(attempt.backend.clone()));
+        map.insert(
+            "loker.attempt".to_string(),
+            Value::Number(attempt.attempt.into()),
+        );
+        map.insert(
+            "gen_ai.system".to_string(),
+            Value::String(attempt.backend.clone()),
+        );
         if let Some(ref model) = attempt.model {
-            map.insert("gen_ai.request.model".to_string(), Value::String(model.clone()));
+            map.insert(
+                "gen_ai.request.model".to_string(),
+                Value::String(model.clone()),
+            );
         }
         if let Some(input) = result.usage_input_tokens {
             map.insert(
@@ -92,7 +122,14 @@ impl TraceSink for InMemorySink {
         if !result.finish_reasons.is_empty() {
             map.insert(
                 "gen_ai.response.finish_reasons".to_string(),
-                Value::Array(result.finish_reasons.iter().cloned().map(Value::String).collect()),
+                Value::Array(
+                    result
+                        .finish_reasons
+                        .iter()
+                        .cloned()
+                        .map(Value::String)
+                        .collect(),
+                ),
             );
         }
         if let Some(ref err) = result.error {
@@ -103,14 +140,23 @@ impl TraceSink for InMemorySink {
 
     fn aggregator_fold(&self, ctx: &super::PhaseSpanContext, kind: &str, _input_count: usize) {
         let mut map = serde_json::Map::new();
-        map.insert("trace_id".to_string(), Value::String(ctx.trace_id.to_string()));
+        map.insert(
+            "trace_id".to_string(),
+            Value::String(ctx.trace_id.to_string()),
+        );
         map.insert("span_id".to_string(), Value::String(super::new_span_id()));
         map.insert(
             "parent_span_id".to_string(),
             Value::String(ctx.span_id.clone()),
         );
-        map.insert("name".to_string(), Value::String(format!("aggregator.{kind}")));
-        map.insert("loker.aggregator".to_string(), Value::String(kind.to_string()));
+        map.insert(
+            "name".to_string(),
+            Value::String(format!("aggregator.{kind}")),
+        );
+        map.insert(
+            "loker.aggregator".to_string(),
+            Value::String(kind.to_string()),
+        );
         self.push(Value::Object(map));
     }
 
@@ -121,7 +167,10 @@ impl TraceSink for InMemorySink {
         result: &super::VerifySpanResult,
     ) {
         let mut map = serde_json::Map::new();
-        map.insert("trace_id".to_string(), Value::String(ctx.trace_id.to_string()));
+        map.insert(
+            "trace_id".to_string(),
+            Value::String(ctx.trace_id.to_string()),
+        );
         map.insert("span_id".to_string(), Value::String(super::new_span_id()));
         map.insert(
             "parent_span_id".to_string(),
@@ -147,7 +196,10 @@ impl TraceSink for InMemorySink {
 
     fn phase_finished(&self, ctx: &super::PhaseSpanContext, outcome: &str) {
         let mut map = serde_json::Map::new();
-        map.insert("trace_id".to_string(), Value::String(ctx.trace_id.to_string()));
+        map.insert(
+            "trace_id".to_string(),
+            Value::String(ctx.trace_id.to_string()),
+        );
         map.insert("span_id".to_string(), Value::String(super::new_span_id()));
         map.insert(
             "parent_span_id".to_string(),
@@ -157,13 +209,19 @@ impl TraceSink for InMemorySink {
             "name".to_string(),
             Value::String(format!("phase.{}.finished", ctx.phase)),
         );
-        map.insert("loker.outcome".to_string(), Value::String(outcome.to_string()));
+        map.insert(
+            "loker.outcome".to_string(),
+            Value::String(outcome.to_string()),
+        );
         self.push(Value::Object(map));
     }
 
     fn error(&self, ctx: &super::PhaseSpanContext, kind: &str, message: &str) {
         let mut map = serde_json::Map::new();
-        map.insert("trace_id".to_string(), Value::String(ctx.trace_id.to_string()));
+        map.insert(
+            "trace_id".to_string(),
+            Value::String(ctx.trace_id.to_string()),
+        );
         map.insert("span_id".to_string(), Value::String(super::new_span_id()));
         map.insert(
             "parent_span_id".to_string(),
@@ -174,7 +232,10 @@ impl TraceSink for InMemorySink {
             Value::String(format!("phase.{}.error", ctx.phase)),
         );
         map.insert("error.kind".to_string(), Value::String(kind.to_string()));
-        map.insert("error.message".to_string(), Value::String(message.to_string()));
+        map.insert(
+            "error.message".to_string(),
+            Value::String(message.to_string()),
+        );
         self.push(Value::Object(map));
     }
 }
