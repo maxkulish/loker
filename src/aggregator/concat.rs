@@ -31,10 +31,12 @@ pub const EMPTY_CONCAT_SENTINEL: &str =
 /// Unknown placeholders are preserved literally.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Aggregator {
+    First,
     Concat {
         heading_template: String,
     },
     AnyFail,
+    AllPass,
     LLMJudge {
         judge_backend: String,
         prompt_template: String,
@@ -46,6 +48,11 @@ pub enum Aggregator {
 }
 
 impl Aggregator {
+    /// Build a first-success aggregator.
+    pub fn first() -> Self {
+        Self::First
+    }
+
     /// Build a concat aggregator with the provided heading template.
     pub fn concat(heading_template: impl Into<String>) -> Self {
         Self::Concat {
@@ -76,11 +83,18 @@ impl Aggregator {
         Self::AnyFail
     }
 
+    /// Build an AllPass aggregator (no configuration needed).
+    pub fn all_pass() -> Self {
+        Self::AllPass
+    }
+
     /// Return the schema-facing strategy aggregator label for this behavior.
     pub fn kind(&self) -> crate::strategy::Aggregator {
         match self {
+            Self::First => crate::strategy::Aggregator::First,
             Self::Concat { .. } => crate::strategy::Aggregator::Concat,
             Self::AnyFail => crate::strategy::Aggregator::AnyFail,
+            Self::AllPass => crate::strategy::Aggregator::AllPass,
             Self::LLMJudge { .. } => crate::strategy::Aggregator::LLMJudge,
             Self::Vote { .. } => crate::strategy::Aggregator::Vote,
         }
@@ -94,10 +108,12 @@ impl Aggregator {
         _ctx: &PhaseContext,
     ) -> Result<AggregatedArtifact, AggregatorError> {
         match self {
+            Self::First => aggregate_first(input),
             Self::Concat { heading_template } => aggregate_concat(heading_template, input),
             Self::AnyFail => Err(AggregatorError::Unsupported(
                 "AnyFail is evaluated inline by ParallelFanOut, not via aggregate()".into(),
             )),
+            Self::AllPass => aggregate_all_pass(input),
             Self::LLMJudge { .. } => Err(AggregatorError::Unsupported(
                 "LLMJudge requires async backend access; use aggregate_llm_judge()".into(),
             )),
@@ -155,6 +171,52 @@ pub struct AggregatedArtifact {
 pub enum AggregatorError {
     #[error("unsupported aggregator operation: {0}")]
     Unsupported(String),
+    #[error("no successful branches")]
+    NoSuccessfulBranches,
+    #[error("one or more branches failed: {0}")]
+    BranchFailures(String),
+}
+
+fn aggregate_first(input: AggregateInput) -> Result<AggregatedArtifact, AggregatorError> {
+    let mut failed = 0;
+    for branch in input.branches {
+        match branch {
+            BranchOutcome::Success(success) => {
+                return Ok(AggregatedArtifact {
+                    text: success.output,
+                    successful: 1,
+                    failed,
+                });
+            }
+            BranchOutcome::Failure(_) => failed += 1,
+        }
+    }
+    Err(AggregatorError::NoSuccessfulBranches)
+}
+
+fn aggregate_all_pass(input: AggregateInput) -> Result<AggregatedArtifact, AggregatorError> {
+    let mut outputs = Vec::new();
+    let mut failures = Vec::new();
+
+    for branch in input.branches {
+        match branch {
+            BranchOutcome::Success(success) => outputs.push(success.output),
+            BranchOutcome::Failure(failure) => failures.push(format!(
+                "#{} {}: {}",
+                failure.index, failure.backend_id, failure.reason
+            )),
+        }
+    }
+
+    if !failures.is_empty() {
+        return Err(AggregatorError::BranchFailures(failures.join("; ")));
+    }
+
+    Ok(AggregatedArtifact {
+        text: outputs.join("\n\n"),
+        successful: outputs.len(),
+        failed: 0,
+    })
 }
 
 fn aggregate_concat(
