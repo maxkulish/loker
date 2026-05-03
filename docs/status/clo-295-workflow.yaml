@@ -27,7 +27,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T12:35:56.289Z'
-  updated_at: '2026-05-03T13:09:36.165Z'
+  updated_at: '2026-05-03T13:14:42.892Z'
 phases:
   discovery:
     status: complete
@@ -65,7 +65,10 @@ phases:
     plan_file: docs/plans/clo-295-run-resumability.md
     approved: true
   implement:
-    status: pending
+    status: in_progress
+    commits:
+      - 0cc2c8f
+      - ac403d2
   pr:
     status: pending
   complete:
@@ -144,5 +147,17 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-03T13:14:09.615Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: extended heartbeat schema with ttl_seconds, added read_ttl helper, updated tests. Commit 0cc2c8f.'
+  - timestamp: '2026-05-03T13:14:37.637Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: added fs2 0.4 dependency. Commit ac403d2.'
+  - timestamp: '2026-05-03T13:14:42.892Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: added fs2 dependency. Commit ac403d2.'
 task_title: '[T-031] Implement run resumability via status markers'
 task_url: https://linear.app/cloud-ai/issue/CLO-295/t-031-implement-run-resumability-via-status-markers

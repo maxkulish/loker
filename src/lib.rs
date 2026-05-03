@@ -10,6 +10,7 @@ pub mod backend;
 pub mod family;
 pub mod manifest;
 pub mod phase_runner;
+pub mod resume;
 pub mod run_state;
 pub mod strategy;
 pub mod template;
