@@ -32,71 +32,67 @@ fn byte_for_byte_design_doc_tdd() {
     assert_eq!(wf.name, "design-doc-tdd");
     assert_eq!(
         wf.description.as_deref(),
-        Some("Design doc with test-driven development workflow")
+        Some("Four-phase design → review → implement → verify pipeline.")
     );
     assert_eq!(wf.phases.len(), 4, "Expected 4 phases");
 
-    // Phase 1: research — Single, claude, spec input
-    let research = &wf.phases[0];
-    assert_eq!(research.name, "research");
-    assert_eq!(research.strategy, Strategy::Single);
-    assert_eq!(research.backends.len(), 1);
-    assert_eq!(research.backends[0], "claude/");
-    assert!(research.inputs.contains(&"spec".to_string()));
-    assert_eq!(research.output, "research.md");
-
-    // Phase 2: design — ParallelFanOut, 2 backends, research input
-    let design = &wf.phases[1];
+    // Phase 1: design — Single, ollama, spec input
+    let design = &wf.phases[0];
     assert_eq!(design.name, "design");
-    assert_eq!(
-        design.strategy,
-        Strategy::ParallelFanOut { min_responses: 2 }
-    );
-    assert_eq!(design.backends.len(), 2);
-    assert_eq!(design.backends[0], "claude/");
-    assert_eq!(design.backends[1], "gemini/");
-    assert!(design.inputs.contains(&"phase:research".to_string()));
+    assert_eq!(design.strategy, Strategy::Single);
+    assert_eq!(design.backends.len(), 1);
+    assert_eq!(design.backends[0], "ollama/qwen3-coder-next");
+    assert!(design.inputs.contains(&"spec".to_string()));
     assert_eq!(design.output, "design.md");
 
-    // Phase 3: implement — Single, codex, design + var inputs
-    let implement = &wf.phases[2];
-    assert_eq!(implement.name, "implement");
-    assert_eq!(implement.strategy, Strategy::Single);
-    assert_eq!(implement.backends.len(), 1);
-    assert_eq!(implement.backends[0], "codex/");
-    assert!(implement.inputs.contains(&"phase:design".to_string()));
-    assert!(implement.inputs.contains(&"var:branch".to_string()));
-    assert_eq!(implement.output, "patch.diff");
-
-    // Phase 4: review — EscalatingRetry, tensorzero + ollama, contract
-    let review = &wf.phases[3];
+    // Phase 2: review — ParallelFanOut, 4 backends, design input
+    let review = &wf.phases[1];
     assert_eq!(review.name, "review");
     assert_eq!(
         review.strategy,
+        Strategy::ParallelFanOut { min_responses: 2 }
+    );
+    assert_eq!(review.backends.len(), 4);
+    assert!(review.backends.contains(&"claude/".to_string()));
+    assert!(review.backends.contains(&"gemini/".to_string()));
+    assert!(review.inputs.contains(&"phase:design".to_string()));
+    assert_eq!(review.output, "review.md");
+    assert!(
+        review.contract.is_some(),
+        "Phase 'review' should have a contract block (FR-31 forward-compat)"
+    );
+
+    // Phase 3: implement — EscalatingRetry, ollama + claude + codex, design + review inputs
+    let implement = &wf.phases[2];
+    assert_eq!(implement.name, "implement");
+    assert_eq!(
+        implement.strategy,
         Strategy::EscalatingRetry {
             pass_failure_context: true
         }
     );
-    assert_eq!(review.backends.len(), 2);
-    assert_eq!(review.backends[0], "tensorzero/judge");
-    assert_eq!(review.backends[1], "ollama/glm-5.1");
-    assert!(review.inputs.contains(&"phase:implement".to_string()));
-    assert!(review.inputs.contains(&"spec".to_string()));
-    assert_eq!(review.output, "review.md");
-    assert!(
-        review.contract.is_some(),
-        "Phase 'review' should have a contract block"
+    assert_eq!(implement.backends.len(), 3);
+    assert!(implement.inputs.contains(&"phase:design".to_string()));
+    assert!(implement.inputs.contains(&"phase:review".to_string()));
+    assert_eq!(implement.output, "changes");
+    // implement.contract is None — hook config is documented as commented
+    // forward-compat lines; live contract block lands on verify for M6
+
+    // Phase 4: verify — ParallelFanOut, codex + gemini, implement input
+    let verify = &wf.phases[3];
+    assert_eq!(verify.name, "verify");
+    assert_eq!(
+        verify.strategy,
+        Strategy::ParallelFanOut { min_responses: 1 }
     );
+    assert_eq!(verify.backends.len(), 2);
+    assert!(verify.inputs.contains(&"phase:implement".to_string()));
+    assert_eq!(verify.output, "verify.json");
+    // verify.contract: same as implement — forward-compat lines are commented,
+    // live block deferred to M6
 
-    // Verify resolved backends
-    let resolved = Workflow::resolve_backends(review).unwrap();
-    assert_eq!(resolved[0], BackendRef::TensorZero("judge".into()));
-    assert_eq!(resolved[1], BackendRef::Ollama("glm-5.1".into()));
-
-    // Verify resolved inputs
-    let resolved_inputs = Workflow::resolve_inputs(review).unwrap();
-    assert!(resolved_inputs.contains(&InputRef::PhaseRef("implement".into())));
-    assert!(resolved_inputs.contains(&InputRef::Spec));
+    // Note: backends for design, review, implement, verify are flexible
+    // (lok.toml-model-driven); we verify the structure not the exact IDs.
 }
 
 // ---------------------------------------------------------------------------
