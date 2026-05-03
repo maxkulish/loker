@@ -315,7 +315,7 @@ fn phase_status_is_derived_from_markers() {
 }
 
 #[test]
-fn corrupted_completed_marker_returns_json_error() {
+fn corrupted_completed_marker_is_skipped_and_does_not_enable_orphan_sweep() {
     let tmp = tempfile::tempdir().unwrap();
     let (entry, payload) = build_entry_payload("design/design.md", b"good bytes");
     write_manifest_with_run_state(tmp.path(), vec![(entry.clone(), payload)], "run-011");
@@ -324,11 +324,11 @@ fn corrupted_completed_marker_returns_json_error() {
     fs::create_dir_all(&markers_dir).unwrap();
     fs::write(markers_dir.join("design.completed"), "not json").unwrap();
 
-    let err = RunState::load(tmp.path(), 300).unwrap_err();
-    match err {
-        LoadError::Json(_) => {}
-        other => panic!("expected Json error, got: {other}"),
-    }
+    let run_state = RunState::load(tmp.path(), 300).unwrap();
+    // Corrupted marker is skipped, so no completed markers exist and orphan sweep is disabled
+    assert_eq!(run_state.entries.len(), 1);
+    assert_eq!(run_state.dropped_orphans.len(), 0);
+    assert_eq!(run_state.phase_status.get("design"), None);
 }
 
 #[test]

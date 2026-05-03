@@ -185,6 +185,9 @@ impl RunState {
         for dir_entry in std::fs::read_dir(&markers_dir)? {
             let dir_entry = dir_entry?;
             let path = dir_entry.path();
+            if !path.is_file() {
+                continue;
+            }
             let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
@@ -194,11 +197,21 @@ impl RunState {
             };
 
             if file_name.ends_with(".completed") {
-                let text = std::fs::read_to_string(&path)?;
-                let marker: CompletedMarker = serde_json::from_str(&text)?;
-                completed.insert(marker.manifest_entry_sha256);
-                has_completed_markers = true;
-                let _ = update_phase_status(&mut status, phase, PhaseStatus::Completed);
+                match std::fs::read_to_string(&path) {
+                    Ok(text) => match serde_json::from_str::<CompletedMarker>(&text) {
+                        Ok(marker) => {
+                            completed.insert(marker.manifest_entry_sha256);
+                            has_completed_markers = true;
+                            let _ = update_phase_status(&mut status, phase, PhaseStatus::Completed);
+                        }
+                        Err(e) => {
+                            eprintln!("WARN: failed to parse completed marker {path:?}: {e}");
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("WARN: failed to read completed marker {path:?}: {e}");
+                    }
+                }
                 continue;
             }
 
@@ -207,7 +220,7 @@ impl RunState {
                 continue;
             }
 
-            if file_name.ends_with(".started") {
+            if file_name.contains(".started") {
                 let _ = update_phase_status(&mut status, phase, PhaseStatus::Started);
             }
         }
@@ -331,7 +344,12 @@ fn marker_phase(file_name: &str) -> Option<String> {
     file_name
         .strip_suffix(".completed")
         .or_else(|| file_name.strip_suffix(".failed"))
-        .or_else(|| file_name.strip_suffix(".started"))
+        .or_else(|| {
+            // Handle both `<phase>.started` and `<phase>.started.<attempt>`
+            file_name
+                .strip_suffix(".started")
+                .or_else(|| file_name.split(".started.").next())
+        })
         .map(ToString::to_string)
 }
 
