@@ -315,6 +315,73 @@ fn phase_status_is_derived_from_markers() {
 }
 
 #[test]
+fn corrupted_completed_marker_returns_json_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (entry, payload) = build_entry_payload("design/design.md", b"good bytes");
+    write_manifest_with_run_state(tmp.path(), vec![(entry.clone(), payload)], "run-011");
+
+    let markers_dir = tmp.path().join("markers");
+    fs::create_dir_all(&markers_dir).unwrap();
+    fs::write(markers_dir.join("design.completed"), "not json").unwrap();
+
+    let err = RunState::load(tmp.path(), 300).unwrap_err();
+    match err {
+        LoadError::Json(_) => {}
+        other => panic!("expected Json error, got: {other}"),
+    }
+}
+
+#[test]
+fn phase_status_failed_wins_over_started() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (entry, payload) = build_entry_payload("design/design.md", b"design work");
+    write_manifest_with_run_state(tmp.path(), vec![(entry.clone(), payload)], "run-012");
+
+    marker_started(tmp.path(), "design");
+    fs::write(
+        tmp.path().join("markers/design.failed"),
+        serde_json::json!({
+            "phase": "design",
+            "attempts_made": 1,
+            "failed_at": Utc::now().to_rfc3339(),
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let run_state = RunState::load(tmp.path(), 300).unwrap();
+    assert_eq!(
+        run_state.phase_status.get("design"),
+        Some(&PhaseStatus::Failed)
+    );
+}
+
+#[test]
+fn phase_status_completed_wins_over_failed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (entry, payload) = build_entry_payload("design/design.md", b"design work");
+    write_manifest_with_run_state(tmp.path(), vec![(entry.clone(), payload)], "run-013");
+
+    marker_completed(tmp.path(), "design", &entry.sha256);
+    fs::write(
+        tmp.path().join("markers/design.failed"),
+        serde_json::json!({
+            "phase": "design",
+            "attempts_made": 1,
+            "failed_at": Utc::now().to_rfc3339(),
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let run_state = RunState::load(tmp.path(), 300).unwrap();
+    assert_eq!(
+        run_state.phase_status.get("design"),
+        Some(&PhaseStatus::Completed)
+    );
+}
+
+#[test]
 fn changes_dir_entry_is_verified_with_digest() {
     let tmp = tempfile::tempdir().unwrap();
 

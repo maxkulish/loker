@@ -27,8 +27,6 @@ pub enum HeartbeatStatus {
         /// TTL window used by the caller, in seconds.
         ttl_seconds: u64,
     },
-    /// No heartbeat file exists.
-    Missing,
 }
 
 /// Snapshot of `heartbeat.json` loaded from disk.
@@ -62,18 +60,6 @@ pub enum LoadError {
         found: String,
     },
 
-    #[error("stale writer heartbeat: last tick {last_tick} older than ttl {ttl_seconds}s")]
-    StaleWriter {
-        last_tick: DateTime<Utc>,
-        ttl_seconds: u64,
-    },
-
-    #[error("live writer heartbeat: pid={writer_pid}, host={writer_host}")]
-    LiveWriter {
-        writer_pid: i64,
-        writer_host: String,
-    },
-
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -81,6 +67,16 @@ pub enum LoadError {
     Json(#[from] serde_json::Error),
 }
 
+/// Validated snapshot of a run directory.
+///
+/// Resume contract:
+/// - `entries` contains manifest rows whose SHA-256 appears in at least one
+///   `markers/*.completed` file (or all rows when no completed markers exist).
+/// - `dropped_orphans` lists rows that were removed because no completed marker
+///   referenced them.
+/// - `phase_status` maps phase names to the highest-severity marker found.
+/// - `heartbeat` is `None` when no heartbeat file exists, otherwise classifies
+///   the writer as live or stale.
 #[derive(Debug)]
 pub struct RunState {
     pub run_id: String,
@@ -131,17 +127,8 @@ impl RunState {
 
         let phase_status = marker_scan.phase_status;
 
-        let heartbeat = Self::read_heartbeat(run_dir)?.map(|hb| {
-            let age = Utc::now().signed_duration_since(hb.tick_at);
-            if age > Duration::seconds(heartbeat_ttl_seconds as i64) {
-                HeartbeatStatus::Stale {
-                    last_tick: hb.tick_at,
-                    ttl_seconds: heartbeat_ttl_seconds,
-                }
-            } else {
-                HeartbeatStatus::Live(hb)
-            }
-        });
+        let heartbeat = Self::read_heartbeat(run_dir)?
+            .map(|hb| Self::status_from_heartbeat(&hb, heartbeat_ttl_seconds));
 
         Self::verify_entries(run_dir, &entries)?;
 
@@ -209,12 +196,11 @@ impl RunState {
             }
 
             if file_name.ends_with(".completed") {
-                if let Ok(text) = std::fs::read_to_string(&path) {
-                    if let Ok(marker) = serde_json::from_str::<CompletedMarker>(&text) {
-                        completed.insert(marker.manifest_entry_sha256);
-                    }
-                }
-                let _ = update_phase_status(&mut status, phase.clone(), PhaseStatus::Completed);
+                let text = std::fs::read_to_string(&path)?;
+                let marker: CompletedMarker = serde_json::from_str(&text)?;
+                completed.insert(marker.manifest_entry_sha256);
+                has_completed_markers = true;
+                let _ = update_phase_status(&mut status, phase, PhaseStatus::Completed);
                 continue;
             }
 
@@ -248,7 +234,7 @@ impl RunState {
                     let computed = dir_digest(&path).map_err(LoadError::Io)?;
                     if computed != entry.sha256 {
                         return Err(LoadError::ArtefactCorrupt {
-                            path: entry.name.clone(),
+                            path: path.display().to_string(),
                             expected: entry.sha256.clone(),
                             found: computed,
                         });
@@ -300,8 +286,9 @@ impl RunState {
                     .or_else(|| entry.name.split('/').next().map(ToString::to_string));
                 let phase = phase.unwrap_or_else(|| "unknown".to_string());
                 let kind = kind_name(&entry.kind);
+                // TODO: replace with trace logger
                 eprintln!(
-                    "orphan manifest entry dropped: phase={phase}, kind={kind}, sha256={}",
+                    "WARN: orphan manifest entry dropped: phase={phase}, kind={kind}, sha256={}",
                     entry.sha256
                 );
                 dropped.push(entry);
@@ -325,7 +312,6 @@ impl RunState {
         }))
     }
 
-    #[allow(dead_code)]
     pub fn status_from_heartbeat(heartbeat: &Heartbeat, ttl_seconds: u64) -> HeartbeatStatus {
         let age = Utc::now().signed_duration_since(heartbeat.tick_at);
         if age > Duration::seconds(ttl_seconds as i64) {

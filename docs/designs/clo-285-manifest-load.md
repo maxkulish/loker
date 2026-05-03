@@ -9,7 +9,8 @@
 ### Goals
 - Introduce a dedicated loader surface (`src/run_state/load.rs`) that returns a typed `RunState` for downstream resume paths.
 - Preserve existing `src/manifest.rs` append/write semantics and reuse its existing types/helpers (`Manifest`, `ManifestEntry`, `Kind`, `dir_digest`, `sha256_hex`).
-- Add typed load errors (`LoadError`) that distinguish schema mismatch, missing artefacts, corrupt artefacts, and heartbeat state (`StaleWriter` / `LiveWriter`).
+- Add typed load errors (`LoadError`) that distinguish schema mismatch, missing artefacts, and corrupt artefacts.
+- Expose heartbeat state through `RunState.heartbeat` as `Option<HeartbeatStatus>` (`None` when no heartbeat file exists).
 - Keep orphan handling deterministic: only keep manifest entries whose sha256 appears in `markers/*.completed`.
 - Keep docs updated with a resume-path hint in rustdoc.
 
@@ -45,9 +46,9 @@ runs/<id>/manifest.json  --> parse manifest + schema_version check --> parse hea
    - `dropped_orphans` (sha256 not present).
 5. For every surviving entry, resolve its artefact path relative to run directory and verify SHA-256.
 6. Detect heartbeat (`runs/<id>/heartbeat.json`) freshness using `heartbeat_ttl_seconds`.
-   - missing heartbeat file -> no warning and continue as `NoHeartbeat`.
-   - stale -> `HeartbeatStatus::StaleWriter`
-   - live -> `HeartbeatStatus::LiveWriter`
+   - missing heartbeat file -> `RunState.heartbeat = None`
+   - stale -> `RunState.heartbeat = Some(HeartbeatStatus::Stale)`
+   - live -> `RunState.heartbeat = Some(HeartbeatStatus::Live(...))`
 7. For each marker file set (`*.started`, `*.completed`, `*.failed`) compute a per-phase status map.
 
 ### Phase status precedence
@@ -70,12 +71,6 @@ pub enum LoadError {
     #[error("artefact corrupt: {path} (expected {expected}, found {found})")]
     ArtefactCorrupt { path: String, expected: String, found: String },
 
-    #[error("live writer at pid={writer_pid}, host={writer_host}")]
-    LiveWriter { writer_pid: i64, writer_host: String },
-
-    #[error("stale writer: last_tick={last_tick}, ttl={ttl_seconds}s")]
-    StaleWriter { last_tick: chrono::DateTime<chrono::Utc>, ttl_seconds: u64 },
-
     #[error("IO: {0}")]
     Io(#[from] std::io::Error),
 
@@ -95,9 +90,13 @@ pub struct RunState {
     pub heartbeat: Option<HeartbeatStatus>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum HeartbeatStatus { Live(Heartbeat), Stale, Missing }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeartbeatStatus {
+    Live(Heartbeat),
+    Stale { last_tick: chrono::DateTime<chrono::Utc>, ttl_seconds: u64 },
+}
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Heartbeat {
     pub writer_pid: i64,
     pub writer_host: String,
@@ -124,8 +123,8 @@ Each dropped orphan should log at `WARN` level with `phase`, `kind`, and `sha256
   3. changed file bytes -> `ArtefactCorrupt`
   4. deleted file -> `ArtefactMissing`
   5. orphan sweep -> dropped entries listed
-  6. stale heartbeat -> `StaleWriter`
-  7. fresh heartbeat -> `LiveWriter`
+  6. stale heartbeat -> `RunState.heartbeat` is `Some(HeartbeatStatus::Stale(...))`
+  7. fresh heartbeat -> `RunState.heartbeat` is `Some(HeartbeatStatus::Live(...))`
   8. empty manifest -> no entries, no dropped
   9. phase-status derivation from started/completed/failed markers
   10. missing `markers/` directory tolerated (all entries survive)
