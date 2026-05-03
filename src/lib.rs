@@ -21,5 +21,5 @@ mod context;
 mod git_agent;
 mod role;
 mod utils;
-mod workflow;
+pub mod workflow;
 mod workflows;

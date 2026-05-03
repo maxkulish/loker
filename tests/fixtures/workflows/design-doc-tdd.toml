@@ -1,0 +1,90 @@
+# Design-doc-tdd reference workflow
+# Used by CLO-287 test 1: byte-for-byte design-doc-tdd
+name = "design-doc-tdd"
+description = "Design doc with test-driven development workflow"
+
+# Phase 1: Research - analyze the spec and gather context
+[[phases]]
+name = "research"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = """
+Analyze the following specification and identify key requirements,
+constraints, and edge cases:
+
+{{ spec }}
+
+Produce a structured analysis with:
+- Core requirements
+- Technical constraints
+- Edge cases to consider
+- Suggested approach
+"""
+inputs = ["spec"]
+output = "research.md"
+
+# Phase 2: Design - create the architecture plan
+[[phases]]
+name = "design"
+strategy = { parallel = { min_responses = 2 } }
+backends = ["claude/", "gemini/"]
+prompt_template = """
+Based on the research analysis, design the architecture:
+
+{{ phase:research }}
+
+Consider:
+- Module structure
+- API boundaries
+- Data flow
+- Error handling strategy
+
+Provide a detailed design document.
+"""
+inputs = ["phase:research"]
+output = "design.md"
+
+# Phase 3: Implement - write the code
+[[phases]]
+name = "implement"
+strategy = { single = {} }
+backends = ["codex/"]
+prompt_template = """
+Implement the design from the design document:
+
+{{ phase:design }}
+
+Constraints:
+- Follow the architecture exactly
+- Include tests
+- Handle all edge cases from the research
+- Use idiomatic Rust
+
+Generate complete, compilable code.
+"""
+inputs = ["phase:design", "var:branch"]
+output = "patch.diff"
+
+# Phase 4: Review - verify with multiple backends
+[[phases]]
+name = "review"
+strategy = { escalating = { pass_failure_context = true } }
+backends = ["tensorzero/judge", "ollama/glm-5.1"]
+prompt_template = """
+Review the implementation:
+
+{{ phase:implement }}
+
+Check for:
+- Correctness
+- Security issues
+- Performance concerns
+- Completeness versus the spec
+
+{{ spec }}
+
+Provide a structured review with severity ratings.
+"""
+inputs = ["phase:implement", "spec"]
+output = "review.md"
+contract = { required_reviewers = 2, min_approval = 1 }
