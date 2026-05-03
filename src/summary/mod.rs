@@ -11,7 +11,7 @@
 //! 5. Writes summary.json via atomic write
 //! 6. Registers the artefact in the manifest
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -131,18 +131,31 @@ impl SummaryWriter {
         let mut backends = TraceReader::aggregate(trace_path)?;
 
         // 2. Compute costs from price table
-        let prices_path = run_dir.join("../../docs/prices.toml");
-        // Try canonical path first, then relative to CWD
-        let price_table = if prices_path.exists() {
-            PriceTable::load(&prices_path)
-        } else {
-            PriceTable::load(Path::new("docs/prices.toml"))
-        };
+        // Try several candidate paths for prices.toml:
+        //   - run_dir/../../docs/prices.toml  (production: run is <root>/runs/<uuid>/)
+        //   - run_dir/../docs/prices.toml      (run is <root>/<phase>/<attempt>/)
+        //   - run_dir/docs/prices.toml         (flat run dir, e.g. tests)
+        //   - docs/prices.toml                 (CWD fallback)
+        let price_table = [
+            run_dir.join("../../docs/prices.toml"),
+            run_dir.join("../docs/prices.toml"),
+            run_dir.join("docs/prices.toml"),
+            Path::new("docs/prices.toml").to_path_buf(),
+        ]
+        .into_iter()
+        .find(|p| p.exists())
+        .map(|p| PriceTable::load(&p))
+        .unwrap_or_default();
 
         let mut total_cost_usd = 0.0_f64;
         let mut any_cost_known = false;
         for backend in &mut backends {
-            match price_table.compute_cost(&backend.name, &backend.model, backend.input_tokens, backend.output_tokens) {
+            match price_table.compute_cost(
+                &backend.name,
+                &backend.model,
+                backend.input_tokens,
+                backend.output_tokens,
+            ) {
                 Some(cost) => {
                     backend.cost_usd = Some(cost);
                     total_cost_usd += cost;
@@ -160,8 +173,7 @@ impl SummaryWriter {
         // 4. Compute duration and timestamps
         let now = chrono::Utc::now();
         let finished_at = now.to_rfc3339();
-        let started_at = get_run_start_time(run_dir)
-            .unwrap_or_else(|| now.to_rfc3339());
+        let started_at = get_run_start_time(run_dir).unwrap_or_else(|| now.to_rfc3339());
         let duration_ms = compute_duration_ms(run_dir);
 
         // 5. Determine run status
@@ -170,7 +182,11 @@ impl SummaryWriter {
         // 6. Build totals
         let totals_input: u64 = backends.iter().map(|b| b.input_tokens).sum();
         let totals_output: u64 = backends.iter().map(|b| b.output_tokens).sum();
-        let totals_cost = if any_cost_known { Some(total_cost_usd) } else { None };
+        let totals_cost = if any_cost_known {
+            Some(total_cost_usd)
+        } else {
+            None
+        };
 
         // 7. Compute budget warning
         let budget_warning = match (cost_budget_usd, totals_cost) {
@@ -243,11 +259,17 @@ impl InMemorySummarySink {
     }
 
     pub fn summaries(&self) -> Vec<Summary> {
-        self.summaries.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.summaries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     pub fn clear(&self) {
-        self.summaries.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.summaries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
     }
 }
 
@@ -376,8 +398,12 @@ fn compute_run_status(phases: &[PhaseSummary]) -> RunStatus {
         return RunStatus::Failed;
     }
 
-    let all_completed = phases.iter().all(|p| matches!(p.status, PhaseStatus::Completed));
-    let any_failed = phases.iter().any(|p| matches!(p.status, PhaseStatus::Failed));
+    let all_completed = phases
+        .iter()
+        .all(|p| matches!(p.status, PhaseStatus::Completed));
+    let any_failed = phases
+        .iter()
+        .any(|p| matches!(p.status, PhaseStatus::Failed));
 
     if all_completed {
         RunStatus::Success
@@ -416,7 +442,11 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let markers = tmp.path().join("markers");
         std::fs::create_dir_all(&markers).unwrap();
-        std::fs::write(markers.join("implement.failed"), "{\"error\":\"verify_failed\"}").unwrap();
+        std::fs::write(
+            markers.join("implement.failed"),
+            "{\"error\":\"verify_failed\"}",
+        )
+        .unwrap();
 
         let phases = collect_phases(tmp.path());
         assert_eq!(phases.len(), 1);
@@ -452,15 +482,13 @@ mod tests {
 
     #[test]
     fn compute_run_status_all_success() {
-        let phases = vec![
-            PhaseSummary {
-                phase: "design".into(),
-                status: PhaseStatus::Completed,
-                attempts: 1,
-                duration_ms: 100,
-                strategy: None,
-            },
-        ];
+        let phases = vec![PhaseSummary {
+            phase: "design".into(),
+            status: PhaseStatus::Completed,
+            attempts: 1,
+            duration_ms: 100,
+            strategy: None,
+        }];
         assert!(matches!(compute_run_status(&phases), RunStatus::Success));
     }
 
@@ -501,7 +529,11 @@ mod tests {
             finished_at: "2026-01-01T01:00:00Z".into(),
             duration_ms: 3600000,
             status: RunStatus::Success,
-            totals: Totals { input_tokens: 100, output_tokens: 200, cost_usd: None },
+            totals: Totals {
+                input_tokens: 100,
+                output_tokens: 200,
+                cost_usd: None,
+            },
             backends: vec![],
             phases: vec![],
             cost_budget_usd: None,
@@ -521,7 +553,11 @@ mod tests {
             finished_at: "2026-05-03T13:00:00Z".into(),
             duration_ms: 3600000,
             status: RunStatus::Success,
-            totals: Totals { input_tokens: 1000, output_tokens: 500, cost_usd: Some(0.05) },
+            totals: Totals {
+                input_tokens: 1000,
+                output_tokens: 500,
+                cost_usd: Some(0.05),
+            },
             backends: vec![BackendUsage {
                 name: "mock".into(),
                 model: "m1".into(),
@@ -558,7 +594,11 @@ mod tests {
             finished_at: "2026-01-01T01:00:00Z".into(),
             duration_ms: 3600000,
             status: RunStatus::Success,
-            totals: Totals { input_tokens: 0, output_tokens: 0, cost_usd: None },
+            totals: Totals {
+                input_tokens: 0,
+                output_tokens: 0,
+                cost_usd: None,
+            },
             backends: vec![],
             phases: vec![],
             cost_budget_usd: None,
@@ -569,5 +609,196 @@ mod tests {
         assert!(summary_path.exists());
         let content = std::fs::read_to_string(&summary_path).unwrap();
         assert!(content.contains("test-write"));
+    }
+
+    #[test]
+    fn write_summary_full_pipeline() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        // Create markers directory with one completed phase
+        let markers = run_dir.join("markers");
+        std::fs::create_dir_all(&markers).unwrap();
+        std::fs::write(markers.join("design.completed"), "{}").unwrap();
+
+        // Create trace.jsonl with backend call data
+        let trace_path = run_dir.join("trace.jsonl");
+        std::fs::write(
+            &trace_path,
+            r#"{"name":"backend.mock","gen_ai.system":"mock","gen_ai.request.model":"m1","gen_ai.usage.input_tokens":100,"gen_ai.usage.output_tokens":200}
+{"name":"backend.mock","gen_ai.system":"mock","gen_ai.request.model":"m1","gen_ai.usage.input_tokens":50,"gen_ai.usage.output_tokens":75}
+"#,
+        )
+        .unwrap();
+
+        // Create manifest
+        let manifest_path = run_dir.join("manifest.json");
+        let mut manifest = Manifest::new("test-run-uuid");
+        manifest
+            .append(
+                ManifestEntry::from_payload(
+                    "preexisting.md",
+                    Kind::DesignMd,
+                    1,
+                    Producer::Single,
+                    Some("design".into()),
+                    Some(0),
+                    b"hello",
+                ),
+                &manifest_path,
+            )
+            .unwrap();
+
+        // Create prices.toml for cost computation
+        let prices_path = tmp.path().join("docs");
+        std::fs::create_dir_all(&prices_path).unwrap();
+        std::fs::write(
+            prices_path.join("prices.toml"),
+            r#"["mock:m1"]
+input_per_mtok = 10.0
+output_per_mtok = 30.0
+"#,
+        )
+        .unwrap();
+
+        // Run the full pipeline
+        let writer = SummaryWriter::new(false);
+        let summary = writer
+            .write_summary(run_dir, &mut manifest, &trace_path, Some(0.50))
+            .expect("write_summary should succeed");
+
+        // Verify summary.json was written
+        let summary_path = run_dir.join("summary.json");
+        assert!(summary_path.exists());
+
+        // Verify summary content
+        assert_eq!(summary.run_id, "test-run-uuid");
+        assert_eq!(summary.status as u8, RunStatus::Success as u8);
+        assert_eq!(summary.totals.input_tokens, 150);
+        assert_eq!(summary.totals.output_tokens, 275);
+        assert!(!summary.backends.is_empty());
+        assert_eq!(summary.backends[0].name, "mock");
+        assert_eq!(summary.backends[0].input_tokens, 150);
+        assert_eq!(summary.backends[0].output_tokens, 275);
+        // Cost: 150/1M * $10 + 275/1M * $30 = $0.0015 + $0.00825 = $0.00975
+        let cost = summary.backends[0].cost_usd.unwrap();
+        assert!((cost - 0.00975).abs() < 0.001);
+        // Budget not exceeded (0.00975 < 0.50), so no warning
+        assert!(summary.budget_warning.is_none());
+
+        // Verify manifest entry
+        let manifest_entry = manifest.sha256_for("summary.json");
+        assert!(
+            manifest_entry.is_some(),
+            "manifest should have summary.json entry"
+        );
+
+        // Verify phases
+        assert!(!summary.phases.is_empty());
+        assert_eq!(summary.phases[0].phase, "design");
+    }
+
+    #[test]
+    fn write_summary_budget_exceeded() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        // Create markers + trace
+        let markers = run_dir.join("markers");
+        std::fs::create_dir_all(&markers).unwrap();
+        std::fs::write(markers.join("design.completed"), "{}").unwrap();
+
+        let trace_path = run_dir.join("trace.jsonl");
+        std::fs::write(
+            &trace_path,
+            r#"{"name":"backend.expensive","gen_ai.system":"expensive","gen_ai.request.model":"big","gen_ai.usage.input_tokens":100000,"gen_ai.usage.output_tokens":200000}
+"#,
+        )
+        .unwrap();
+
+        // Create manifest
+        let manifest_path = run_dir.join("manifest.json");
+        let mut manifest = Manifest::new("budget-test");
+        manifest
+            .append(
+                ManifestEntry::from_payload(
+                    "existing.md",
+                    Kind::DesignMd,
+                    1,
+                    Producer::Single,
+                    Some("design".into()),
+                    Some(0),
+                    b"data",
+                ),
+                &manifest_path,
+            )
+            .unwrap();
+
+        // Create prices.toml with high prices
+        let prices_path = tmp.path().join("docs");
+        std::fs::create_dir_all(&prices_path).unwrap();
+        std::fs::write(
+            prices_path.join("prices.toml"),
+            r#"["expensive:big"]
+input_per_mtok = 50.0
+output_per_mtok = 150.0
+"#,
+        )
+        .unwrap();
+
+        // Budget is $1.00, but cost will be higher
+        let writer = SummaryWriter::new(false);
+        let summary = writer
+            .write_summary(run_dir, &mut manifest, &trace_path, Some(1.00))
+            .expect("write_summary should succeed");
+
+        // Cost: 0.1M * $50 + 0.2M * $150 = $5 + $30 = $35 >> $1 budget
+        assert_eq!(summary.budget_warning, Some(true));
+    }
+
+    #[test]
+    fn write_summary_without_prices() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        // Create markers + trace (no prices.toml)
+        let markers = run_dir.join("markers");
+        std::fs::create_dir_all(&markers).unwrap();
+        std::fs::write(markers.join("design.completed"), "{}").unwrap();
+
+        let trace_path = run_dir.join("trace.jsonl");
+        std::fs::write(
+            &trace_path,
+            r#"{"name":"backend.noprice","gen_ai.system":"noprice","gen_ai.request.model":"x","gen_ai.usage.input_tokens":100,"gen_ai.usage.output_tokens":200}
+"#,
+        )
+        .unwrap();
+
+        let manifest_path = run_dir.join("manifest.json");
+        let mut manifest = Manifest::new("noprice-test");
+        manifest
+            .append(
+                ManifestEntry::from_payload(
+                    "existing.md",
+                    Kind::DesignMd,
+                    1,
+                    Producer::Single,
+                    Some("design".into()),
+                    Some(0),
+                    b"data",
+                ),
+                &manifest_path,
+            )
+            .unwrap();
+
+        // No prices.toml exists — cost should be None
+        let writer = SummaryWriter::new(false);
+        let summary = writer
+            .write_summary(run_dir, &mut manifest, &trace_path, None)
+            .expect("write_summary should succeed even without prices");
+
+        assert!(summary.totals.cost_usd.is_none());
+        assert!(summary.backends[0].cost_usd.is_none());
+        assert!(summary.budget_warning.is_none());
     }
 }

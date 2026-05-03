@@ -57,11 +57,10 @@ impl TraceReader {
                 continue;
             }
 
-            let value: Value = serde_json::from_str(line)
-                .map_err(|e| TraceReaderError::Parse {
-                    line: idx + 1,
-                    message: format!("invalid JSON: {e}"),
-                })?;
+            let value: Value = serde_json::from_str(line).map_err(|e| TraceReaderError::Parse {
+                line: idx + 1,
+                message: format!("invalid JSON: {e}"),
+            })?;
 
             let obj = match value.as_object() {
                 Some(o) => o,
@@ -104,13 +103,15 @@ impl TraceReader {
 
         let mut backends: Vec<BackendUsage> = groups
             .into_iter()
-            .map(|((backend, model), (input_tokens, output_tokens))| BackendUsage {
-                name: backend,
-                model,
-                input_tokens,
-                output_tokens,
-                cost_usd: None,
-            })
+            .map(
+                |((backend, model), (input_tokens, output_tokens))| BackendUsage {
+                    name: backend,
+                    model,
+                    input_tokens,
+                    output_tokens,
+                    cost_usd: None,
+                },
+            )
             .collect();
 
         // Sort for deterministic output
@@ -157,7 +158,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path = write_trace(
             &tmp,
-            &[r#"{"name":"backend.mock","gen_ai.system":"mock","gen_ai.request.model":"m1","gen_ai.usage.input_tokens":10,"gen_ai.usage.output_tokens":20}"#],
+            &[
+                r#"{"name":"backend.mock","gen_ai.system":"mock","gen_ai.request.model":"m1","gen_ai.usage.input_tokens":10,"gen_ai.usage.output_tokens":20}"#,
+            ],
         );
         let result = TraceReader::aggregate(&path).unwrap();
         assert_eq!(result.len(), 1);
@@ -258,7 +261,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path = write_trace(
             &tmp,
-            &[r#"{"name":"backend.mock","gen_ai.system":"mock","gen_ai.request.model":"m1","gen_ai.usage.input_tokens":10,"gen_ai.usage.output_tokens":20,"error.message":"rate limited"}"#],
+            &[
+                r#"{"name":"backend.mock","gen_ai.system":"mock","gen_ai.request.model":"m1","gen_ai.usage.input_tokens":10,"gen_ai.usage.output_tokens":20,"error.message":"rate limited"}"#,
+            ],
         );
         // Error spans with token usage SHOULD still be counted
         let result = TraceReader::aggregate(&path).unwrap();
@@ -279,7 +284,7 @@ mod tests {
         let result = TraceReader::aggregate(&path);
         assert!(result.is_err());
         match result {
-            Err(TraceReaderError::Parse { line: 1, ..}) => {} // expected
+            Err(TraceReaderError::Parse { line: 1, .. }) => {} // expected
             _ => panic!("expected Parse error on line 1"),
         }
     }
