@@ -373,7 +373,8 @@ impl Strategy for ParallelFanOut {
 
             let aggregate_output_path = aggregated_output_path.clone();
 
-            if let Some(parent) = Path::new(&aggregate_output_path).parent() {
+            let aggregate_output_path = ctx.cwd.join(&aggregate_output_path);
+            if let Some(parent) = aggregate_output_path.parent() {
                 if !parent.as_os_str().is_empty() {
                     fs::create_dir_all(parent).await.map_err(|err| {
                         StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
@@ -387,8 +388,7 @@ impl Strategy for ParallelFanOut {
                 }
             }
 
-            let aggregate_output_path = aggregate_output_path.clone();
-            let aggregate_output_path_ref = aggregate_output_path.as_str();
+            let aggregate_output_path_ref = aggregate_output_path.display().to_string();
             fs::write(&aggregate_output_path, aggregate.text)
                 .await
                 .map_err(|err| {
@@ -425,7 +425,8 @@ impl Strategy for ParallelFanOut {
                     }
                 })?;
 
-            if let Some(parent) = Path::new(&aggregated_output_path).parent() {
+            let aggregate_output_path = ctx.cwd.join(&aggregated_output_path);
+            if let Some(parent) = aggregate_output_path.parent() {
                 if !parent.as_os_str().is_empty() {
                     fs::create_dir_all(parent).await.map_err(|err| {
                         StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
@@ -439,8 +440,8 @@ impl Strategy for ParallelFanOut {
                 }
             }
 
-            let aggregate_output_path_ref = aggregated_output_path.as_str();
-            fs::write(&aggregated_output_path, aggregate.text)
+            let aggregate_output_path_ref = aggregate_output_path.display().to_string();
+            fs::write(&aggregate_output_path, aggregate.text)
                 .await
                 .map_err(|err| {
                     StrategyError::Backend(
@@ -467,6 +468,9 @@ async fn write_branch_output(
     output_path: &str,
     text: &str,
 ) -> Result<(), StrategyError> {
+    if cwd == Path::new(".") {
+        return Ok(());
+    }
     let path = cwd.join(output_path);
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {

@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T06:24:24.357Z'
-  updated_at: '2026-05-03T06:55:49.771Z'
+  updated_at: '2026-05-03T06:57:34.089Z'
 phases:
   discovery:
     status: complete
@@ -59,7 +59,7 @@ phases:
     plan_file: docs/plans/clo-292-phase-runner.md
     approved: true
   implement:
-    status: in_progress
+    status: validating
     commits:
       - a1bd6e3
       - 39cb57a
@@ -68,6 +68,7 @@ phases:
       - 80ddc07
       - 4e8a4d0
       - 653852e
+      - 57908bc
   pr:
     status: pending
   complete:
@@ -206,3 +207,11 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST7 landed: escalating retry recovery and terminal failure marker behavior covered. Commit 653852e'
+  - timestamp: '2026-05-03T06:57:23.057Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST8 landed: make check passed and formatting/clippy cleanup committed. Commit 57908bc'
+  - timestamp: '2026-05-03T06:57:34.089Z'
+    action: implementation_complete
+    phase: implement
+    details: All 8 sub-tasks landed. make check green. 8 commits.
