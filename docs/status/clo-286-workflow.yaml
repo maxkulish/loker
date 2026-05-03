@@ -1,0 +1,162 @@
+task_id: clo-286
+task_type: development
+classification_reason: >-
+  Title starts with 'Implement' and acceptance criteria are mechanical code changes (path layout, producer wiring,
+  attempt counter).
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-286-implement-attempt-directories
+  priority: High
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-03T06:22:03.922Z'
+  updated_at: '2026-05-03T06:45:25.598Z'
+phases:
+  discovery:
+    status: complete
+    problem_framed: true
+    approach_chosen: >-
+      D3 Approach A: canonical path stays at <phase>/<artefact>; attempts/<phase>/<n>/ archives failed attempts.
+      next_attempt() scans both markers and attempt dirs. Manifest populates attempt field. Best-effort latest
+      symlink/pointer.
+    approaches_identified: 1
+    baseline_score: 90
+    discovery_debt: 1
+    discovery_report: docs/run-state.md + issue body + docs/prds/clo-284-phase-status-markers.md
+    prd_created: false
+    prd_exists: false
+    approved: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-286-attempt-directories.md
+    draft_ready: true
+    discovery_context_used: true
+    review_completed: true
+    review_gemini: docs/reviews/clo-286-design-gemini.md
+    review_synthesis: docs/reviews/clo-286-design-synthesis.md
+    review_verdict: approve_with_changes
+    applied_suggestions:
+      - Fix next_attempt_from_dirs off-by-one bug
+      - Add run_state/mod.rs export changes
+      - Add Config/RunStateConfig wiring
+      - Clarify promote_to_canonical uses directory rename
+      - Add Migration/Rollout section
+      - Add Open Questions section
+    flagged_suggestions: []
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-286-attempt-directories.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-03T06:22:03.922Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-286 as development
+  - timestamp: '2026-05-03T06:22:29.644Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: Title starts with 'Implement' and acceptance criteria are mechanical code changes (path
+      layout, producer wiring, attempt counter).
+  - timestamp: '2026-05-03T06:22:29.644Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-03T06:22:31.771Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-03T06:22:44.131Z'
+    action: discovery_started
+    phase: discovery
+    details: Discovery phase entry for clo-286
+  - timestamp: '2026-05-03T06:24:40.159Z'
+    action: problem_framed
+    phase: discovery
+    details: >-
+      Problem framed: implement attempt directory archive per D3 Approach A (canonical stays at <phase>/<artefact>,
+      attempts/ is for failed-debris). Flagged conflict: issue description implies Approach B which D3 rejected.
+  - timestamp: '2026-05-03T06:24:58.776Z'
+    action: discovery_report_complete
+    phase: discovery
+    details: >-
+      PRD exists in issue body + docs/run-state.md (D3). 1 killer assumption: issue description implies Approach B (all
+      attempts under attempts/) but D3 explicitly chose Approach A (canonical at <phase>/<artefact>, attempts/ only for
+      failed debris). Roadmap T-027 confirms: 'Canonical artefact path remains the latest successful one.' Approaches
+      identified: 1 (D3-aligned). Verdict: Ready to Build with reconciliation.
+  - timestamp: '2026-05-03T06:25:13.131Z'
+    action: discovery_approved
+    phase: discovery
+    details: Approved reconciled D3 Approach A. Proceeding to design.
+  - timestamp: '2026-05-03T06:25:33.163Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-03T06:26:09.964Z'
+    action: design_started
+    phase: design
+    details: Beginning design phase for clo-286. No prior design doc exists.
+  - timestamp: '2026-05-03T06:28:05.835Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Design doc created: docs/design-docs/clo-286-attempt-directories.md. AI review skipped (no /design-doc:review
+      available in pi runtime).
+  - timestamp: '2026-05-03T06:36:53.333Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 1 critical fix applied (next_attempt off-by-one), 3 medium items applied
+      (mod.rs exports, config wiring, design note clarification), 2 low items applied (migration section, open
+      questions). External reviewers failed (gemini trust dir, ollama model missing); manual fallback review performed.
+  - timestamp: '2026-05-03T06:37:55.507Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator review approved. No annotations.
+  - timestamp: '2026-05-03T06:38:00.373Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. Doc: docs/designs/clo-286-attempt-directories.md. Review: approve_with_changes (6
+      applied suggestions, 0 flagged).
+  - timestamp: '2026-05-03T06:38:17.049Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-03T06:45:02.235Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-286-attempt-directories.md
+  - timestamp: '2026-05-03T06:45:09.959Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 6 sub-tasks queued. All have concrete acceptance commands, reference real files/modules, pre-merge
+      gate is make check.
+  - timestamp: '2026-05-03T06:45:25.598Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+task_title: Implement attempt directories runs/<id>/attempts/<phase>/<n>/
+task_url: https://linear.app/cloud-ai/issue/CLO-286/implement-attempt-directories

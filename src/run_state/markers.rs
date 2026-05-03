@@ -208,18 +208,30 @@ fn hostname() -> String {
 // Helper: next_attempt
 // ---------------------------------------------------------------------------
 
-/// Derive the next attempt number for a phase by scanning existing started
-/// markers under `markers_dir`.
+/// Derive the next attempt number for a phase by scanning both started
+/// markers and existing attempt directories.
 ///
-/// Returns `0` if no started markers exist for the phase.
+/// Returns `0` if no started markers or attempt dirs exist for the phase.
 /// Returns `max(attempt_numbers) + 1` otherwise (gaps in attempt numbering
 /// do not reduce the counter).
 ///
-/// # TODO(T-027)
-///
-/// When attempt directories land (T-027), consider switching to directory
-/// listing for better performance with many retries.
-pub fn next_attempt(markers_dir: &Path, phase: &str) -> Result<u32, MarkerError> {
+/// Dual-source scanning ensures correctness after a crash between marker
+/// write and attempt directory creation (or vice versa).
+pub fn next_attempt(run_dir: &Path, phase: &str) -> Result<u32, MarkerError> {
+    let markers_dir = run_dir.join("markers");
+    let attempts_dir = run_dir.join("attempts").join(phase);
+
+    let marker_max = next_attempt_from_markers(&markers_dir, phase)?;
+    let dir_max = next_attempt_from_dirs(&attempts_dir)?;
+
+    Ok(std::cmp::max(marker_max, dir_max))
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers for next_attempt
+// ---------------------------------------------------------------------------
+
+fn next_attempt_from_markers(markers_dir: &Path, phase: &str) -> Result<u32, MarkerError> {
     let started_prefix = format!("{}.started.", phase);
     let dir = match std::fs::read_dir(markers_dir) {
         Ok(d) => d,
@@ -228,7 +240,6 @@ pub fn next_attempt(markers_dir: &Path, phase: &str) -> Result<u32, MarkerError>
     };
 
     let mut max_attempt: Option<u32> = None;
-
     for entry in dir {
         let entry = entry?;
         let file_name = entry.file_name();
@@ -238,14 +249,38 @@ pub fn next_attempt(markers_dir: &Path, phase: &str) -> Result<u32, MarkerError>
         if !name.starts_with(&started_prefix) {
             continue;
         }
-        // Read the marker file and extract its attempt number.
         let content = std::fs::read_to_string(entry.path())?;
         let marker: StartedMarker = serde_json::from_str(&content)?;
-        let attempt = marker.attempt;
-        if max_attempt.map_or(true, |m| attempt > m) {
-            max_attempt = Some(attempt);
+        if max_attempt.map_or(true, |m| marker.attempt > m) {
+            max_attempt = Some(marker.attempt);
         }
     }
 
+    Ok(max_attempt.map_or(0, |m| m + 1))
+}
+
+fn next_attempt_from_dirs(attempts_dir: &Path) -> Result<u32, MarkerError> {
+    let dir = match std::fs::read_dir(attempts_dir) {
+        Ok(d) => d,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
+        Err(e) => return Err(e.into()),
+    };
+
+    let mut max_attempt: Option<u32> = None;
+    for entry in dir {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if let Ok(n) = name.parse::<u32>() {
+            if max_attempt.map_or(true, |m| n > m) {
+                max_attempt = Some(n);
+            }
+        }
+    }
+
+    // Same +1 logic as next_attempt_from_markers
     Ok(max_attempt.map_or(0, |m| m + 1))
 }

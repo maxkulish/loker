@@ -130,9 +130,8 @@ fn atomic_rename_tmp_cleaned_after_success() {
 #[test]
 fn next_attempt_zero_markers() {
     let tmp = tempfile::tempdir().unwrap();
-    let markers_dir = tmp.path().join("markers");
     // Don't create the markers directory at all.
-    let n = next_attempt(&markers_dir, "design").unwrap();
+    let n = next_attempt(tmp.path(), "design").unwrap();
     assert_eq!(n, 0, "no markers dir → attempt 0");
 }
 
@@ -140,7 +139,7 @@ fn next_attempt_zero_markers() {
 fn next_attempt_single_marker() {
     let (_tmp, writer) = temp_run_dir();
     writer.write_started("design", 0).unwrap();
-    let n = next_attempt(writer.markers_dir(), "design").unwrap();
+    let n = next_attempt(_tmp.path(), "design").unwrap();
     assert_eq!(n, 1, "one marker at attempt 0 → next is 1");
 }
 
@@ -150,7 +149,7 @@ fn next_attempt_three_markers() {
     writer.write_started("design", 0).unwrap();
     writer.write_started("design", 1).unwrap();
     writer.write_started("design", 2).unwrap();
-    let n = next_attempt(writer.markers_dir(), "design").unwrap();
+    let n = next_attempt(_tmp.path(), "design").unwrap();
     assert_eq!(n, 3, "three markers (0,1,2) → next is 3");
 }
 
@@ -160,7 +159,7 @@ fn next_attempt_with_gaps() {
     // Markers for attempt 0 and 2 (missing 1 → simulates partial cleanup).
     writer.write_started("design", 0).unwrap();
     writer.write_started("design", 2).unwrap();
-    let n = next_attempt(writer.markers_dir(), "design").unwrap();
+    let n = next_attempt(_tmp.path(), "design").unwrap();
     assert_eq!(n, 3, "gaps: max attempt is 2 → next is 3");
 }
 
@@ -231,9 +230,9 @@ fn different_phases_do_not_interfere() {
     writer.write_started("implement", 0).unwrap();
     writer.write_started("review", 0).unwrap();
 
-    let n_design = next_attempt(writer.markers_dir(), "design").unwrap();
-    let n_implement = next_attempt(writer.markers_dir(), "implement").unwrap();
-    let n_review = next_attempt(writer.markers_dir(), "review").unwrap();
+    let n_design = next_attempt(_tmp.path(), "design").unwrap();
+    let n_implement = next_attempt(_tmp.path(), "implement").unwrap();
+    let n_review = next_attempt(_tmp.path(), "review").unwrap();
 
     assert_eq!(n_design, 1);
     assert_eq!(n_implement, 1);
