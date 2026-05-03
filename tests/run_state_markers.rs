@@ -89,7 +89,7 @@ fn marker_roundtrip_failed() {
 
 #[test]
 fn atomic_write_leaves_no_temporary_files_on_success() {
-    // Verify that after a successful atomic write, no .tmp files linger.
+    // Verify that after a successful atomic write, no temporary files are left behind.
     let (_tmp, writer) = temp_run_dir();
     // Write a marker normally.
     writer.write_started("design", 0).unwrap();
