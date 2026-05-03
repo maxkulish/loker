@@ -56,13 +56,18 @@ impl AttemptDir {
                 }
                 Ok(())
             }
-            Err(_e) => {
-                // Fallback: copy tree + remove source.
-                // We do this for any rename error (including CrossesDevices)
-                // to avoid MSRV issues (ErrorKind::CrossesDevices is 1.85+).
-                Self::copy_tree(&self.path, canonical_dir)?;
-                std::fs::remove_dir_all(&self.path)?;
-                Ok(())
+            Err(e) => {
+                // Targeted fallback for cross-device rename only.
+                // We use raw_os_error instead of ErrorKind::CrossesDevices
+                // (stabilised in Rust 1.85) to respect the crate's 1.80 MSRV.
+                #[cfg(unix)]
+                if e.raw_os_error() == Some(18) {
+                    // libc::EXDEV = 18
+                    Self::copy_tree(&self.path, canonical_dir)?;
+                    std::fs::remove_dir_all(&self.path)?;
+                    return Ok(());
+                }
+                Err(e)
             }
         }
     }

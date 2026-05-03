@@ -43,6 +43,8 @@ impl LatestPointer {
             {
                 let latest_link = phase_dir.join("latest");
                 let _ = std::fs::remove_file(&latest_link);
+                // Also remove any stale latest.json from a prior promoted attempt
+                let _ = std::fs::remove_file(phase_dir.join("latest.json"));
                 if std::os::unix::fs::symlink(&target, &latest_link).is_ok() {
                     return Ok(());
                 }
@@ -57,7 +59,9 @@ impl LatestPointer {
             atomic_write(&pointer, body.to_string().as_bytes())?;
             Ok(())
         } else {
-            // Promoted attempt: write latest.json pointing to canonical path
+            // Promoted attempt: write latest.json pointing to canonical path.
+            // Remove any stale symlink first so it doesn't shadow the json.
+            let _ = std::fs::remove_file(phase_dir.join("latest"));
             let pointer = phase_dir.join("latest.json");
             let body = serde_json::json!({
                 "attempt": attempt,
