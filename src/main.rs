@@ -67,6 +67,16 @@ enum Commands {
         no_cache: bool,
     },
 
+    /// Resume a partially-completed run
+    Resume {
+        /// Path to the run directory to resume.
+        run_dir: PathBuf,
+        /// Heartbeat TTL in seconds. Defaults to the value stored in
+        /// heartbeat.json, or 300 if absent. Must match the original run.
+        #[arg(long)]
+        ttl: Option<u64>,
+    },
+
     /// Run a bug hunt on a codebase
     Hunt {
         /// Directory to analyze
@@ -850,6 +860,40 @@ async fn main() -> Result<()> {
             println!("{}", "=".repeat(50).dimmed());
             println!("{}", "Full output saved.".green());
             println!("{}", result);
+        }
+        Commands::Resume { run_dir, ttl } => {
+            use loker::resume::lock::RunLock;
+            use loker::run_state::{read_ttl, RunState};
+
+            let lock = RunLock::acquire(&run_dir)?;
+            let effective_ttl = ttl.unwrap_or_else(|| read_ttl(&run_dir).unwrap_or(300));
+            let swept = loker::resume::sweep::sweep_stale_tmp(&run_dir, effective_ttl)?;
+            if !swept.is_empty() {
+                eprintln!("  swept {} stale tmp files", swept.len());
+            }
+
+            let run_state = RunState::load(&run_dir, effective_ttl)?;
+
+            if let Some(loker::run_state::HeartbeatStatus::Live(ref hb)) =
+                run_state.heartbeat
+            {
+                anyhow::bail!(
+                    "run is already in progress (heartbeat live at {})",
+                    hb.tick_at
+                );
+            }
+
+            println!("Run state loaded for {}", run_dir.display());
+            println!("  phases: {:?}", run_state.phase_status);
+
+            // Phase configs would be derived from workflow here.
+            // For now, print status and exit.
+            if run_state.phase_status.values().all(|s| *s == loker::run_state::PhaseStatus::Completed) {
+                println!("All phases complete — nothing to resume.");
+                return Ok(());
+            }
+
+            drop(lock);
         }
         Commands::Workflow(subcmd) => match subcmd {
             WorkflowCommands::Run {

@@ -1,5 +1,5 @@
-pub(crate) mod lock;
-pub(crate) mod sweep;
+pub mod lock;
+pub mod sweep;
 
 use chrono::{DateTime, Utc};
 
@@ -138,6 +138,78 @@ impl ResumePlanner {
             actions,
             swept_tmp,
         })
+    }
+}
+
+/// Runner that executes a resume plan against a run directory.
+pub struct ResumeRunner {
+    backends: Vec<std::sync::Arc<dyn crate::backend::Backend>>,
+}
+
+impl ResumeRunner {
+    /// Create a new ResumeRunner with the given backends.
+    pub fn new(backends: Vec<std::sync::Arc<dyn crate::backend::Backend>>) -> Self {
+        Self { backends }
+    }
+
+    /// Execute the resume plan. Returns Ok(()) when the run reaches completion
+    /// (either because work was done or because all phases were already done).
+    pub async fn execute(
+        &self,
+        plan: &ResumePlan,
+    ) -> Result<(), ResumeError> {
+        let runner = crate::phase_runner::PhaseRunner::new();
+
+        for (phase_cfg, action) in &plan.actions {
+            match action {
+                PhaseAction::Skip => {
+                    eprintln!("  [resume] skipping '{}': already completed", phase_cfg.phase);
+                }
+                PhaseAction::Resume { attempt } => {
+                    eprintln!(
+                        "  [resume] resuming '{}' at attempt {}",
+                        phase_cfg.phase, attempt
+                    );
+                    archive_current_attempt(&plan.run_dir,
+                        &phase_cfg.phase,
+                        *attempt,
+                    )?;
+                    self.run_phase(&runner, phase_cfg, &plan.run_dir, *attempt)
+                        .await?;
+                }
+                PhaseAction::RunFresh => {
+                    eprintln!("  [resume] running '{}' fresh", phase_cfg.phase);
+                    self.run_phase(&runner, phase_cfg, &plan.run_dir, 0)
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run_phase(
+        &self,
+        runner: &crate::phase_runner::PhaseRunner,
+        cfg: &crate::phase_runner::PhaseConfig,
+        run_dir: &std::path::Path,
+        _attempt: u32,
+    ) -> Result<(), ResumeError> {
+        let ctx = crate::strategy::PhaseContext::new(&cfg.phase,
+            uuid::Uuid::new_v4(),
+        );
+        let prompt = crate::strategy::Prompt::new();
+        let inputs = crate::phase_runner::PhaseInputs {
+            backends: &self.backends,
+            prompt,
+            ctx,
+            verify: None,
+            run_dir: run_dir.to_path_buf(),
+            trace: None,
+        };
+
+        let _outcome = runner.run(cfg, inputs).await?;
+        Ok(())
     }
 }
 
