@@ -169,6 +169,10 @@ pub enum WorkflowError {
     #[error("Phase '{from}' references phase '{to}' which is declared later")]
     ForwardInputRef { from: String, to: String },
 
+    /// Phase references a phase that does not exist in the workflow.
+    #[error("Phase '{from}' references unknown phase '{to}'")]
+    UnknownPhaseRef { from: String, to: String },
+
     /// `ParallelFanOut.min_responses` exceeds the number of backends.
     #[error("ParallelFanOut.min_responses ({min}) exceeds number of backends ({count}) in phase '{phase}'")]
     MinResponsesExceedsBackends {
@@ -213,15 +217,30 @@ pub enum WorkflowError {
 ///
 /// Unknown schemes return `Err`.
 pub fn resolve_backend_scheme(s: &str) -> Result<BackendRef, WorkflowError> {
-    let (scheme, rest) = s.split_once('/').unwrap_or((s, ""));
+    // Require the `<scheme>/<id>` form — no bare "tensorzero" or "claudefoo".
+    let Some((scheme, rest)) = s.split_once('/') else {
+        return Err(WorkflowError::MalformedBackendRef {
+            raw: s.to_string(),
+        });
+    };
     match scheme {
-        "tensorzero" => Ok(BackendRef::TensorZero(rest.to_string())),
+        "tensorzero" => {
+            if rest.is_empty() {
+                Err(WorkflowError::MalformedBackendRef {
+                    raw: s.to_string(),
+                })
+            } else {
+                Ok(BackendRef::TensorZero(rest.to_string()))
+            }
+        }
         "claude" => Ok(BackendRef::Claude),
         "codex" => Ok(BackendRef::Codex),
         "gemini" => Ok(BackendRef::Gemini),
         "ollama" => {
             if rest.is_empty() {
-                Err(WorkflowError::MalformedBackendRef { raw: s.to_string() })
+                Err(WorkflowError::MalformedBackendRef {
+                    raw: s.to_string(),
+                })
             } else {
                 Ok(BackendRef::Ollama(rest.to_string()))
             }
@@ -373,12 +392,14 @@ impl Workflow {
             .collect();
 
         for phase in &self.phases {
-            // Resolve backends (collects UnknownBackendScheme errors)
+            // Resolve backends (collects UnknownBackendScheme / MalformedBackendRef errors)
             let resolved_backends = match Self::resolve_backends(phase) {
                 Ok(b) => b,
                 Err(mut backend_errors) => {
                     errors.append(&mut backend_errors);
-                    continue; // Can't check strategy constraints without resolved backends
+                    // Continue checking inputs even if backends fail —
+                    // only skip strategy constraints that depend on backend count.
+                    Vec::new()
                 }
             };
 
@@ -392,27 +413,29 @@ impl Workflow {
                 }
             };
 
-            // Validate inputs for forward refs
+            // Validate inputs for forward refs and unknown phase refs
             for input in &resolved_inputs {
                 if let InputRef::PhaseRef(target) = input {
-                    // Check if target phase exists
-                    if let Some(&target_idx) = phase_indices.get(target.as_str()) {
-                        let phase_idx = phase_indices
-                            .get(phase.name.as_str())
-                            .copied()
-                            .unwrap_or(usize::MAX);
-                        if target_idx >= phase_idx {
-                            errors.push(WorkflowError::ForwardInputRef {
+                    match phase_indices.get(target.as_str()) {
+                        Some(&target_idx) => {
+                            let phase_idx = phase_indices
+                                .get(phase.name.as_str())
+                                .copied()
+                                .unwrap_or(usize::MAX);
+                            if target_idx >= phase_idx {
+                                errors.push(WorkflowError::ForwardInputRef {
+                                    from: phase.name.clone(),
+                                    to: target.clone(),
+                                });
+                            }
+                        }
+                        None => {
+                            // Target phase does not exist at all
+                            errors.push(WorkflowError::UnknownPhaseRef {
                                 from: phase.name.clone(),
                                 to: target.clone(),
                             });
                         }
-                    } else {
-                        // Target phase doesn't exist at all
-                        errors.push(WorkflowError::ForwardInputRef {
-                            from: phase.name.clone(),
-                            to: target.clone(),
-                        });
                     }
                 }
             }
@@ -517,6 +540,18 @@ mod tests {
     fn test_ollama_missing_model() {
         let err = resolve_backend_scheme("ollama/").unwrap_err();
         assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "ollama/"));
+    }
+
+    #[test]
+    fn test_malformed_backend_no_slash() {
+        let err = resolve_backend_scheme("tensorzero").unwrap_err();
+        assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "tensorzero"));
+    }
+
+    #[test]
+    fn test_malformed_backend_tensorzero_empty_fn() {
+        let err = resolve_backend_scheme("tensorzero/").unwrap_err();
+        assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "tensorzero/"));
     }
 
     // -- Input ref tests --
@@ -687,6 +722,28 @@ output = "analysis.md"
             .iter()
             .any(|e| matches!(e, WorkflowError::ForwardInputRef { from, to }
                 if from == "synthesis" && to == "analysis"
+            )));
+    }
+
+    #[test]
+    fn test_unknown_phase_ref() {
+        // Phase references a phase that doesn't exist at all
+        let toml = r#"
+name = "unknown-phase"
+
+[[phases]]
+name = "synthesis"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "Synthesize"
+inputs = ["phase:nonexistent"]
+output = "synthesis.md"
+"#;
+        let err = toml.parse::<Workflow>().unwrap_err();
+        assert!(err
+            .iter()
+            .any(|e| matches!(e, WorkflowError::UnknownPhaseRef { from, to }
+                if from == "synthesis" && to == "nonexistent"
             )));
     }
 

@@ -25,7 +25,7 @@ fn parse_fixture(name: &str) -> Result<Workflow, Vec<WorkflowError>> {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn byt_for_byte_design_doc_tdd() {
+fn byte_for_byte_design_doc_tdd() {
     let wf = parse_fixture("design-doc-tdd.toml")
         .expect("design-doc-tdd.toml should parse successfully");
 
