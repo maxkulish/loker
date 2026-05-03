@@ -1,5 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -75,8 +74,13 @@ pub struct HeartbeatConfig {
     /// How often to tick.  Default: `ttl_seconds / 3`.
     pub interval_seconds: u64,
 
-    /// Path to the markers directory (heartbeat.json is written here).
-    pub markers_dir: std::path::PathBuf,
+    /// Run directory (`runs/<id>/`). Heartbeat is written to
+    /// `run_dir / heartbeat.json` (per the D3 protocol layout).
+    pub run_dir: PathBuf,
+
+    /// Markers directory (`runs/<id>/markers/`). Derived from `run_dir`
+    /// but overridable for test isolation.
+    pub markers_dir: PathBuf,
 
     /// Process ID of the writer.
     pub writer_pid: u32,
@@ -88,13 +92,18 @@ pub struct HeartbeatConfig {
 impl HeartbeatConfig {
     /// Create a config with defaults.
     ///
+    /// `run_dir` is the run root (`runs/<id>/`). `markers_dir` defaults
+    /// to `run_dir / "markers"`. Heartbeat is written to
+    /// `run_dir / "heartbeat.json"` per the D3 protocol.
+    ///
     /// `ttl_seconds` defaults to 300; `interval_seconds` defaults to
     /// `ttl_seconds / 3` (every 100s for a 300s TTL).
-    pub fn new(markers_dir: std::path::PathBuf) -> Self {
+    pub fn new(run_dir: PathBuf) -> Self {
         Self {
             ttl_seconds: 300,
             interval_seconds: 100,
-            markers_dir,
+            markers_dir: run_dir.join("markers"),
+            run_dir,
             writer_pid: std::process::id(),
             writer_host: hostname(),
         }
@@ -106,11 +115,12 @@ impl HeartbeatConfig {
 // ---------------------------------------------------------------------------
 
 /// Spawnable heartbeat writer that periodically writes a heartbeat file
-/// under `markers_dir / heartbeat.json`.
+/// at `config.run_dir / "heartbeat.json"`.
 ///
-/// The task runs until:
-/// - The returned `JoinHandle` is dropped/cancelled, or
-/// - The markers directory is deleted (exit silently).
+/// The task runs until the returned `JoinHandle` is aborted or the markers
+/// directory is deleted (exit silently). Note that dropping the
+/// `JoinHandle` only detaches the task — callers must call `.abort()` on
+/// the handle to stop the heartbeat loop.
 pub struct HeartbeatWriter;
 
 impl HeartbeatWriter {
@@ -119,20 +129,19 @@ impl HeartbeatWriter {
     ///
     /// Each tick:
     /// 1. Builds a `HeartbeatBody` with the current time.
-    /// 2. Atomically writes it to `markers_dir / heartbeat.json`.
+    /// 2. Atomically writes it to `run_dir / heartbeat.json`.
     /// 3. Logs a warning on write failure and continues (a missed
     ///    heartbeat is not fatal — 2 more ticks must be missed before
     ///    staleness).
     /// 4. Exits silently if the markers directory is deleted.
+    ///
+    /// To stop the task, call `.abort()` on the returned `JoinHandle`.
     pub fn spawn(config: HeartbeatConfig) -> tokio::task::JoinHandle<()> {
         let interval_secs = config.interval_seconds;
         let markers_dir = config.markers_dir.clone();
+        let heartbeat_path = config.run_dir.join("heartbeat.json");
         let writer_pid = config.writer_pid;
         let writer_host = config.writer_host;
-
-        // Running flag for external shutdown signalling.
-        let running = Arc::new(AtomicBool::new(true));
-        let running_clone = running.clone();
 
         tokio::spawn(async move {
             // Ensure the markers directory exists.
@@ -141,11 +150,10 @@ impl HeartbeatWriter {
                 return;
             }
 
-            let heartbeat_path = markers_dir.join("heartbeat.json");
             let mut ticker = interval(Duration::from_secs(interval_secs));
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-            while running_clone.load(Ordering::Relaxed) {
+            loop {
                 ticker.tick().await;
 
                 // Check if the markers directory still exists.

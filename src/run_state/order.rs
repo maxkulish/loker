@@ -43,8 +43,9 @@ impl fmt::Display for PhaseState {
 /// # Panics
 ///
 /// In debug builds, invalid transitions cause a panic. In release builds the
-/// transition is silently ignored and a `tracing::warn!` message is emitted
-/// (if the `tracing` crate is enabled; currently falls back to `eprintln!`).
+/// transition is silently ignored and an error message is emitted via
+/// `eprintln!` (for now; the `tracing` crate integration is deferred to
+/// T-029).
 ///
 /// # Design note
 ///

@@ -278,15 +278,14 @@ fn phase_order_guard_invalid_skip() {
 #[tokio::test]
 async fn heartbeat_file_gets_created_and_contains_valid_json() {
     let tmp = tempfile::tempdir().unwrap();
-    let markers_dir = tmp.path().join("markers");
 
-    let config = HeartbeatConfig::new(markers_dir.clone());
+    let config = HeartbeatConfig::new(tmp.path().to_path_buf());
     let _handle = HeartbeatWriter::spawn(config);
 
     // Give the task time to create the directory and write one tick.
     tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
-    let heartbeat_path = markers_dir.join("heartbeat.json");
+    let heartbeat_path = tmp.path().join("heartbeat.json");
     assert!(
         heartbeat_path.exists(),
         "heartbeat file should exist after a tick"
@@ -301,17 +300,16 @@ async fn heartbeat_file_gets_created_and_contains_valid_json() {
 #[tokio::test]
 async fn heartbeat_file_updated_on_subsequent_ticks() {
     let tmp = tempfile::tempdir().unwrap();
-    let markers_dir = tmp.path().join("markers");
 
     // Use a very short interval so we get multiple ticks quickly.
-    let mut config = HeartbeatConfig::new(markers_dir.clone());
+    let mut config = HeartbeatConfig::new(tmp.path().to_path_buf());
     config.interval_seconds = 1; // 1 second
     let _handle = HeartbeatWriter::spawn(config);
 
     // Wait long enough for 2 ticks.
     tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
 
-    let heartbeat_path = markers_dir.join("heartbeat.json");
+    let heartbeat_path = tmp.path().join("heartbeat.json");
     assert!(heartbeat_path.exists());
 
     let content = std::fs::read_to_string(&heartbeat_path).unwrap();

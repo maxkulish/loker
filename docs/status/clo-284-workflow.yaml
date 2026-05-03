@@ -20,10 +20,10 @@ linear:
   priority: High
   branch_actual: feat/clo-284-phase-status-markers
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-02T14:06:19.560Z'
-  updated_at: '2026-05-02T17:16:04.866Z'
+  updated_at: '2026-05-02T17:27:40.085Z'
 phases:
   discovery:
     status: complete
@@ -64,7 +64,7 @@ phases:
     plan_file: docs/plans/clo-284-plan.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - 2b228a6
       - b2b914b
@@ -72,8 +72,19 @@ phases:
       - 2dd6624
       - 6d8cdca
       - 71aee95
+      - 31dbe42
+    codex_report: docs/reviews/clo-284-codex-validation.md
+    codex_validated: true
+    codex_verdict: rework
+    gemini_validation_report: docs/reviews/clo-284-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-284-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 32
+    pr_url: https://github.com/maxkulish/loker/pull/32
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -169,5 +180,27 @@ history:
     details: >-
       All 5 sub-tasks landed. make check green. 6 commits: ST1 (atomic_write extraction), ST2 (MarkerWriter), ST3
       (PhaseOrderGuard), ST4 (HeartbeatWriter), ST5 (finalize). Ready for validation gate.
+  - timestamp: '2026-05-02T17:24:01.113Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (superseded by fix). Gemini: approve_with_changes. Synthesis: approve_with_changes. 1 fix iteration
+      applied (clippy + test rename). make check green.
+  - timestamp: '2026-05-02T17:24:13.431Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-02T17:25:05.315Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-02T17:25:38.530Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #32 opened: https://github.com/maxkulish/loker/pull/32'
+  - timestamp: '2026-05-02T17:27:40.085Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: clippy, format, test'
 task_title: Implement phase status markers (started/completed/failed) with atomic write
 task_url: https://linear.app/cloud-ai/issue/CLO-284/implement-phase-status-markers-startedcompletedfailed-with-atomic
