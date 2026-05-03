@@ -229,10 +229,11 @@ If noise/garbage: {"status": "fail", "reason": "<one-line reason>"}
 [[steps]]
 name = "claude_fallback"
 backend = "claude"
-timeout = 180000
+timeout = 600000
 retries = 2
 continue_on_error = true
 depends_on = ["codex_review", "gemini_review"]
+min_deps_success = 0
 when = "not steps.codex_review.success and not steps.gemini_review.success"
 prompt = """
 Both external reviewers (Codex and Gemini) failed. You are the fallback pre-PR validator for **loker** — a Rust CLI for multi-LLM orchestration.
@@ -268,6 +269,7 @@ approve | approve_with_changes | rework
 [[steps]]
 name = "synthesis"
 backend = "claude"
+timeout = 600000
 retries = 3
 depends_on = ["codex_review", "gemini_review", "claude_fallback"]
 min_deps_success = 0

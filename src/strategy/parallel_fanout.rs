@@ -124,6 +124,7 @@ impl Strategy for ParallelFanOut {
         let is_any_fail = matches!(self.aggregator, Aggregator::AnyFail);
         let is_llm_judge = matches!(self.aggregator, Aggregator::LLMJudge { .. });
         let is_vote = matches!(self.aggregator, Aggregator::Vote { .. });
+        let is_all_pass = matches!(self.aggregator, Aggregator::AllPass);
 
         while let Some((idx, result)) = futures.next().await {
             let target = &self.targets[idx];
@@ -137,6 +138,7 @@ impl Strategy for ParallelFanOut {
                         .unwrap_or_default();
                     let model = pick_model_override(&query, prompt, target);
                     let output_path = format!("{}/attempts/{}-parallel.txt", ctx.phase_name, idx);
+                    write_branch_output(&ctx.cwd, &output_path, &query.stdout).await?;
 
                     if is_any_fail {
                         if let Err(reason) = crate::aggregator::any_fail_evaluate(&query.stdout) {
@@ -198,7 +200,11 @@ impl Strategy for ParallelFanOut {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    if !is_any_fail && !is_llm_judge && !is_vote && successes >= self.min_responses
+                    if !is_any_fail
+                        && !is_llm_judge
+                        && !is_vote
+                        && !is_all_pass
+                        && successes >= self.min_responses
                     {
                         // For non-LLMJudge / non-Vote aggregation modes, stop once enough
                         // successes are in to meet the configured floor.
@@ -372,7 +378,8 @@ impl Strategy for ParallelFanOut {
 
             let aggregate_output_path = aggregated_output_path.clone();
 
-            if let Some(parent) = Path::new(&aggregate_output_path).parent() {
+            let aggregate_output_path = ctx.cwd.join(&aggregate_output_path);
+            if let Some(parent) = aggregate_output_path.parent() {
                 if !parent.as_os_str().is_empty() {
                     fs::create_dir_all(parent).await.map_err(|err| {
                         StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
@@ -386,8 +393,7 @@ impl Strategy for ParallelFanOut {
                 }
             }
 
-            let aggregate_output_path = aggregate_output_path.clone();
-            let aggregate_output_path_ref = aggregate_output_path.as_str();
+            let aggregate_output_path_ref = aggregate_output_path.display().to_string();
             fs::write(&aggregate_output_path, aggregate.text)
                 .await
                 .map_err(|err| {
@@ -424,7 +430,8 @@ impl Strategy for ParallelFanOut {
                     }
                 })?;
 
-            if let Some(parent) = Path::new(&aggregated_output_path).parent() {
+            let aggregate_output_path = ctx.cwd.join(&aggregated_output_path);
+            if let Some(parent) = aggregate_output_path.parent() {
                 if !parent.as_os_str().is_empty() {
                     fs::create_dir_all(parent).await.map_err(|err| {
                         StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
@@ -438,8 +445,8 @@ impl Strategy for ParallelFanOut {
                 }
             }
 
-            let aggregate_output_path_ref = aggregated_output_path.as_str();
-            fs::write(&aggregated_output_path, aggregate.text)
+            let aggregate_output_path_ref = aggregate_output_path.display().to_string();
+            fs::write(&aggregate_output_path, aggregate.text)
                 .await
                 .map_err(|err| {
                     StrategyError::Backend(
@@ -461,6 +468,36 @@ impl Strategy for ParallelFanOut {
 
 /// Build the `model` field that lands in an attempt, applying the priority:
 /// backend-reported > target.model > prompt.model > "default".
+async fn write_branch_output(
+    cwd: &Path,
+    output_path: &str,
+    text: &str,
+) -> Result<(), StrategyError> {
+    if cwd == Path::new(".") {
+        return Ok(());
+    }
+    let path = cwd.join(output_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).await.map_err(|err| {
+                StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                    message: format!(
+                        "failed to create branch output parent {}: {err}",
+                        parent.display()
+                    ),
+                    exit_code: None,
+                })
+            })?;
+        }
+    }
+    fs::write(&path, text).await.map_err(|err| {
+        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+            message: format!("failed to write branch output {}: {err}", path.display()),
+            exit_code: None,
+        })
+    })
+}
+
 fn pick_model_override(query: &QueryOutput, prompt: &Prompt, target: &TargetSpec) -> String {
     query
         .model

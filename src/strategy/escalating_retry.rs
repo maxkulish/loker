@@ -20,6 +20,7 @@ use crate::strategy::{
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 
 /// 4 KiB excerpt fits inside an 8 KiB envelope while leaving headroom for
@@ -332,6 +333,7 @@ impl Strategy for EscalatingRetry {
                 .await
             {
                 Ok(query) => {
+                    write_strategy_output(&ctx.cwd, &output_path, &query.stdout).await?;
                     let usage = query
                         .usage
                         .as_ref()
@@ -459,6 +461,33 @@ impl Strategy for EscalatingRetry {
             output: Box::new(exhausted),
         })
     }
+}
+
+async fn write_strategy_output(
+    cwd: &Path,
+    output_path: &str,
+    text: &str,
+) -> Result<(), StrategyError> {
+    if cwd == Path::new(".") {
+        return Ok(());
+    }
+    let path = cwd.join(output_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            tokio::fs::create_dir_all(parent).await.map_err(|err| {
+                StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                    message: format!("failed to create output parent {}: {err}", parent.display()),
+                    exit_code: None,
+                })
+            })?;
+        }
+    }
+    tokio::fs::write(&path, text).await.map_err(|err| {
+        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+            message: format!("failed to write strategy output {}: {err}", path.display()),
+            exit_code: None,
+        })
+    })
 }
 
 #[cfg(test)]

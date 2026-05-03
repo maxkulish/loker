@@ -180,8 +180,10 @@ pub enum FinalStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Aggregator {
+    First,
     Concat,
     AnyFail,
+    AllPass,
     Vote,
     LLMJudge,
 }
@@ -189,8 +191,10 @@ pub enum Aggregator {
 impl Aggregator {
     pub fn as_str(&self) -> &'static str {
         match self {
+            Self::First => "first",
             Self::Concat => "concat",
             Self::AnyFail => "any_fail",
+            Self::AllPass => "all_pass",
             Self::Vote => "vote",
             Self::LLMJudge => "llm_judge",
         }
