@@ -42,10 +42,23 @@
 ## False Positives / Tooling Artifacts
 - Codex claimed "16 failed tests" in its sandbox. Local `make check` passes with 0 failures across all test suites. This was a tooling/environment artifact.
 
-## Recommendation
-Apply the one permitted fix iteration covering S1-S5. The branch architecture is sound; the issues are surface-level correctness, API cleanup, and test/docs gaps. After fixes and a green `make check`, proceed to PR.
+## Re-validation (post-fix iteration)
 
-## Verdict
+Fix iteration applied on commit `ee46fcf`. Re-running `make check`:
+- `cargo fmt` clean
+- `cargo clippy -D warnings` clean
+- `cargo test` all suites pass (0 failures)
+
+All "Must Fix Before PR" items from the synthesis have been addressed:
+- S1: `.completed` marker parsing now propagates IO/JSON errors; orphan sweep only enabled on successful parse.
+- S2: Dead `LoadError` variants (`StaleWriter`, `LiveWriter`) removed; `HeartbeatStatus::Missing` removed; design doc updated.
+- S3: `Heartbeat` re-exported from `src/run_state/mod.rs`.
+- S4: Phase status precedence fully tested (`Failed` over `Started`, `Completed` over `Failed`); `RunState` has rustdoc.
+- S5: `status_from_heartbeat` helper used inline; orphan log has `WARN:` prefix and TODO; path formatting consistent; unnecessary clone removed.
+
+No new issues introduced.
+
+## Final Verdict
 approve_with_changes
 
 One fix iteration addresses all identified issues. No design pivot required.
