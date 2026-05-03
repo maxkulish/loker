@@ -5,14 +5,12 @@ use crate::run_state::atomic_write;
 
 /// Best-effort convenience pointer to the latest attempt.
 ///
-/// On Unix, creates a symlink `run_dir/<phase>/latest`.
-/// - If the attempt directory still exists (in-progress or failed), the target
-///   is `../attempts/<phase>/<n>/`.
-/// - If the attempt was promoted to canonical, the target is `./` (the
-///   canonical phase directory itself).
-///
-/// If symlinks are unavailable (Windows without privileges, or the call fails),
-/// falls back to writing a `latest.json` pointer file with the same metadata.
+/// - If the attempt directory still exists (in-progress or failed) and
+///   symlinks are supported, creates `run_dir/<phase>/latest` pointing to
+///   `../attempts/<phase>/<n>/`.
+/// - If the attempt was promoted to canonical, writes `latest.json` with
+///   the canonical path to avoid self-referential symlinks.
+/// - Falls back to `latest.json` on all platforms where symlinks fail.
 pub struct LatestPointer;
 
 impl LatestPointer {
@@ -31,47 +29,44 @@ impl LatestPointer {
         std::fs::create_dir_all(&phase_dir)?;
 
         // If the attempt dir still exists (in-progress or failed), point to it.
-        // If it was promoted, point to the canonical phase directory itself.
+        // If it was promoted, write latest.json with the canonical path instead
+        // of creating a self-referential symlink.
         let attempt_dir = run_dir
             .join("attempts")
             .join(phase)
             .join(attempt.to_string());
-        let target: PathBuf = if attempt_dir.exists() {
-            PathBuf::from(format!("../attempts/{phase}/{attempt}/"))
-        } else {
-            PathBuf::from(".")
-        };
 
-        // Best-effort symlink on Unix
-        #[cfg(unix)]
-        {
-            let latest_link = phase_dir.join("latest");
-            let _ = std::fs::remove_file(&latest_link);
-            match std::os::unix::fs::symlink(&target, &latest_link) {
-                Ok(()) => return Ok(()),
-                Err(e) => {
-                    eprintln!(
-                        "warn: symlink latest for {phase} attempt {attempt} failed: {e}, \
-                         falling back to latest.json"
-                    );
+        if attempt_dir.exists() {
+            let target = PathBuf::from(format!("../attempts/{phase}/{attempt}/"));
+            // Best-effort symlink on Unix
+            #[cfg(unix)]
+            {
+                let latest_link = phase_dir.join("latest");
+                let _ = std::fs::remove_file(&latest_link);
+                if std::os::unix::fs::symlink(&target, &latest_link).is_ok() {
+                    return Ok(());
                 }
             }
-        }
-
-        // Fallback (non-Unix or symlink failed): write latest.json
-        let pointer = phase_dir.join("latest.json");
-        let path_str = if attempt_dir.exists() {
-            format!("attempts/{phase}/{attempt}/")
+            // Symlink failed or non-Unix: write fallback JSON
+            let pointer = phase_dir.join("latest.json");
+            let body = serde_json::json!({
+                "attempt": attempt,
+                "path": format!("attempts/{phase}/{attempt}/"),
+                "updated_at": chrono::Utc::now().to_rfc3339(),
+            });
+            atomic_write(&pointer, body.to_string().as_bytes())?;
+            Ok(())
         } else {
-            format!("{phase}/")
-        };
-        let body = serde_json::json!({
-            "attempt": attempt,
-            "path": path_str,
-            "updated_at": chrono::Utc::now().to_rfc3339(),
-        });
-        atomic_write(&pointer, body.to_string().as_bytes())?;
-        Ok(())
+            // Promoted attempt: write latest.json pointing to canonical path
+            let pointer = phase_dir.join("latest.json");
+            let body = serde_json::json!({
+                "attempt": attempt,
+                "path": format!("{phase}/"),
+                "updated_at": chrono::Utc::now().to_rfc3339(),
+            });
+            atomic_write(&pointer, body.to_string().as_bytes())?;
+            Ok(())
+        }
     }
 
     /// Resolve the latest pointer for `phase`.

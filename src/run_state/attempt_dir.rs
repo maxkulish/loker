@@ -35,25 +35,35 @@ impl AttemptDir {
     /// Atomically promote the attempt directory to the canonical phase path.
     ///
     /// On the same filesystem this is a single `rename(2)` — atomic and
-    /// crash-safe.  If the source and destination are on different devices
-    /// (should not happen inside a single run directory, but we guard against
-    /// it) we fall back to a recursive copy + remove.
+    /// crash-safe.  If the rename fails for any reason (e.g. cross-device),
+    /// we fall back to a recursive copy + remove.
     pub fn promote_to_canonical(&self, canonical_dir: &Path) -> io::Result<()> {
         // Ensure canonical parent exists
-        if let Some(parent) = canonical_dir.parent() {
-            std::fs::create_dir_all(parent)?;
+        let parent = canonical_dir.parent();
+        if let Some(p) = parent {
+            std::fs::create_dir_all(p)?;
         }
 
         // Try atomic rename first
         match std::fs::rename(&self.path, canonical_dir) {
-            Ok(()) => Ok(()),
-            #[allow(clippy::incompatible_msrv)]
-            Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
+            Ok(()) => {
+                // D3 durability: fsync the parent directory after rename
+                #[cfg(unix)]
+                if let Some(p) = parent {
+                    if let Ok(dir) = std::fs::File::open(p) {
+                        let _ = dir.sync_all();
+                    }
+                }
+                Ok(())
+            }
+            Err(_e) => {
+                // Fallback: copy tree + remove source.
+                // We do this for any rename error (including CrossesDevices)
+                // to avoid MSRV issues (ErrorKind::CrossesDevices is 1.85+).
                 Self::copy_tree(&self.path, canonical_dir)?;
                 std::fs::remove_dir_all(&self.path)?;
                 Ok(())
             }
-            Err(e) => Err(e),
         }
     }
 
