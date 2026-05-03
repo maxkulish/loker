@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T06:24:24.357Z'
-  updated_at: '2026-05-03T06:48:05.469Z'
+  updated_at: '2026-05-03T06:51:08.553Z'
 phases:
   discovery:
     status: complete
@@ -62,6 +62,7 @@ phases:
     status: in_progress
     commits:
       - a1bd6e3
+      - 39cb57a
   pr:
     status: pending
   complete:
@@ -176,3 +177,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST1 landed: extended aggregator vocabulary with First/AllPass schema labels and behavior. Commit a1bd6e3'
+  - timestamp: '2026-05-03T06:51:08.553Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: added PhaseRunner public API shell, dispatch/persist modules, and lib exports. Commit 39cb57a'
