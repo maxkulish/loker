@@ -9,6 +9,7 @@ pub mod aggregator;
 pub mod backend;
 pub mod family;
 pub mod manifest;
+pub mod phase_runner;
 pub mod run_state;
 pub mod strategy;
 pub mod template;
@@ -23,3 +24,8 @@ mod role;
 mod utils;
 mod workflow;
 mod workflows;
+
+pub use phase_runner::{
+    AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRunner, PhaseRung,
+    StrategyName, VerifyHookName,
+};
