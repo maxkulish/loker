@@ -89,8 +89,7 @@ fn marker_roundtrip_failed() {
 
 #[test]
 fn atomic_write_leaves_no_temporary_files_on_success() {
-    // Simulate a crash after tmp write but before rename completes.
-    // The final marker path should not exist.
+    // Verify that after a successful atomic write, no .tmp files linger.
     let (_tmp, writer) = temp_run_dir();
     // Write a marker normally.
     writer.write_started("design", 0).unwrap();
