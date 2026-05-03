@@ -4,6 +4,7 @@ pub(crate) mod heartbeat;
 pub(crate) mod latest;
 pub(crate) mod markers;
 pub(crate) mod order;
+pub(crate) mod run_dir;
 
 pub mod load;
 
@@ -16,3 +17,4 @@ pub use markers::{
     next_attempt, CompletedMarker, FailedMarker, MarkerError, MarkerWriter, StartedMarker,
 };
 pub use order::{PhaseOrderGuard, PhaseState};
+pub use run_dir::{RunDir, RunDirError};

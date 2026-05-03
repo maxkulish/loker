@@ -27,6 +27,7 @@ mod workflows;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use loker::run_state::RunDir;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
@@ -1177,6 +1178,16 @@ async fn run_workflow(
     wf.validate_with_capabilities(crate::backend::capabilities_for_name)?;
 
     let cwd = crate::utils::canonicalize_async(dir).await;
+
+    // Create a RunDir for this workflow execution
+    let run_dir = RunDir::create(&cwd, name)
+        .with_context(|| format!("failed to create run directory for '{}'", name))?;
+    println!(
+        "{} Run directory: {}",
+        "✓".green(),
+        run_dir.path().display()
+    );
+
     let runner = workflow::WorkflowRunner::new(config.clone(), cwd, args)
         .with_explain_validation(explain_validation);
 
