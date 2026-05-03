@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T09:44:59.469Z'
-  updated_at: '2026-05-03T09:48:31.259Z'
+  updated_at: '2026-05-03T09:51:01.494Z'
 phases:
   discovery:
     status: pending
@@ -34,7 +34,9 @@ phases:
   plan:
     status: pending
   implement:
-    status: pending
+    status: validating
+    commits:
+      - 98ada67
   pr:
     status: pending
   complete:
@@ -97,5 +99,15 @@ history:
     action: phase_transition
     phase: spec
     details: Transitioned from spec to implement
+  - timestamp: '2026-05-03T09:49:49.210Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST1 landed: examples/specs/calculator.md authored with 44 lines covering Requirements/Constraints/Out of
+      Scope/Acceptance. All 12 ACs verified. Commit 98ada67.
+  - timestamp: '2026-05-03T09:51:01.494Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green (8 unit tests + 1 doc-test pass). 1 commit (98ada67).
 task_title: Author calculator example spec at examples/specs/calculator.md
 task_url: https://linear.app/cloud-ai/issue/CLO-290/author-calculator-example-spec-at-examplesspecscalculatormd

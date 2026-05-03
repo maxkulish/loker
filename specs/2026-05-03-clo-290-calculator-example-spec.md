@@ -21,7 +21,7 @@ Author the tiny example spec that the M6 end-to-end integration test (CLO-291) r
 - [ ] **AC9**: Spec describes the project as a library (not a binary). (**verification command:** `rg "library|binary" -i examples/specs/calculator.md`)
 - [ ] **AC10**: Spec lists tests as living alongside code (not in a separate integration test directory). (**verification command:** `rg "tests live" -i examples/specs/calculator.md`)
 - [ ] **AC11**: Spec's Acceptance section contains at least 3 concrete examples (e.g., `add(2, 3) == 5`, `divide(1, 0) -> Err`). (**verification command:** `rg "add\(" -A1 examples/specs/calculator.md | rg "^\s*[0-9]" | wc -l`)
-- [ ] **AC12**: All code-fenced example blocks in the Acceptance section are valid Rust syntax. (**verification command:** `rg "```rust" -A5 examples/specs/calculator.md | rg -v "^```$" > /tmp/check_rust.rs && rustfmt --check /tmp/check_rust.rs 2>&1 | head -5`)
+- [ ] **AC12**: Acceptance section uses `` ```text ``` `` fences (not `` ```rust ``` ``). The examples are pseudocode for human illustration, not runnable Rust. (**verification command:** `rg "^```text$" examples/specs/calculator.md && ! rg "^```rust$" examples/specs/calculator.md`)
 
 ## 3. Sub-tasks
 

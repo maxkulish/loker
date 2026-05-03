@@ -37,7 +37,7 @@ add(2, 3) == 5
 add(-1, 1) == 0
 subtract(10, 4) == 6
 multiply(3, 7) == 21
-divide(10, 2) == 5.0
+divide(10, 2) == 5
 divide(7.0, 2.0) == 3.5
 divide(1, 0) -> Err(DivisionByZero)
 ```
