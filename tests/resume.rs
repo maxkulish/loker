@@ -4,13 +4,8 @@ use std::path::Path;
 use chrono::{Duration, Utc};
 use loker::manifest::{Kind, Manifest, ManifestEntry, Producer};
 use loker::phase_runner::PhaseConfig;
-use loker::resume::{
-    archive_current_attempt, PhaseAction, ResumeError, ResumePlanner, ResumeRunner,
-};
-use loker::run_state::{
-    read_ttl, CompletedMarker, FailedMarker, HeartbeatBody, HeartbeatConfig, HeartbeatWriter,
-    MarkerWriter, PhaseStatus, RunState,
-};
+use loker::resume::{PhaseAction, ResumePlanner};
+use loker::run_state::{CompletedMarker, HeartbeatBody, PhaseStatus, RunState};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,31 +74,12 @@ fn write_started_marker(tmp: &Path, phase: &str, attempt: u32) {
     .unwrap();
 }
 
-fn write_failed_marker(tmp: &Path, phase: &str, attempts_made: u32) {
-    let marker = FailedMarker {
-        phase: phase.to_string(),
-        attempts_made,
-        failed_at: Utc::now(),
-        error_class: "test".to_string(),
-        last_attempt_path: format!("attempts/{phase}/{}", attempts_made),
-    };
-    fs::write(
-        tmp.join("markers").join(format!("{phase}.failed")),
-        serde_json::to_string_pretty(&marker).unwrap(),
-    )
-    .unwrap();
-}
-
 fn make_phase_cfgs() -> Vec<PhaseConfig> {
     vec![
         PhaseConfig::single("design", "openai", "do design", "design.md"),
         PhaseConfig::single("review", "openai", "do review", "review.md"),
         PhaseConfig::single("verify", "openai", "do verify", "verify.json"),
     ]
-}
-
-fn fake_backends() -> Vec<std::sync::Arc<dyn loker::backend::Backend>> {
-    vec![]
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +117,7 @@ fn resume_kill_mid_phase_2() {
     let plan = ResumePlanner::plan(tmp.path(), &run_state, &phases, swept).unwrap();
 
     assert_eq!(plan.actions[0].1, PhaseAction::Skip);
-    assert_eq!(plan.actions[1].1, PhaseAction::Resume { attempt: 2 });
+    assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 2 });
     assert_eq!(plan.actions[2].1, PhaseAction::RunFresh);
 }
 
@@ -258,6 +234,6 @@ fn resume_stale_writer() {
     // Stale tmp swept (tested)
     // Phase 2 resumed at attempt 2
     assert_eq!(plan.actions[0].1, PhaseAction::Skip);
-    assert_eq!(plan.actions[1].1, PhaseAction::Resume { attempt: 2 });
+    assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 2 });
     assert_eq!(plan.actions[2].1, PhaseAction::RunFresh);
 }

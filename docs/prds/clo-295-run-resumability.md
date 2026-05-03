@@ -2,41 +2,45 @@
 
 ## Goal
 
-`loker resume <run-dir>` continues a partially-completed run by reading status markers + manifest, skipping already-completed phases, and re-running the last in-flight phase from a fresh attempt directory. No bespoke resume state — all source-of-truth lives on disk.
+CLO-295 delivers the **resume planner + disk-state scaffolding** for run resumability: `loker resume <run-dir>` validates on-disk state (markers, manifest, heartbeat), sweeps stale tmp, acquires advisory lock, and produces a `ResumePlan` that decides Skip / Resume / RunFresh per phase. The actual execution wiring (`ResumeRunner` driving `PhaseRunner` end-to-end) is intentionally deferred to a follow-up issue because it requires resolving how `PhaseConfig` is derived from a persisted workflow.
 
 ## In Scope
 
-1. **`loker resume <run-dir>`** CLI subcommand.
+1. **`loker resume <run-dir>`** hidden CLI subcommand (state validation + planning only; execution deferred).
 2. **Resume planner**: scan markers; phases with `<phase>.completed` are skipped; the first phase without `completed` becomes the resume point.
-3. **Stale-writer detection via heartbeat** (CLO-284): if heartbeat is fresh, refuse to resume with `RunInProgress` error; if stale, take over and start a new attempt.
+3. **Stale-writer detection via heartbeat** (CLO-284): if heartbeat is fresh, refuse to resume with `RunInProgress` error; if stale, take over.
 4. **Manifest verification** for completed phases (sha256 match) before trusting them; surface `ArtefactCorrupt` / `ArtefactMissing` from CLO-285.
-5. **Run-level executor**: walks workflow phases in order, calling `PhaseRunner` only for phases not already completed; passes upstream artefacts through manifest entries.
-6. **Idempotency**: resuming an already-finished run is a no-op that logs "all phases complete" and exits 0.
-7. **TDD test contract** in `tests/resume.rs` covering the 5 scenarios below.
-8. **Advisory lock file** (`runs/<id>/.lock`) for concurrent-writer detection (row 14 of D3 kill matrix).
-9. **Stale tmp sweep**: on resume, move any `*.tmp` files older than heartbeat TTL to `attempts/_orphan_tmp/<timestamp>/`.
+5. **Advisory lock file** (`runs/<id>/.lock`) for concurrent-writer detection (row 14 of D3 kill matrix).
+6. **Stale tmp sweep**: on resume, move any `*.tmp` files older than heartbeat TTL to `attempts/_orphan_tmp/<timestamp>/`.
+7. **Archive operation**: atomic rename of current attempt to `attempts/<phase>/<n>/`.
+8. **Heartbeat TTL persistence**: `heartbeat.json` stores `ttl_seconds` so resume reads the exact TTL used by the original run.
+9. **TDD test contract** in `tests/resume.rs` covering the 5 planner scenarios below.
 
-## Out of Scope (post-v0)
+## Out of Scope (follow-up issue)
 
+- `ResumeRunner::execute()` wiring that calls `PhaseRunner::run()` for each non-Skip phase.
+- Deriving `Vec<PhaseConfig>` from a persisted workflow at resume time.
 - `loker resume --from <phase>` (manual rewind).
 - Multi-run-dir batch resume.
 - Cross-host coordination beyond heartbeat + advisory lock.
 
 ## Acceptance Criteria
 
-- Resume produces an outcome bit-identical to a fresh run when no flakes occur (modulo timestamps in `trace.jsonl`).
+- `ResumePlanner::plan()` correctly classifies every phase as Skip / Resume / RunFresh for all 5 TDD scenarios.
+- `RunState::load()` + heartbeat TTL recovery + advisory lock + stale tmp sweep work together without race conditions.
+- Hidden CLI subcommand validates state and either exits 0 (all complete) or prints a clear "execution not yet implemented" message.
 - No state file beyond markers + manifest + heartbeat.
 - `make check` clean (clippy, test, fmt).
 
 ## TDD Test Contract
 
-`tests/resume.rs` must include:
+`tests/resume.rs` validates the **planner decisions** for 5 scenarios (execution wiring is follow-up):
 
-1. **Kill mid-phase-2**: 3-phase workflow, kill mid-phase-2. Resume re-runs phase 2 in a new attempt dir, phase 3 then runs, manifest gains exactly the new entries.
-2. **Already complete**: 3-phase workflow, kill after all phases completed. Resume is a no-op, no new artefacts.
-3. **Corrupt manifest entry**: sha mismatch surfaces `ArtefactCorrupt` and aborts before re-running.
+1. **Kill mid-phase-2**: 3-phase workflow, kill mid-phase-2. Planner marks phase 2 as `Resume { next_attempt: 2 }`, phase 3 as `RunFresh`.
+2. **Already complete**: 3-phase workflow, all phases completed. Planner marks all phases as `Skip`.
+3. **Corrupt manifest entry**: sha mismatch surfaces `ArtefactCorrupt` via `RunState::load` before planner runs.
 4. **Live writer**: heartbeat fresh rejects resume with `RunInProgress`.
-5. **Stale writer**: heartbeat older than TTL is taken over, attempt counter increments correctly.
+5. **Stale writer**: heartbeat older than TTL is taken over, planner marks resume phase with correct next attempt.
 
 ## Data Model
 

@@ -1,5 +1,3 @@
-#![allow(clippy::result_large_err)]
-
 pub mod lock;
 pub mod sweep;
 
@@ -18,10 +16,10 @@ pub enum ResumeError {
     Manifest(#[from] crate::manifest::ManifestError),
 
     #[error("load error: {0}")]
-    Load(#[from] crate::run_state::LoadError),
+    Load(Box<crate::run_state::LoadError>),
 
     #[error("phase error: {0}")]
-    Phase(#[from] crate::phase_runner::PhaseError),
+    Phase(Box<crate::phase_runner::PhaseError>),
 
     #[error("marker error: {0}")]
     Marker(#[from] crate::run_state::MarkerError),
@@ -33,6 +31,18 @@ pub enum ResumeError {
     /// Another loker process holds the lock; non-loker processes may ignore it.
     #[error("run directory is locked by another loker process")]
     LockInUse,
+}
+
+impl From<crate::run_state::LoadError> for ResumeError {
+    fn from(e: crate::run_state::LoadError) -> Self {
+        ResumeError::Load(Box::new(e))
+    }
+}
+
+impl From<crate::phase_runner::PhaseError> for ResumeError {
+    fn from(e: crate::phase_runner::PhaseError) -> Self {
+        ResumeError::Phase(Box::new(e))
+    }
 }
 
 use std::path::{Path, PathBuf};
@@ -81,7 +91,8 @@ pub enum PhaseAction {
     Skip,
     /// Phase was started (stale heartbeat) or failed. Archive current attempt
     /// and start a new one at the given counter.
-    Resume { attempt: u32 },
+    /// `next_attempt` is the attempt number for the *new* attempt (current + 1).
+    Resume { next_attempt: u32 },
     /// No markers exist for this phase — normal first-time execution.
     RunFresh,
 }
@@ -123,12 +134,12 @@ impl ResumePlanner {
                 Some(crate::run_state::PhaseStatus::Failed) => {
                     // Determine the next attempt counter.
                     let next = crate::run_state::next_attempt(run_dir, phase_name)?;
-                    PhaseAction::Resume { attempt: next }
+                    PhaseAction::Resume { next_attempt: next }
                 }
                 Some(crate::run_state::PhaseStatus::Started) => {
                     // Stale heartbeat (RunState::load would have errored on Live).
                     let next = crate::run_state::next_attempt(run_dir, phase_name)?;
-                    PhaseAction::Resume { attempt: next }
+                    PhaseAction::Resume { next_attempt: next }
                 }
                 Some(crate::run_state::PhaseStatus::None) => PhaseAction::RunFresh,
             };
@@ -167,12 +178,14 @@ impl ResumeRunner {
                         phase_cfg.phase
                     );
                 }
-                PhaseAction::Resume { attempt } => {
+                PhaseAction::Resume {
+                    next_attempt: attempt,
+                } => {
                     eprintln!(
                         "  [resume] resuming '{}' at attempt {}",
                         phase_cfg.phase, attempt
                     );
-                    archive_current_attempt(&plan.run_dir, &phase_cfg.phase, *attempt)?;
+                    archive_current_attempt(&plan.run_dir, &phase_cfg.phase, attempt - 1)?;
                     self.run_phase(&runner, phase_cfg, &plan.run_dir, *attempt)
                         .await?;
                 }
@@ -289,7 +302,7 @@ mod planner_tests {
 
         let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
         assert_eq!(plan.actions[0].1, PhaseAction::Skip);
-        assert_eq!(plan.actions[1].1, PhaseAction::Resume { attempt: 2 });
+        assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 2 });
         assert_eq!(plan.actions[2].1, PhaseAction::RunFresh);
     }
 
@@ -331,7 +344,7 @@ mod planner_tests {
 
         let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
         assert_eq!(plan.actions[0].1, PhaseAction::Skip);
-        assert_eq!(plan.actions[1].1, PhaseAction::Resume { attempt: 2 });
+        assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 2 });
     }
 
     #[test]

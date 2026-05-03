@@ -11,7 +11,8 @@ use crate::resume::ResumeError;
 /// released when this value is dropped (file descriptor close).
 #[derive(Debug)]
 pub struct RunLock {
-    #[allow(dead_code)]
+    /// The file descriptor holding the advisory lock.
+    /// Dropping this struct closes the fd, releasing the OS lock.
     file: File,
 }
 

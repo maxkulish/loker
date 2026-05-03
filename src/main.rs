@@ -67,7 +67,8 @@ enum Commands {
         no_cache: bool,
     },
 
-    /// Resume a partially-completed run
+    /// Resume a partially-completed run (planner scaffolding; execution not yet wired)
+    #[command(hide = true)]
     Resume {
         /// Path to the run directory to resume.
         run_dir: PathBuf,
@@ -884,8 +885,6 @@ async fn main() -> Result<()> {
             println!("Run state loaded for {}", run_dir.display());
             println!("  phases: {:?}", run_state.phase_status);
 
-            // Phase configs would be derived from workflow here.
-            // For now, print status and exit.
             if run_state
                 .phase_status
                 .values()
@@ -896,6 +895,12 @@ async fn main() -> Result<()> {
             }
 
             drop(lock);
+
+            anyhow::bail!(
+                "resume execution is not yet implemented (CLO-295 delivers planner + scaffolding only). \
+                 Phase configs must be derived from the persisted workflow before the runner can execute. \
+                 See: https://linear.app/cloud-ai/issue/CLO-295"
+            );
         }
         Commands::Workflow(subcmd) => match subcmd {
             WorkflowCommands::Run {

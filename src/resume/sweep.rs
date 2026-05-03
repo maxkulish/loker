@@ -43,7 +43,7 @@ pub fn sweep_stale_tmp(run_dir: &Path, ttl_seconds: u64) -> Result<Vec<PathBuf>,
             Err(e) => return Err(e),
         };
 
-        if mtime <= cutoff {
+        if mtime < cutoff {
             // Move relative to run_dir to preserve tree structure
             let rel = path.strip_prefix(run_dir).unwrap_or(&path);
             let dest = orphan_dir.join(rel);

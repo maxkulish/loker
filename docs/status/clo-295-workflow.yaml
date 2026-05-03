@@ -27,7 +27,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T12:35:56.289Z'
-  updated_at: '2026-05-03T13:31:25.600Z'
+  updated_at: '2026-05-03T13:33:02.916Z'
 phases:
   discovery:
     status: complete
@@ -65,7 +65,7 @@ phases:
     plan_file: docs/plans/clo-295-run-resumability.md
     approved: true
   implement:
-    status: in_progress
+    status: validating
     commits:
       - 0cc2c8f
       - ac403d2
@@ -75,6 +75,7 @@ phases:
       - 1d1c7fd
       - 633ef43
       - f94c6be
+      - fb53825
   pr:
     status: pending
   complete:
@@ -191,5 +192,9 @@ history:
     details: >-
       ST8 landed: 5 integration tests covering kill mid-phase, already complete, corrupt manifest, live writer, stale
       writer. Commit f94c6be.
+  - timestamp: '2026-05-03T13:33:02.916Z'
+    action: implementation_complete
+    phase: implement
+    details: All 9 sub-tasks landed. make check green. 9 commits.
 task_title: '[T-031] Implement run resumability via status markers'
 task_url: https://linear.app/cloud-ai/issue/CLO-295/t-031-implement-run-resumability-via-status-markers

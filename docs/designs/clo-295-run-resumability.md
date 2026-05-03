@@ -8,17 +8,19 @@ The `loker run` command creates a fresh `RunDir` and unconditionally executes ev
 
 ### Goals
 
-- `loker resume <run-dir>` re-enters a partially-completed run, skipping phases whose `.completed` markers are present and whose manifest entries pass sha256 verification.
-- The first non-completed phase becomes the resume point; if it has a `.started` marker, its current attempt is archived and a new attempt directory is created.
+- `loker resume <run-dir>` (hidden subcommand) validates on-disk state: lock, sweep, load, plan.
+- The resume planner (`ResumePlanner::plan`) reads markers + manifest and decides Skip / Resume / RunFresh per phase.
 - If the heartbeat is live (within TTL), refuse to resume with `RunInProgress`.
-- If the heartbeat is stale, take over: archive the in-flight attempt and resume from the next attempt counter.
+- If the heartbeat is stale, the planner marks the in-flight phase for resume with the correct next attempt counter.
 - A fully-completed run is a no-op that prints "all phases complete" and exits `0`.
 - Stale `*.tmp` files (mtime > heartbeat TTL) are swept to `attempts/_orphan_tmp/<timestamp>/` on resume start.
 - Advisory lock (`run_dir/.lock`) prevents concurrent writers on the same run directory.
 - All resume decisions are driven by the existing D3 protocol — no bespoke resume state file.
+- Heartbeat TTL is persisted in `heartbeat.json` so resume reads the exact TTL.
 
 ### Non-goals
 
+- `ResumeRunner::execute()` wiring that calls `PhaseRunner::run()` (follow-up issue — requires Workflow → PhaseConfig adapter).
 - `loker resume --from <phase>` (manual rewind) — post-v0.
 - Multi-run-dir batch resume.
 - Cross-host coordination beyond heartbeat + advisory lock (row 14 of D3 kill matrix).
