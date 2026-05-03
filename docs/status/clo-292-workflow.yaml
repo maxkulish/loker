@@ -19,7 +19,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T06:24:24.357Z'
-  updated_at: '2026-05-03T06:52:52.157Z'
+  updated_at: '2026-05-03T06:53:53.312Z'
 phases:
   discovery:
     status: complete
@@ -66,6 +66,7 @@ phases:
       - 786e94e
       - 338470e
       - 80ddc07
+      - 4e8a4d0
   pr:
     status: pending
   complete:
@@ -196,3 +197,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST5 landed: single/first/no-verify path writes artefact, manifest entry, and completed marker. Commit 80ddc07'
+  - timestamp: '2026-05-03T06:53:53.312Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST6 landed: parallel concat verifier success path and all-pass failure coverage. Commit 4e8a4d0'

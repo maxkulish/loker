@@ -79,9 +79,14 @@ pub fn canonical_bytes(
         }
     }
 
+    if matches!(aggregator, Aggregator::First) {
+        return winning_success_bytes(run_dir, output);
+    }
+
     let input = aggregate_input_from_attempt_paths(run_dir, output);
     match aggregator {
-        Aggregator::First | Aggregator::Concat { .. } | Aggregator::AllPass => {
+        Aggregator::First => winning_success_bytes(run_dir, output),
+        Aggregator::Concat { .. } | Aggregator::AllPass => {
             let aggregate = aggregator.aggregate(input, &[], &crate::strategy::PhaseContext::new(&output.phase, output.run_id))?;
             Ok(aggregate.text.into_bytes())
         }
@@ -98,6 +103,25 @@ fn first_success_bytes(
         .attempts
         .iter()
         .find(|a| !a.finish_reasons.contains(&crate::strategy::FinishReason::Error))
+        .ok_or_else(|| PhaseError::PhaseFailed {
+            phase: output.phase.clone(),
+            message: "no successful attempts".into(),
+        })?;
+    Ok(std::fs::read(resolve_output_path(run_dir, &attempt.output_path))?)
+}
+
+fn winning_success_bytes(
+    run_dir: &Path,
+    output: &crate::strategy::StrategyOutput,
+) -> Result<Vec<u8>, PhaseError> {
+    let attempt = output
+        .attempts
+        .iter()
+        .rev()
+        .find(|a| {
+            !a.finish_reasons.contains(&crate::strategy::FinishReason::Error)
+                && a.verify.status != crate::strategy::VerifyStatus::Fail
+        })
         .ok_or_else(|| PhaseError::PhaseFailed {
             phase: output.phase.clone(),
             message: "no successful attempts".into(),

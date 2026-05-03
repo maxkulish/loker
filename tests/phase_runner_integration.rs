@@ -1,12 +1,12 @@
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
 use loker::manifest::Manifest;
 use loker::strategy::verify::{VerifyContext, VerifyError, VerifyHook, VerifyResult};
-use loker::strategy::{PhaseContext, Prompt, TargetSpec};
+use loker::strategy::{PhaseContext, Prompt, TargetSpec, Tier};
 use loker::{AggregatorName, PhaseConfig, PhaseInputs, PhaseRunner, StrategyName, VerifyHookName};
 
 #[derive(Debug)]
@@ -27,6 +27,22 @@ impl VerifyHook for StubVerifyHook {
 
     async fn verify(&self, _ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
         Ok(self.result.clone())
+    }
+}
+
+struct SequenceVerifyHook {
+    results: Mutex<Vec<VerifyResult>>,
+}
+
+#[async_trait]
+impl VerifyHook for SequenceVerifyHook {
+    fn name(&self) -> &str {
+        "SequenceVerifyHook"
+    }
+
+    async fn verify(&self, _ctx: &VerifyContext) -> Result<VerifyResult, VerifyError> {
+        let mut results = self.results.lock().unwrap();
+        Ok(results.remove(0))
     }
 }
 
@@ -164,4 +180,65 @@ async fn phase_runner_parallel_all_pass_collects_failures() {
         .unwrap_err();
     assert_eq!(err.error_class(), "strategy_failed");
     assert!(tmp.path().join("markers/review.failed").is_file());
+}
+
+#[tokio::test]
+async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failure_marks_failed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = PhaseConfig::single("implement", "unused", "hello", "impl.md");
+    cfg.strategy = StrategyName::EscalatingRetry;
+    cfg.verify = VerifyHookName::LlmVerifier;
+    cfg.rungs = vec![
+        loker::PhaseRung::new(Tier::Cheap, "cheap"),
+        loker::PhaseRung::new(Tier::Strong, "strong"),
+    ];
+    let backends: Vec<Arc<dyn Backend>> = vec![
+        Arc::new(MockBackend { name: "cheap", output: "bad" }),
+        Arc::new(MockBackend { name: "strong", output: "good" }),
+    ];
+    let verify: Arc<dyn VerifyHook> = Arc::new(SequenceVerifyHook {
+        results: Mutex::new(vec![VerifyResult::fail("not yet"), VerifyResult::pass()]),
+    });
+
+    let outcome = PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "implement"),
+                verify: Some(verify),
+                run_dir: tmp.path().to_path_buf(),
+            },
+        )
+        .await
+        .expect("escalating recovers");
+    assert_eq!(std::fs::read_to_string(outcome.artefact_path).unwrap(), "good");
+    assert!(tmp.path().join("markers/implement.completed").is_file());
+
+    let tmp = tempfile::tempdir().unwrap();
+    let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(MockBackend {
+        name: "cheap",
+        output: "bad",
+    })];
+    let mut fail_cfg = cfg;
+    fail_cfg.rungs = vec![loker::PhaseRung::new(Tier::Cheap, "cheap")];
+    let verify: Arc<dyn VerifyHook> = Arc::new(SequenceVerifyHook {
+        results: Mutex::new(vec![VerifyResult::fail("still bad")]),
+    });
+    let err = PhaseRunner::new()
+        .run(
+            &fail_cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "implement"),
+                verify: Some(verify),
+                run_dir: tmp.path().to_path_buf(),
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.error_class(), "strategy_failed");
+    assert!(tmp.path().join("markers/implement.failed").is_file());
 }

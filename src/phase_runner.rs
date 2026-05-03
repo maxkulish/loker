@@ -229,7 +229,9 @@ impl PhaseRunner {
             }
         };
 
-        let verify_result = if matches!(cfg.verify, VerifyHookName::None) {
+        let verify_result = if matches!(cfg.verify, VerifyHookName::None)
+            || matches!(strategy_output.strategy, StrategyKind::Escalating)
+        {
             None
         } else {
             let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
