@@ -1,0 +1,61 @@
+# design-doc-tdd: loker's canonical reference workflow (PRD §UC-1).
+#
+# This file defines the four-phase design → review → implement → verify
+# pipeline that loker uses as its primary end-to-end design workflow.
+#
+# Backend swap points:
+#   - design.backends:   single-model design. Swap to any strong model.
+#   - review.backends:   must span ≥ 2 families (FR-13).  Local-reviewer
+#                        slot is ollama/ (per PRD line 271).  If Ollama
+#                        is unavailable the run degrades to the remaining
+#                        reviewers, gated by min_responses = 2.
+#   - implement.backends: ordered cheap → strong (escalating retry).
+#   - verify.backends:   parallel, any backend that can run a command.
+#
+# cost_budget_usd: <PLACEHOLDER>   # wired through summary.json in M6.
+
+name = "design-doc-tdd"
+description = "Four-phase design → review → implement → verify pipeline."
+
+[[phases]]
+name = "design"
+strategy = { single = {} }
+backends = ["ollama/qwen3-coder-next"]
+prompt_template = "You are a senior systems architect.\n\nRead the specification at {{ spec }} and produce a complete design document covering:\n1. Problem statement\n2. Goals and non-goals\n3. Architecture (modules, data flow, concrete types)\n4. Public API surface (Rust trait / struct signatures)\n5. Test plan (unit, integration, manual)\n6. Migration / rollout\n7. Open questions\n\nOutput format: Markdown with numbered sections."
+inputs = ["spec"]
+output = "design.md"
+
+[[phases]]
+name = "review"
+strategy = { parallel = { min_responses = 2 } }
+backends = ["claude/", "gemini/", "codex/", "ollama/qwen3-coder-next"]
+prompt_template = "You are a senior code reviewer.\n\nReview the design document at {{ phase:design }} and produce a structured review.\n\nRead docs/handoff.md for project intent, constraints, and conventions.\n\nOUTPUT FORMAT:\n\n## 1. Completeness Check\n[sections present/missing]\n\n## 2. Architecture Assessment\n**Strengths**: [...]\n**Concerns**: [...]\n\n## 3. Alignment with Handoff & Roadmap\n[fit with docs/handoff.md]\n\n## 4. Security Review\n[assessment]\n\n## 5. Implementation Concerns\n[feedback on plan]\n\n## 6. Blind Spots\n[missing edge cases, failure modes]\n\n## 7. Verdict\n[APPROVE | APPROVE_WITH_SUGGESTIONS | NEEDS_REVISION]\n\n## 8. Actionable Feedback\n[prioritized list]"
+inputs = ["phase:design"]
+output = "review.md"
+# FR-31 forward-compat: hook config goes here when grammar adds `hooks` field.
+# Currently ignored; lint() emits the reservation warning.
+[phases.contract]
+# hooks = { test_runner = "cargo test --test workflows_design_doc_tdd" }
+# reserved until Phase struct carries a `hooks` field.
+
+[[phases]]
+name = "implement"
+strategy = { escalating = { pass_failure_context = true } }
+backends = ["ollama/qwen3-coder-next", "claude/", "codex/"]
+prompt_template = "You are a senior Rust engineer.\n\nRead the design at {{ phase:design }} and the review at {{ phase:review }}.\n\nImplement the changes described. Follow the project conventions:\n- `make fmt` before committing\n- `cargo clippy -- -D warnings` passes\n- Write tests for every new function/method\n- Update docs/ and tests/ as needed\n\nOutput: file edits with clear `// BEFORE` / `// AFTER` markers."
+inputs = ["phase:design", "phase:review"]
+output = "changes/"
+# FR-31 forward-compat: test_runner hook goes here when grammar supports it.
+# [phases.contract]
+# hooks = { test_runner = "cargo test --test workflows_design_doc_tdd" }
+
+[[phases]]
+name = "verify"
+strategy = { parallel = { min_responses = 1 } }
+backends = ["codex/", "gemini/"]
+prompt_template = "You are a build and quality gate.\n\nVerify the changes at {{ phase:implement }} satisfy the design at {{ phase:design }}.\n\nRun: cargo test --test workflows_design_doc_tdd && cargo clippy -- -D warnings && cargo fmt --check\n\nOUTPUT FORMAT: JSON\n{\n  \"build_ok\": true|false,\n  \"tests_ok\": true|false,\n  \"clippy_ok\": true|false,\n  \"fmt_ok\": true|false,\n  \"issues\": [\"file:line: description\"]\n}"
+inputs = ["phase:implement"]
+output = "verify.json"
+# FR-31 forward-compat: run_command and llm_verifier hooks go here when grammar supports them.
+# [phases.contract]
+# hooks = { run_command = "cargo build && cargo test", llm_verifier = "gemini/pro" }
