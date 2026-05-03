@@ -32,11 +32,9 @@ backends = ["claude/", "gemini/", "codex/", "ollama/qwen3-coder-next"]
 prompt_template = "You are a senior code reviewer.\n\nReview the design document at {{ phase:design }} and produce a structured review.\n\nRead docs/handoff.md for project intent, constraints, and conventions.\n\nOUTPUT FORMAT:\n\n## 1. Completeness Check\n[sections present/missing]\n\n## 2. Architecture Assessment\n**Strengths**: [...]\n**Concerns**: [...]\n\n## 3. Alignment with Handoff & Roadmap\n[fit with docs/handoff.md]\n\n## 4. Security Review\n[assessment]\n\n## 5. Implementation Concerns\n[feedback on plan]\n\n## 6. Blind Spots\n[missing edge cases, failure modes]\n\n## 7. Verdict\n[APPROVE | APPROVE_WITH_SUGGESTIONS | NEEDS_REVISION]\n\n## 8. Actionable Feedback\n[prioritized list]"
 inputs = ["phase:design"]
 output = "review.md"
-# FR-31 forward-compat: hook config goes here when grammar adds `hooks` field.
-# Currently ignored; lint() emits the reservation warning.
 [phases.contract]
-# hooks = { test_runner = "cargo test --test workflows_design_doc_tdd" }
-# reserved until Phase struct carries a `hooks` field.
+# FR-31 forward-compat: local-reviewer hook goes here when grammar supports it.
+# reviewer = "ollama/glm-5.1"
 
 [[phases]]
 name = "implement"
@@ -44,10 +42,9 @@ strategy = { escalating = { pass_failure_context = true } }
 backends = ["ollama/qwen3-coder-next", "claude/", "codex/"]
 prompt_template = "You are a senior Rust engineer.\n\nRead the design at {{ phase:design }} and the review at {{ phase:review }}.\n\nImplement the changes described. Follow the project conventions:\n- `make fmt` before committing\n- `cargo clippy -- -D warnings` passes\n- Write tests for every new function/method\n- Update docs/ and tests/ as needed\n\nOutput: file edits with clear `// BEFORE` / `// AFTER` markers."
 inputs = ["phase:design", "phase:review"]
-output = "changes/"
+output = "changes"
 # FR-31 forward-compat: test_runner hook goes here when grammar supports it.
-# [phases.contract]
-# hooks = { test_runner = "cargo test --test workflows_design_doc_tdd" }
+# test_runner = "cargo test --test workflows_design_doc_tdd"
 
 [[phases]]
 name = "verify"
@@ -57,5 +54,5 @@ prompt_template = "You are a build and quality gate.\n\nVerify the changes at {{
 inputs = ["phase:implement"]
 output = "verify.json"
 # FR-31 forward-compat: run_command and llm_verifier hooks go here when grammar supports them.
-# [phases.contract]
-# hooks = { run_command = "cargo build && cargo test", llm_verifier = "gemini/pro" }
+# run_command = "cargo build && cargo test"
+# llm_verifier = "gemini/pro"

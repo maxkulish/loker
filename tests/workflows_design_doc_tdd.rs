@@ -37,14 +37,23 @@ fn roundtrip_parses_clean() {
         .expect("canonical design-doc-tdd.toml should parse cleanly — check grammar");
     assert_eq!(wf.name, "design-doc-tdd");
     let warnings = wf.lint();
-    // Contract reservation warnings are expected (FR-31 forward-compat).
-    // Only fail on unexpected warnings.
-    for w in &warnings {
-        assert!(
-            w.contains("phase.contract reserved for post-v0"),
-            "unexpected lint warning: {w}"
-        );
-    }
+    // Exactly 1 contract block (review phase); implement and verify use commented
+    // forward-compat lines so their Phase.contract is None.
+    let contract_count = wf.phases.iter().filter(|p| p.contract.is_some()).count();
+    assert_eq!(
+        contract_count, 1,
+        "exactly 1 phase should have contract block"
+    );
+    assert_eq!(
+        warnings.len(),
+        1,
+        "exactly 1 lint warning (FR-31 for review phase)"
+    );
+    assert!(
+        warnings[0].contains("phase.contract reserved for post-v0"),
+        "unexpected lint warning: {}",
+        warnings[0]
+    );
 }
 
 /// ST1-2: phase names and order match PRD §UC-1.
