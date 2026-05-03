@@ -184,9 +184,9 @@ The implementation lists files matching `<phase>.started.*` (the `.*` accounts f
 ### Marker file naming convention
 
 ```
-markers/<phase>.started          # after successful rename of .tmp.<rand>
-markers/<phase>.completed        # after successful rename
-markers/<phase>.failed           # after successful rename
+markers/<phase>.started.<attempt>   # attempt-numbered so multiple attempts can coexist
+markers/<phase>.completed           # terminal — only the latest completed marker is kept
+markers/<phase>.failed              # terminal — only the latest failed marker is kept
 ```
 
 Tmp files during write: `.markers/<phase>.<state>.tmp.<rand64>` — created in the same directory to ensure rename is atomic (POSIX requirement).

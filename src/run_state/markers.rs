@@ -85,6 +85,9 @@ impl MarkerWriter {
 
     /// Write a "started" marker for the given phase and attempt.
     ///
+    /// The filename includes the attempt number so multiple attempts
+    /// can coexist: `<phase>.started.<attempt>`.
+    ///
     /// Returns the written marker for inspection.
     pub fn write_started(&self, phase: &str, attempt: u32) -> Result<StartedMarker, MarkerError> {
         let marker = StartedMarker {
@@ -95,11 +98,14 @@ impl MarkerWriter {
             writer_host: hostname(),
             heartbeat_ttl_seconds: 300,
         };
-        self.write_marker(phase, "started", &marker)?;
+        self.write_marker_with_attempt(phase, "started", attempt, &marker)?;
         Ok(marker)
     }
 
     /// Write a "completed" marker for the given phase and attempt.
+    ///
+    /// The filename does NOT include the attempt number so only the
+    /// latest completed marker is stored: `<phase>.completed`.
     ///
     /// Returns the written marker for inspection.
     pub fn write_completed(
@@ -122,6 +128,9 @@ impl MarkerWriter {
 
     /// Write a "failed" marker for the given phase.
     ///
+    /// The filename does NOT include the attempt number:
+    /// `<phase>.failed`.
+    ///
     /// Returns the written marker for inspection.
     pub fn write_failed(
         &self,
@@ -141,9 +150,16 @@ impl MarkerWriter {
         Ok(marker)
     }
 
-    /// Build the marker file path: `<markers_dir>/<phase>.<state>`.
-    fn marker_path(&self, phase: &str, state: &str) -> PathBuf {
-        self.markers_dir.join(format!("{}.{}", phase, state))
+    /// Build the marker file path:
+    /// - For started markers: `<markers_dir>/<phase>.<state>.<attempt>`
+    ///   (attempt-numbered so multiple can coexist)
+    /// - For completed/failed: `<markers_dir>/<phase>.<state>`
+    ///   (terminal, only the latest is kept)
+    fn marker_path(&self, phase: &str, state: &str, attempt: Option<u32>) -> PathBuf {
+        match attempt {
+            Some(a) => self.markers_dir.join(format!("{}.{}.{}", phase, state, a)),
+            None => self.markers_dir.join(format!("{}.{}", phase, state)),
+        }
     }
 
     /// Serialise `body` as JSON and atomically write it to the marker file.
@@ -153,9 +169,24 @@ impl MarkerWriter {
         state: &str,
         body: &T,
     ) -> Result<(), MarkerError> {
-        // Ensure the markers directory exists.
+        // Terminal markers (completed, failed) have no attempt in filename.
         std::fs::create_dir_all(&self.markers_dir)?;
-        let path = self.marker_path(phase, state);
+        let path = self.marker_path(phase, state, None);
+        let json = serde_json::to_string_pretty(body)?;
+        atomic_write(&path, json.as_bytes())?;
+        Ok(())
+    }
+
+    /// Like `write_marker` but includes the attempt number in the filename.
+    fn write_marker_with_attempt<T: Serialize>(
+        &self,
+        phase: &str,
+        state: &str,
+        attempt: u32,
+        body: &T,
+    ) -> Result<(), MarkerError> {
+        std::fs::create_dir_all(&self.markers_dir)?;
+        let path = self.marker_path(phase, state, Some(attempt));
         let json = serde_json::to_string_pretty(body)?;
         atomic_write(&path, json.as_bytes())?;
         Ok(())
@@ -189,7 +220,7 @@ fn hostname() -> String {
 /// When attempt directories land (T-027), consider switching to directory
 /// listing for better performance with many retries.
 pub fn next_attempt(markers_dir: &Path, phase: &str) -> Result<u32, MarkerError> {
-    let started_pattern = format!("{}.started", phase);
+    let started_prefix = format!("{}.started.", phase);
     let dir = match std::fs::read_dir(markers_dir) {
         Ok(d) => d,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
@@ -204,7 +235,7 @@ pub fn next_attempt(markers_dir: &Path, phase: &str) -> Result<u32, MarkerError>
         let Some(name) = file_name.to_str() else {
             continue;
         };
-        if name != started_pattern {
+        if !name.starts_with(&started_prefix) {
             continue;
         }
         // Read the marker file and extract its attempt number.

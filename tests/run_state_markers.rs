@@ -31,7 +31,7 @@ fn marker_roundtrip_started() {
     assert_eq!(marker.heartbeat_ttl_seconds, 300);
 
     // Read it back from disk
-    let path = writer.markers_dir().join("design.started");
+    let path = writer.markers_dir().join("design.started.0");
     let content = std::fs::read_to_string(path).unwrap();
     let deserialized: StartedMarker = serde_json::from_str(&content).unwrap();
     assert_eq!(deserialized, marker);
@@ -96,7 +96,7 @@ fn atomic_write_leaves_no_temporary_files_on_success() {
     writer.write_started("design", 0).unwrap();
 
     // Now verify the marker path exists (it was renamed successfully).
-    let path = writer.markers_dir().join("design.started");
+    let path = writer.markers_dir().join("design.started.0");
     assert!(
         path.exists(),
         "marker file should exist after completed write"
@@ -194,9 +194,9 @@ fn concurrent_writers_no_corruption() {
     t2.join().unwrap();
 
     // Both markers should be present and valid JSON.
-    let design_started = std::fs::read_to_string(markers_dir.join("design.started")).unwrap();
+    let design_started = std::fs::read_to_string(markers_dir.join("design.started.0")).unwrap();
     let design_completed = std::fs::read_to_string(markers_dir.join("design.completed")).unwrap();
-    let review_started = std::fs::read_to_string(markers_dir.join("review.started")).unwrap();
+    let review_started = std::fs::read_to_string(markers_dir.join("review.started.0")).unwrap();
     let review_completed = std::fs::read_to_string(markers_dir.join("review.completed")).unwrap();
 
     serde_json::from_str::<StartedMarker>(&design_started).unwrap();
@@ -222,7 +222,7 @@ fn markers_dir_created_automatically() {
         markers_dir.exists(),
         "markers dir should be created on first write"
     );
-    assert!(markers_dir.join("design.started").exists());
+    assert!(markers_dir.join("design.started.0").exists());
 }
 
 #[test]
