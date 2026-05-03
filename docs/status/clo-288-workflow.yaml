@@ -20,10 +20,10 @@ linear:
   priority: High
   branch_actual: feat/clo-288-dd-tdd
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-03T12:34:50.115Z'
-  updated_at: '2026-05-03T13:40:27.695Z'
+  updated_at: '2026-05-03T13:56:45.429Z'
 phases:
   discovery:
     status: complete
@@ -94,13 +94,20 @@ phases:
     validation_synthesis_report: docs/reviews/clo-288-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: in_progress
+    status: complete
     pr_number: 41
     pr_url: https://github.com/maxkulish/loker/pull/41
-    pr_status: open
+    pr_status: merged
     ci_status: green
+    ci_passed: true
+    merge_commit: 76e48a7d
+    review_threads_resolved: 11
+    fix_commit: d4bd9aa
   complete:
-    status: pending
+    status: complete
+    merge_commit: 76e48a7d
+    merge_date: '2026-05-03T13:52:47Z'
+    merge_method: squash
 history:
   - timestamp: '2026-05-03T12:34:50.115Z'
     action: workflow_started
@@ -234,5 +241,20 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-03T13:53:07.216Z'
+    action: pr_merged
+    phase: complete
+    details: >-
+      PR #41 merged (squash, commit 76e48a7d). Bot reviews addressed in commit d4bd9aa: MiniJinja syntax corrected
+      (phase:X → steps.X.output), phase:design added to verify inputs, contract block moved to implement phase, fixture
+      synced to canonical. 11 review threads resolved. CI green. 1 fix iteration within limit.
+  - timestamp: '2026-05-03T13:54:34.598Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-03T13:56:45.429Z'
+    action: workflow_complete
+    phase: complete
+    details: 'PR #41 merged. Linear CLO-288 state set to Done. CLO-289 (end-to-end test using design-doc-tdd) unblocked.'
 task_title: Author design-doc-tdd workflow file at .lok/workflows/design-doc-tdd.toml
 task_url: https://linear.app/cloud-ai/issue/CLO-288/author-design-doc-tdd-workflow-file-at-lokworkflowsdesign-doc-tddtoml
