@@ -44,7 +44,7 @@ Run each verification command from AC1–AC12 and confirm all pass. No additiona
 | # | Scenario | Input | Expected | Verification |
 |---|---|---|---|---|
 | 1 | File exists | `test -s examples/specs/calculator.md` | exit 0 | `test -s examples/specs/calculator.md && echo OK` |
-| 2 | Four sections present | `rg "^## " examples/specs/calculator.md` | 4 lines (Requirements, Constraints, Out of Scope, Acceptance) | `rg "^## " examples/specs/calculator.md | wc -l` |
+| 2 | Four sections present | `rg "^## " examples/specs/calculator.md` | 5 lines (Problem Statement / Requirements / Constraints / Out of Scope / Acceptance) | `rg "^## " examples/specs/calculator.md | wc -l` |
 | 3 | Four operations named | `rg "add\|subtract\|multiply\|divide" examples/specs/calculator.md` | at least 4 occurrences | `rg "add\|subtract\|multiply\|divide" examples/specs/calculator.md | wc -l` |
 | 4 | Division-by-zero error handling | `rg "division by zero\|typed error" -i examples/specs/calculator.md` | non-empty match | `rg "division by zero\|typed error" -i examples/specs/calculator.md` |
 | 5 | 3+ acceptance examples | count concrete `add(`, `divide(` examples | ≥3 | `rg "add\([0-9]" examples/specs/calculator.md | wc -l` |
@@ -53,6 +53,6 @@ Run each verification command from AC1–AC12 and confirm all pass. No additiona
 ## 5. Edge cases
 
 - **Wording variants**: Accept any phrasing for `typed error` — `return an error`, `Err` variant, `Result<_, _>`, `Error` type — as long as panic/not-a-number is excluded.
-- **Code block language**: Accept `rust`, `text`, or no language tag — the spec is for human readers; validation in CLO-291's test runner handles syntax checking.
+- **Code block language**: Acceptance section uses `` ```text ``` `` per AC12. The examples are pseudocode, not runnable Rust (CLO-291's test runner handles syntax validation).
 - **Word count**: Hard cap is ≤80 lines to stay within M6 timing budget; target 40–60 lines.
 - **No external deps**: If the spec mentions "standard library only" or "no crates needed", that satisfies the constraint.
