@@ -219,52 +219,40 @@ pub enum WorkflowError {
 pub fn resolve_backend_scheme(s: &str) -> Result<BackendRef, WorkflowError> {
     // Require the `<scheme>/<id>` form — no bare "tensorzero" or "claudefoo".
     let Some((scheme, rest)) = s.split_once('/') else {
-        return Err(WorkflowError::MalformedBackendRef {
-            raw: s.to_string(),
-        });
+        return Err(WorkflowError::MalformedBackendRef { raw: s.to_string() });
     };
     match scheme {
         "tensorzero" => {
             if rest.is_empty() {
-                Err(WorkflowError::MalformedBackendRef {
-                    raw: s.to_string(),
-                })
+                Err(WorkflowError::MalformedBackendRef { raw: s.to_string() })
             } else {
                 Ok(BackendRef::TensorZero(rest.to_string()))
             }
         }
         "claude" => {
             if !rest.is_empty() {
-                Err(WorkflowError::MalformedBackendRef {
-                    raw: s.to_string(),
-                })
+                Err(WorkflowError::MalformedBackendRef { raw: s.to_string() })
             } else {
                 Ok(BackendRef::Claude)
             }
         }
         "codex" => {
             if !rest.is_empty() {
-                Err(WorkflowError::MalformedBackendRef {
-                    raw: s.to_string(),
-                })
+                Err(WorkflowError::MalformedBackendRef { raw: s.to_string() })
             } else {
                 Ok(BackendRef::Codex)
             }
         }
         "gemini" => {
             if !rest.is_empty() {
-                Err(WorkflowError::MalformedBackendRef {
-                    raw: s.to_string(),
-                })
+                Err(WorkflowError::MalformedBackendRef { raw: s.to_string() })
             } else {
                 Ok(BackendRef::Gemini)
             }
         }
         "ollama" => {
             if rest.is_empty() {
-                Err(WorkflowError::MalformedBackendRef {
-                    raw: s.to_string(),
-                })
+                Err(WorkflowError::MalformedBackendRef { raw: s.to_string() })
             } else {
                 Ok(BackendRef::Ollama(rest.to_string()))
             }
