@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loker.dev/schemas/trace_span.schema.json",
+  "title": "Loker Trace Span",
+  "description": "One JSON-encoded span from runs/<id>/trace.jsonl. Follows OpenTelemetry GenAI semantic conventions (gen_ai.*) with Loker-specific extensions (loker.*). Forward-compatible: unknown loker.* keys are allowed via patternProperties.",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "span_id",
+    "timestamp",
+    "name"
+  ],
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Trace identifier, equal to loker.run_id."
+    },
+    "span_id": {
+      "type": "string",
+      "minLength": 16,
+      "description": "Unique span identifier within the trace."
+    },
+    "parent_span_id": {
+      "type": ["string", "null"],
+      "minLength": 16,
+      "description": "Parent span identifier; null for root spans (phase spans)."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Span start time in ISO-8601."
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Wall-clock duration in milliseconds."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable span name, e.g. 'phase.design' or 'backend.claude'."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["internal", "client", "server", "producer", "consumer"],
+      "description": "OTel span kind. Defaults to 'internal' for Loker spans."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "error", "unset"],
+      "description": "OTel span status."
+    },
+    "gen_ai.system": {
+      "type": "string",
+      "description": "Provider family, e.g. anthropic, openai, google. Required on backend_call spans."
+    },
+    "gen_ai.request.model": {
+      "type": "string",
+      "description": "Model identifier, e.g. 'claude-sonnet-4'."
+    },
+    "gen_ai.usage.input_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of input (prompt) tokens."
+    },
+    "gen_ai.usage.output_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of output (completion) tokens."
+    },
+    "gen_ai.response.id": {
+      "type": "string",
+      "description": "Provider response identifier."
+    },
+    "gen_ai.response.finish_reasons": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Finish reasons from the backend."
+    },
+    "loker.run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Run identifier, same as trace_id."
+    },
+    "loker.phase": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Phase name, e.g. design, implement, verify."
+    },
+    "loker.attempt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Attempt number within the phase."
+    },
+    "loker.strategy": {
+      "type": "string",
+      "enum": ["single", "parallel", "escalating"],
+      "description": "Strategy kind used for this phase."
+    },
+    "loker.aggregator": {
+      "type": "string",
+      "enum": ["first", "concat", "vote", "any_fail", "all_pass", "llm_judge"],
+      "description": "Aggregator kind used for this phase."
+    },
+    "loker.verify_hook": {
+      "type": ["string", "null"],
+      "description": "Verify hook name, or null if none."
+    },
+    "loker.outcome": {
+      "type": "string",
+      "enum": ["success", "verify_failed", "aggregator_failed", "strategy_failed", "backend_error", "timeout"],
+      "description": "Terminal outcome for this span's scope."
+    },
+    "error.kind": {
+      "type": "string",
+      "description": "Error classification when status is error."
+    },
+    "error.message": {
+      "type": "string",
+      "description": "Human-readable error message."
+    }
+  },
+  "patternProperties": {
+    "^loker\.[a-z][a-z0-9_]*$": {}
+  },
+  "additionalProperties": false
+}
