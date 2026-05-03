@@ -233,9 +233,33 @@ pub fn resolve_backend_scheme(s: &str) -> Result<BackendRef, WorkflowError> {
                 Ok(BackendRef::TensorZero(rest.to_string()))
             }
         }
-        "claude" => Ok(BackendRef::Claude),
-        "codex" => Ok(BackendRef::Codex),
-        "gemini" => Ok(BackendRef::Gemini),
+        "claude" => {
+            if !rest.is_empty() {
+                Err(WorkflowError::MalformedBackendRef {
+                    raw: s.to_string(),
+                })
+            } else {
+                Ok(BackendRef::Claude)
+            }
+        }
+        "codex" => {
+            if !rest.is_empty() {
+                Err(WorkflowError::MalformedBackendRef {
+                    raw: s.to_string(),
+                })
+            } else {
+                Ok(BackendRef::Codex)
+            }
+        }
+        "gemini" => {
+            if !rest.is_empty() {
+                Err(WorkflowError::MalformedBackendRef {
+                    raw: s.to_string(),
+                })
+            } else {
+                Ok(BackendRef::Gemini)
+            }
+        }
         "ollama" => {
             if rest.is_empty() {
                 Err(WorkflowError::MalformedBackendRef {
@@ -552,6 +576,24 @@ mod tests {
     fn test_malformed_backend_tensorzero_empty_fn() {
         let err = resolve_backend_scheme("tensorzero/").unwrap_err();
         assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "tensorzero/"));
+    }
+
+    #[test]
+    fn test_malformed_backend_claude_extra_path() {
+        let err = resolve_backend_scheme("claude/foo").unwrap_err();
+        assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "claude/foo"));
+    }
+
+    #[test]
+    fn test_malformed_backend_codex_extra_path() {
+        let err = resolve_backend_scheme("codex/bar").unwrap_err();
+        assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "codex/bar"));
+    }
+
+    #[test]
+    fn test_malformed_backend_gemini_extra_path() {
+        let err = resolve_backend_scheme("gemini/baz").unwrap_err();
+        assert!(matches!(&err, WorkflowError::MalformedBackendRef { raw } if raw == "gemini/baz"));
     }
 
     // -- Input ref tests --
