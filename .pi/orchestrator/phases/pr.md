@@ -240,20 +240,41 @@ query($owner:String!, $repo:String!, $pr:Int!) {
 }' -f owner=maxkulish -f repo=loker -F pr=<n>
 ```
 
-**Decision per thread:**
+#### Mandatory trailer rule
+
+**Every author reply to ANY review comment - Gemini, Copilot, human, or
+any other reviewer - MUST end with the `/gemini review` trailer on its
+own line.** Gemini is the universal validator: by triggering it on every
+reply we ensure each response (rationale, fix description, declined
+suggestion) is independently re-evaluated, regardless of who originally
+posted the comment.
+
+This is not a per-template detail; it is a hard precondition on every
+reply post. Step 3.5.6.5 below verifies this after pushes and fails the
+gate if any reply is missing it.
+
+**Decision per thread (reviewer-agnostic):**
 
 | Thread state | Action |
 |---|---|
 | Already resolved | Skip |
-| Gemini's latest comment approves the fix ("looks good", "this is sound", "no further action") | Resolve only - no reply |
-| Awaiting author fix (no author reply yet) | Post reply with `/gemini review`, then resolve after Gemini approves |
-| Author replied but Gemini hasn't re-reviewed | Post `/gemini review` reply to trigger re-review |
-| Declined suggestion | Post "Intentionally kept as-is: `<rationale>`" reply |
+| Latest reviewer comment approves the fix ("looks good", "this is sound", "no further action", "LGTM") | Resolve only - no reply |
+| Awaiting author response (no author reply yet) | Post reply with `/gemini review` trailer, then resolve after Gemini approves |
+| Author replied but no validator re-review yet | Post `/gemini review` reply to trigger re-review |
+| Declined suggestion | Post "Intentionally kept as-is: `<rationale>`" reply with `/gemini review` trailer |
+
+The same rules apply whether the original commenter was `gemini-code-assist`,
+`copilot-pull-request-reviewer`, or a human reviewer. Copilot does not
+re-review on demand the way Gemini does; routing every reply through
+`/gemini review` gives every thread - Copilot's included - a consistent
+validator.
 
 **CRITICAL: one reply per thread, maximum. NEVER post a second standalone comment
-to add the trigger after the fact.**
+to add the trigger after the fact.** Construct the reply body completely
+(content + trailer) before calling `gh api .../replies`. If the trailer
+is missing, fix the body and retry; never patch with a follow-up comment.
 
-**Resolve a thread (no reply needed when Gemini already approved):**
+**Resolve a thread (no reply needed when validator already approved):**
 
 ```bash
 gh api graphql -f query='
@@ -264,7 +285,7 @@ mutation($id:ID!) {
 }' -f id="<thread_graphql_id>"
 ```
 
-**Reply when fix needs Gemini re-validation:**
+**Reply when fix needs validator re-review:**
 
 ```bash
 COMMIT_SHA=$(git rev-parse --short HEAD)
@@ -284,11 +305,60 @@ gh api repos/${REPO}/pulls/${PR}/comments/<comment_id>/replies \
 /gemini review"
 ```
 
-The `/gemini review` trailer asks Gemini to re-evaluate after the
-rationale. If Gemini accepts, the thread can be resolved; if it pushes
-back, escalate via Step 4.
+The `/gemini review` trailer asks Gemini to re-evaluate the thread - both
+the original comment and the new author reply - after the fix or rationale.
+If Gemini accepts, the thread can be resolved; if it pushes back, escalate
+via Step 4. This applies even when the original comment was from Copilot
+or a human; Gemini becomes the validator of record for the response.
 
-Track reply count in state update.
+Track reply count in state update. Before continuing, record the UTC
+timestamp of the most recent reply push so Step 3.5.6.5 can scope its
+verification window:
+
+```bash
+REPLY_PUSH_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+```
+
+### 3.5.6.5 - Verify the trailer landed on every reply (MANDATORY)
+
+After all replies for this round are posted, fetch every author reply
+made since `REPLY_PUSH_TS` and confirm each one ends with the
+`/gemini review` trailer. If any reply is missing it, the gate fails.
+Do **not** patch with a follow-up comment - that is explicitly
+forbidden by 3.5.6. Instead: stop, escalate to the user, and treat the
+thread as unresolved.
+
+```bash
+PR=<n>
+REPO=maxkulish/loker
+AUTHOR=$(gh api user --jq .login)
+
+MISSING=$(gh api repos/${REPO}/pulls/${PR}/comments --paginate \
+  --jq --arg author "$AUTHOR" --arg since "$REPLY_PUSH_TS" '
+    .[]
+    | select(.user.login == $author)
+    | select(.created_at >= $since)
+    | select((.body | test("(^|\\n)/gemini review\\s*$")) | not)
+    | {id, created_at, body_preview: (.body[0:120])}
+  ')
+
+if [ -n "$MISSING" ]; then
+  echo "GATE FAIL: replies missing /gemini review trailer:"
+  echo "$MISSING"
+  exit 1
+fi
+
+echo "GATE OK: every reply since ${REPLY_PUSH_TS} ends with /gemini review"
+```
+
+The regex `(^|\n)/gemini review\s*$` requires the trailer on its own
+line at the end of the body (trailing whitespace tolerated). A trailer
+buried mid-body does not satisfy the gate - Gemini only triggers when
+the marker is on its own line.
+
+If the verification passes, proceed to 3.5.7. If it fails, log a
+`workflow_blocked` event, surface the offending comment IDs to the user,
+and wait for guidance.
 
 ### 3.5.7 - Re-check for new comments
 
@@ -302,7 +372,7 @@ gh api repos/${REPO}/pulls/${PR}/comments --paginate \
 ```
 
 If new comments exist in unresolved threads, return to 3.5.3 and repeat.
-Threads already resolved by Gemini approval can be skipped. Otherwise proceed.
+Threads already resolved by validator approval can be skipped. Otherwise proceed.
 
 ### 3.5.8 - Log state
 
@@ -311,7 +381,7 @@ update_workflow_state({
   task_id: "CLO-XX",
   phase: "pr",
   action: "review_addressed",
-  details: "<N> threads resolved; replies posted N/N; /gemini review trailer on all inline replies.",
+  details: "<N> threads resolved; replies posted N/N; /gemini review trailer verified on every reply (Gemini, Copilot, human alike).",
   phase_updates: { reviews_addressed: true }
 })
 ```

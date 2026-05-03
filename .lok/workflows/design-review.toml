@@ -6,7 +6,7 @@ description = "Multi-model design document review with output validation and Cla
 name = "health_check"
 timeout = 30000
 continue_on_error = true
-shell = """
+shell = '''
 GEMINI_OK=false
 OLLAMA_OK=false
 
@@ -19,21 +19,21 @@ if timeout 10 ollama list 2>/dev/null | grep -q .; then
 fi
 
 echo "gemini=$GEMINI_OK ollama=$OLLAMA_OK"
-"""
+'''
 
 # Step 1b: Resolve active milestone text for prompt injection from CLAUDE.md
 [[steps]]
 name = "read_milestone"
 timeout = 10000
 continue_on_error = true
-shell = """
+shell = '''
 ACTIVE_MILESTONE=$(grep -E '^Active milestone:' CLAUDE.md | head -1 | sed 's/^Active milestone: //; s/\*\*//g; s/\.$//')
 if [ -z "$ACTIVE_MILESTONE" ]; then
   echo "Unknown"
 else
   echo "$ACTIVE_MILESTONE"
 fi
-"""
+'''
 
 # Step 2: Gemini review with fallback model support
 [[steps]]
@@ -43,7 +43,7 @@ retries = 3
 continue_on_error = false
 depends_on = ["health_check", "read_milestone"]
 when = "steps.health_check.success"
-shell = """
+shell = '''
 PROMPT=$(cat .pi/agents/gemini-architect.md .lok/prompts/design-review-prompt.md | sed -e 's|__DOC_PATH__|{{ arg.1 }}|g' -e 's|__TASK_ID__|{{ arg.2 }}|g')
 PRIMARY_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 FALLBACK_MODEL="${GEMINI_FALLBACK_MODEL:-gemini-2.5-pro}"
@@ -65,7 +65,7 @@ if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
 fi
 
 echo "$OUTPUT"
-"""
+'''
 
 [steps.validate]
 check = "min_length(200)"
@@ -98,7 +98,7 @@ retries = 2
 continue_on_error = false
 depends_on = ["health_check", "read_milestone"]
 when = "steps.health_check.success"
-shell = """
+shell = '''
 PROMPT=$(cat .pi/agents/ollama-rust-reviewer.md .lok/prompts/design-review-prompt.md | sed -e 's|__DOC_PATH__|{{ arg.1 }}|g' -e 's|__TASK_ID__|{{ arg.2 }}|g')
 
 OUTPUT=$(timeout 570 opencode run --model "${OLLAMA_MODEL:-ollama/glm-5.1:cloud}" --dangerously-skip-permissions "$PROMPT" 2>/tmp/lok-ollama-stderr.log)
@@ -110,7 +110,7 @@ if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
 fi
 
 echo "$OUTPUT"
-"""
+'''
 
 [steps.validate]
 check = "min_length(200)"
@@ -295,7 +295,7 @@ Based on the consolidated verdict and priority actions, recommend one of:
 name = "write_reviews"
 depends_on = ["gemini_review", "ollama_review", "claude_fallback", "synthesis"]
 min_deps_success = 0
-shell = """
+shell = '''
 mkdir -p docs/reviews
 REVIEW_DATE=$(date +%Y-%m-%d)
 TMP_DIR=$(mktemp -d)
@@ -375,4 +375,4 @@ write_review \
   "Synthesis engine"
 
 echo "Reviews written to docs/reviews/{{ arg.2 }}-review-*.md"
-"""
+'''
