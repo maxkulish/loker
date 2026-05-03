@@ -19,10 +19,10 @@ linear:
   branch_suggested: kmamemo/clo-285-implement-manifest-driven-artefact-load-with-orphan-entry
   branch_actual: feat/clo-285-manifest-load
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-02T14:19:48.376Z'
-  updated_at: '2026-05-03T05:46:01.721Z'
+  updated_at: '2026-05-03T06:00:16.944Z'
 phases:
   discovery:
     status: complete
@@ -71,12 +71,19 @@ phases:
     validation_synthesis_report: docs/reviews/clo-285-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: in_progress
+    status: complete
     ci_passed: false
     pr_number: 33
     pr_url: https://github.com/maxkulish/loker/pull/33
+    reviews_addressed: true
+    merged_at: '2026-05-03T05:59:42Z'
+    merge_commit: 00da65663c04289db2b6ac4c3f89bcdf9d648b32
   complete:
-    status: pending
+    status: complete
+    merge_commit: 00da65663c04289db2b6ac4c3f89bcdf9d648b32
+    merged_at: '2026-05-03T05:59:42Z'
+    aggregation_files_updated: false
+    aggregation_files_skip_reason: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
 history:
   - timestamp: '2026-05-02T14:19:48.376Z'
     action: workflow_started
@@ -190,3 +197,21 @@ history:
     details: >-
       Resolved merge conflict in src/run_state/mod.rs after origin/main gained run_state submodules. Merged + make check
       green. Pushed 9a0f16a.
+  - timestamp: '2026-05-03T05:59:30.233Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      6 threads resolved; 5 Copilot + 1 Gemini. Replies posted 6/6; Gemini re-reviewed and approved fix in 0880f14. All
+      inline comments resolved.
+  - timestamp: '2026-05-03T05:59:55.341Z'
+    action: pr_merged
+    phase: complete
+    details: 'PR #33 merged via squash. Merge commit 00da656.'
+  - timestamp: '2026-05-03T06:00:10.840Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-03T06:00:16.944Z'
+    action: workflow_complete
+    phase: complete
+    details: 'CLO-285 workflow complete. PR #33 merged. Linear status: Done.'
