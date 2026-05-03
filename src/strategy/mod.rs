@@ -321,6 +321,8 @@ pub struct Attempt {
     pub usage: TokenUsageReport,
     pub output_path: String,
     pub verify: VerifyOutcome,
+    #[serde(skip)]
+    pub duration: std::time::Duration,
 }
 
 /// Schema-aligned reason a backend stopped producing tokens.

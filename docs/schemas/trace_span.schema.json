@@ -109,7 +109,7 @@
     },
     "loker.outcome": {
       "type": "string",
-      "enum": ["success", "verify_failed", "aggregator_failed", "strategy_failed", "backend_error", "timeout"],
+      "enum": ["success", "verify_failed", "aggregator_failed", "strategy_failed", "backend_error", "timeout", "manifest_failed", "marker_failed", "io_failed", "phase_failed"],
       "description": "Terminal outcome for this span's scope."
     },
     "error.kind": {

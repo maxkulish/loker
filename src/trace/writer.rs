@@ -113,6 +113,10 @@ impl TraceSink for TraceWriter {
                 Value::String(model.clone()),
             );
         }
+        extras.insert(
+            "duration_ms".to_string(),
+            Value::Number(result.duration_ms.into()),
+        );
         if let Some(input) = result.usage_input_tokens {
             extras.insert(
                 "gen_ai.usage.input_tokens".to_string(),
@@ -199,6 +203,10 @@ impl TraceSink for TraceWriter {
                 "verify_failed".to_string()
             }),
         );
+        extras.insert(
+            "duration_ms".to_string(),
+            Value::Number(result.duration_ms.into()),
+        );
         if let Some(ref msg) = result.message {
             extras.insert("error.message".to_string(), Value::String(msg.clone()));
         }
@@ -212,7 +220,7 @@ impl TraceSink for TraceWriter {
         );
     }
 
-    fn phase_finished(&self, ctx: &super::PhaseSpanContext, outcome: &str) {
+    fn phase_finished(&self, ctx: &super::PhaseSpanContext, outcome: &str, duration_ms: u64) {
         let mut extras = serde_json::Map::new();
         extras.insert(
             "loker.run_id".to_string(),
@@ -223,6 +231,7 @@ impl TraceSink for TraceWriter {
             "loker.outcome".to_string(),
             Value::String(outcome.to_string()),
         );
+        extras.insert("duration_ms".to_string(), Value::Number(duration_ms.into()));
         let span_id = super::new_span_id();
         self.write_line(
             ctx.trace_id,
@@ -233,7 +242,7 @@ impl TraceSink for TraceWriter {
         );
     }
 
-    fn error(&self, ctx: &super::PhaseSpanContext, kind: &str, message: &str) {
+    fn error(&self, ctx: &super::PhaseSpanContext, kind: &str, message: &str, duration_ms: u64) {
         let mut extras = serde_json::Map::new();
         extras.insert(
             "loker.run_id".to_string(),
@@ -245,6 +254,7 @@ impl TraceSink for TraceWriter {
             "error.message".to_string(),
             Value::String(message.to_string()),
         );
+        extras.insert("duration_ms".to_string(), Value::Number(duration_ms.into()));
         let span_id = super::new_span_id();
         self.write_line(
             ctx.trace_id,

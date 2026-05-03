@@ -359,6 +359,7 @@ impl Strategy for EscalatingRetry {
                                 usage,
                                 output_path,
                                 verify: verify_outcome,
+                                duration: query.duration,
                             });
 
                             if passed {
@@ -405,6 +406,7 @@ impl Strategy for EscalatingRetry {
                                 usage,
                                 output_path,
                                 verify: VerifyOutcome::failed(self.verify.name()),
+                                duration: query.duration,
                             });
 
                             previous_failure = self.pass_failure_context.then(|| {
@@ -437,6 +439,7 @@ impl Strategy for EscalatingRetry {
                         usage: TokenUsageReport::default(),
                         output_path,
                         verify: VerifyOutcome::skipped(),
+                        duration: std::time::Duration::ZERO,
                     });
 
                     previous_failure = self.pass_failure_context.then(|| {

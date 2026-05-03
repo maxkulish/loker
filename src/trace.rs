@@ -29,8 +29,8 @@ pub trait TraceSink: Send + Sync {
     );
     fn aggregator_fold(&self, ctx: &PhaseSpanContext, kind: &str, input_count: usize);
     fn verify_result(&self, ctx: &PhaseSpanContext, hook_name: &str, result: &VerifySpanResult);
-    fn phase_finished(&self, ctx: &PhaseSpanContext, outcome: &str);
-    fn error(&self, ctx: &PhaseSpanContext, kind: &str, message: &str);
+    fn phase_finished(&self, ctx: &PhaseSpanContext, outcome: &str, duration_ms: u64);
+    fn error(&self, ctx: &PhaseSpanContext, kind: &str, message: &str, duration_ms: u64);
 }
 
 /// Context shared by all spans within a phase.

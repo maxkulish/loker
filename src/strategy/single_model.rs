@@ -81,6 +81,7 @@ impl Strategy for SingleModel {
             usage,
             output_path,
             verify: VerifyOutcome::skipped(),
+            duration: query.duration,
         };
 
         Ok(StrategyOutput {

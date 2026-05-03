@@ -22,7 +22,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T09:42:05.276Z'
-  updated_at: '2026-05-03T10:18:38.970Z'
+  updated_at: '2026-05-03T10:21:03.227Z'
 phases:
   discovery:
     status: complete
@@ -58,7 +58,7 @@ phases:
     plan_file: docs/plans/clo-293-trace-jsonl.md
     approved: true
   implement:
-    status: pending
+    status: validating
     commits:
       - 1c33a50
       - '3267656'
@@ -149,5 +149,9 @@ history:
     details: >-
       ST4 landed: TraceSink wired into PhaseRunner. All 711 unit tests + 5 integration tests pass. make check green.
       Commit 3267656.
+  - timestamp: '2026-05-03T10:21:03.227Z'
+    action: implementation_complete
+    phase: implement
+    details: 'All 5 sub-tasks landed. make check green. 3 commits: trait+types+writer, PhaseRunner wiring, integration tests.'
 task_title: '[T-029] Implement trace.jsonl writer with OpenTelemetry GenAI semantic conventions'
 task_url: https://linear.app/cloud-ai/issue/CLO-293/t-029-implement-tracejsonl-writer-with-opentelemetry-genai-semantic

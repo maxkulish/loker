@@ -197,6 +197,7 @@ impl PhaseRunner {
         inputs: PhaseInputs<'_>,
     ) -> Result<PhaseOutcome, PhaseError> {
         validate_config(cfg)?;
+        let phase_start = std::time::Instant::now();
         let trace_sink = inputs.trace;
         let markers = crate::run_state::markers::MarkerWriter::new(&inputs.run_dir);
         persist::start_attempt(&markers, &cfg.phase, 0)?;
@@ -237,8 +238,17 @@ impl PhaseRunner {
                     other => PhaseError::StrategyFailed(other),
                 };
                 if let Some(t) = trace_sink {
-                    t.error(&trace_ctx, phase_err.error_class(), &phase_err.to_string());
-                    t.phase_finished(&trace_ctx, phase_err.error_class());
+                    t.error(
+                        &trace_ctx,
+                        phase_err.error_class(),
+                        &phase_err.to_string(),
+                        phase_start.elapsed().as_millis() as u64,
+                    );
+                    t.phase_finished(
+                        &trace_ctx,
+                        phase_err.error_class(),
+                        phase_start.elapsed().as_millis() as u64,
+                    );
                 }
                 if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
@@ -264,7 +274,7 @@ impl PhaseRunner {
                     model: Some(attempt.model.clone()),
                 };
                 let result = BackendSpanResult {
-                    duration_ms: 0,
+                    duration_ms: attempt.duration.as_millis() as u64,
                     usage_input_tokens: Some(attempt.usage.input_tokens as u64),
                     usage_output_tokens: Some(attempt.usage.output_tokens as u64),
                     finish_reasons: attempt
@@ -288,8 +298,17 @@ impl PhaseRunner {
                 Ok(bytes) => bytes,
                 Err(err) => {
                     if let Some(t) = trace_sink {
-                        t.error(&trace_ctx, err.error_class(), &err.to_string());
-                        t.phase_finished(&trace_ctx, err.error_class());
+                        t.error(
+                            &trace_ctx,
+                            err.error_class(),
+                            &err.to_string(),
+                            phase_start.elapsed().as_millis() as u64,
+                        );
+                        t.phase_finished(
+                            &trace_ctx,
+                            err.error_class(),
+                            phase_start.elapsed().as_millis() as u64,
+                        );
                     }
                     if let Err(persist_err) = persist::record_terminal_failure(
                         &markers,
@@ -360,8 +379,17 @@ impl PhaseRunner {
                     result,
                 };
                 if let Some(t) = trace_sink {
-                    t.error(&trace_ctx, phase_err.error_class(), &phase_err.to_string());
-                    t.phase_finished(&trace_ctx, phase_err.error_class());
+                    t.error(
+                        &trace_ctx,
+                        phase_err.error_class(),
+                        &phase_err.to_string(),
+                        phase_start.elapsed().as_millis() as u64,
+                    );
+                    t.phase_finished(
+                        &trace_ctx,
+                        phase_err.error_class(),
+                        phase_start.elapsed().as_millis() as u64,
+                    );
                 }
                 if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
@@ -388,7 +416,11 @@ impl PhaseRunner {
         )?;
 
         if let Some(t) = trace_sink {
-            t.phase_finished(&trace_ctx, "success");
+            t.phase_finished(
+                &trace_ctx,
+                "success",
+                phase_start.elapsed().as_millis() as u64,
+            );
         }
 
         let strategy_kind = strategy_output.strategy;

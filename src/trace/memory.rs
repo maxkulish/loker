@@ -45,15 +45,11 @@ impl Default for InMemorySink {
 
 impl TraceSink for InMemorySink {
     fn phase_started(&self, ctx: &super::PhaseSpanContext) {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "trace_id".to_string(),
-            Value::String(ctx.trace_id.to_string()),
-        );
-        map.insert("span_id".to_string(), Value::String(ctx.span_id.clone()));
-        map.insert(
-            "name".to_string(),
-            Value::String(format!("phase.{}", ctx.phase)),
+        let mut map = super::build_span_skeleton(
+            ctx.trace_id,
+            &ctx.span_id,
+            None,
+            &format!("phase.{}", ctx.phase),
         );
         map.insert("loker.phase".to_string(), Value::String(ctx.phase.clone()));
         map.insert(
@@ -76,22 +72,11 @@ impl TraceSink for InMemorySink {
         attempt: &super::AttemptSpanContext,
         result: &super::BackendSpanResult,
     ) {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "trace_id".to_string(),
-            Value::String(ctx.trace_id.to_string()),
-        );
-        map.insert(
-            "span_id".to_string(),
-            Value::String(attempt.span_id.clone()),
-        );
-        map.insert(
-            "parent_span_id".to_string(),
-            Value::String(ctx.span_id.clone()),
-        );
-        map.insert(
-            "name".to_string(),
-            Value::String(format!("backend.{}", attempt.backend)),
+        let mut map = super::build_span_skeleton(
+            ctx.trace_id,
+            &attempt.span_id,
+            Some(&ctx.span_id),
+            &format!("backend.{}", attempt.backend),
         );
         map.insert(
             "loker.attempt".to_string(),
@@ -107,6 +92,10 @@ impl TraceSink for InMemorySink {
                 Value::String(model.clone()),
             );
         }
+        map.insert(
+            "duration_ms".to_string(),
+            Value::Number(result.duration_ms.into()),
+        );
         if let Some(input) = result.usage_input_tokens {
             map.insert(
                 "gen_ai.usage.input_tokens".to_string(),
@@ -139,19 +128,11 @@ impl TraceSink for InMemorySink {
     }
 
     fn aggregator_fold(&self, ctx: &super::PhaseSpanContext, kind: &str, _input_count: usize) {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "trace_id".to_string(),
-            Value::String(ctx.trace_id.to_string()),
-        );
-        map.insert("span_id".to_string(), Value::String(super::new_span_id()));
-        map.insert(
-            "parent_span_id".to_string(),
-            Value::String(ctx.span_id.clone()),
-        );
-        map.insert(
-            "name".to_string(),
-            Value::String(format!("aggregator.{kind}")),
+        let mut map = super::build_span_skeleton(
+            ctx.trace_id,
+            &super::new_span_id(),
+            Some(&ctx.span_id),
+            &format!("aggregator.{kind}"),
         );
         map.insert(
             "loker.aggregator".to_string(),
@@ -166,19 +147,11 @@ impl TraceSink for InMemorySink {
         hook_name: &str,
         result: &super::VerifySpanResult,
     ) {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "trace_id".to_string(),
-            Value::String(ctx.trace_id.to_string()),
-        );
-        map.insert("span_id".to_string(), Value::String(super::new_span_id()));
-        map.insert(
-            "parent_span_id".to_string(),
-            Value::String(ctx.span_id.clone()),
-        );
-        map.insert(
-            "name".to_string(),
-            Value::String(format!("verify.{hook_name}")),
+        let mut map = super::build_span_skeleton(
+            ctx.trace_id,
+            &super::new_span_id(),
+            Some(&ctx.span_id),
+            &format!("verify.{hook_name}"),
         );
         map.insert(
             "loker.outcome".to_string(),
@@ -188,54 +161,44 @@ impl TraceSink for InMemorySink {
                 "verify_failed".to_string()
             }),
         );
+        map.insert(
+            "duration_ms".to_string(),
+            Value::Number(result.duration_ms.into()),
+        );
         if let Some(ref msg) = result.message {
             map.insert("error.message".to_string(), Value::String(msg.clone()));
         }
         self.push(Value::Object(map));
     }
 
-    fn phase_finished(&self, ctx: &super::PhaseSpanContext, outcome: &str) {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "trace_id".to_string(),
-            Value::String(ctx.trace_id.to_string()),
-        );
-        map.insert("span_id".to_string(), Value::String(super::new_span_id()));
-        map.insert(
-            "parent_span_id".to_string(),
-            Value::String(ctx.span_id.clone()),
-        );
-        map.insert(
-            "name".to_string(),
-            Value::String(format!("phase.{}.finished", ctx.phase)),
+    fn phase_finished(&self, ctx: &super::PhaseSpanContext, outcome: &str, duration_ms: u64) {
+        let mut map = super::build_span_skeleton(
+            ctx.trace_id,
+            &super::new_span_id(),
+            Some(&ctx.span_id),
+            &format!("phase.{}.finished", ctx.phase),
         );
         map.insert(
             "loker.outcome".to_string(),
             Value::String(outcome.to_string()),
         );
+        map.insert("duration_ms".to_string(), Value::Number(duration_ms.into()));
         self.push(Value::Object(map));
     }
 
-    fn error(&self, ctx: &super::PhaseSpanContext, kind: &str, message: &str) {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            "trace_id".to_string(),
-            Value::String(ctx.trace_id.to_string()),
-        );
-        map.insert("span_id".to_string(), Value::String(super::new_span_id()));
-        map.insert(
-            "parent_span_id".to_string(),
-            Value::String(ctx.span_id.clone()),
-        );
-        map.insert(
-            "name".to_string(),
-            Value::String(format!("phase.{}.error", ctx.phase)),
+    fn error(&self, ctx: &super::PhaseSpanContext, kind: &str, message: &str, duration_ms: u64) {
+        let mut map = super::build_span_skeleton(
+            ctx.trace_id,
+            &super::new_span_id(),
+            Some(&ctx.span_id),
+            &format!("phase.{}.error", ctx.phase),
         );
         map.insert("error.kind".to_string(), Value::String(kind.to_string()));
         map.insert(
             "error.message".to_string(),
             Value::String(message.to_string()),
         );
+        map.insert("duration_ms".to_string(), Value::Number(duration_ms.into()));
         self.push(Value::Object(map));
     }
 }
@@ -336,8 +299,8 @@ mod tests {
                 duration_ms: 0,
             },
         );
-        sink.phase_finished(&ctx, "success");
-        sink.error(&ctx, "test", "message");
+        sink.phase_finished(&ctx, "success", 42);
+        sink.error(&ctx, "test", "message", 7);
 
         let spans = sink.spans();
         assert_eq!(spans.len(), 6);
