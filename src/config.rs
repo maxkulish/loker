@@ -23,6 +23,23 @@ pub struct Config {
     pub roles: HashMap<String, crate::role::RoleConfig>,
     #[serde(default)]
     pub teams: HashMap<String, crate::role::TeamConfig>,
+    #[serde(default)]
+    pub run_state: RunStateConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AttemptRetention {
+    #[default]
+    Unbounded,
+    Keep(usize),
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct RunStateConfig {
+    #[serde(default)]
+    pub keep_attempts: AttemptRetention,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -343,6 +360,7 @@ impl Default for Config {
             tasks,
             roles: HashMap::new(),
             teams: HashMap::new(),
+            run_state: RunStateConfig::default(),
         }
     }
 }
