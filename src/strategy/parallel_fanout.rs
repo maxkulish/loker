@@ -124,6 +124,7 @@ impl Strategy for ParallelFanOut {
         let is_any_fail = matches!(self.aggregator, Aggregator::AnyFail);
         let is_llm_judge = matches!(self.aggregator, Aggregator::LLMJudge { .. });
         let is_vote = matches!(self.aggregator, Aggregator::Vote { .. });
+        let is_all_pass = matches!(self.aggregator, Aggregator::AllPass);
 
         while let Some((idx, result)) = futures.next().await {
             let target = &self.targets[idx];
@@ -199,7 +200,11 @@ impl Strategy for ParallelFanOut {
                         verify: VerifyOutcome::skipped(),
                     });
 
-                    if !is_any_fail && !is_llm_judge && !is_vote && successes >= self.min_responses
+                    if !is_any_fail
+                        && !is_llm_judge
+                        && !is_vote
+                        && !is_all_pass
+                        && successes >= self.min_responses
                     {
                         // For non-LLMJudge / non-Vote aggregation modes, stop once enough
                         // successes are in to meet the configured floor.

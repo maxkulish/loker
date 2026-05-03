@@ -202,7 +202,12 @@ impl PhaseRunner {
         {
             Ok(output) => output,
             Err(err) => {
-                let phase_err = PhaseError::StrategyFailed(err);
+                let phase_err = match err {
+                    StrategyError::AnyFail { reason, .. } => PhaseError::Aggregator(
+                        crate::aggregator::AggregatorError::BranchFailures(reason.to_string()),
+                    ),
+                    other => PhaseError::StrategyFailed(other),
+                };
                 let _ = persist::record_terminal_failure(
                     &markers,
                     &inputs.run_dir,
@@ -214,25 +219,27 @@ impl PhaseRunner {
             }
         };
 
-        let aggregator = dispatch::resolve_aggregator(cfg.aggregator)?;
-        let bytes = match dispatch::canonical_bytes(&inputs.run_dir, &strategy_output, &aggregator)
-        {
-            Ok(bytes) => bytes,
-            Err(err) => {
-                let _ = persist::record_terminal_failure(
-                    &markers,
-                    &inputs.run_dir,
-                    cfg,
-                    strategy_output.attempts.len().max(1) as u32,
-                    err.error_class(),
-                );
-                return Err(err);
-            }
-        };
+        for attempt in 1..strategy_output.attempts.len() {
+            persist::start_attempt(&markers, &cfg.phase, attempt as u32)?;
+        }
 
-        let verify_result = if matches!(cfg.verify, VerifyHookName::None)
-            || matches!(strategy_output.strategy, StrategyKind::Escalating)
-        {
+        let aggregator = dispatch::resolve_aggregator(cfg.aggregator)?;
+        let (bytes, selected_attempt) =
+            match dispatch::canonical_bytes(&inputs.run_dir, &strategy_output, &aggregator) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    let _ = persist::record_terminal_failure(
+                        &markers,
+                        &inputs.run_dir,
+                        cfg,
+                        strategy_output.attempts.len().max(1) as u32,
+                        err.error_class(),
+                    );
+                    return Err(err);
+                }
+            };
+
+        let verify_result = if matches!(cfg.verify, VerifyHookName::None) {
             None
         } else {
             let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
@@ -259,7 +266,7 @@ impl PhaseRunner {
             if !result.is_pass() {
                 let phase_err = PhaseError::VerifyFailed {
                     phase: cfg.phase.clone(),
-                    attempt: winning_attempt(&strategy_output),
+                    attempt: selected_attempt,
                     result,
                 };
                 let _ = persist::record_terminal_failure(
@@ -274,7 +281,7 @@ impl PhaseRunner {
             Some(result)
         };
 
-        let attempt = winning_attempt(&strategy_output);
+        let attempt = selected_attempt;
         let (artefact_path, manifest_entry) =
             persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, inputs.ctx.run_id)?;
         markers.write_completed(

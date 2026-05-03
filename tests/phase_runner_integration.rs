@@ -46,6 +46,11 @@ impl VerifyHook for SequenceVerifyHook {
     }
 }
 
+#[derive(Debug)]
+struct ErrorBackend {
+    name: &'static str,
+}
+
 #[async_trait]
 impl Backend for MockBackend {
     fn name(&self) -> &str {
@@ -63,6 +68,33 @@ impl Backend for MockBackend {
             self.name,
             Duration::from_millis(1),
         ))
+    }
+
+    fn is_available(&self) -> bool {
+        true
+    }
+
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities::none()
+    }
+}
+
+#[async_trait]
+impl Backend for ErrorBackend {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    async fn query(
+        &self,
+        _prompt: &str,
+        _cwd: &Path,
+        _model: Option<&str>,
+    ) -> Result<QueryOutput, BackendError> {
+        Err(BackendError::ExecutionFailed {
+            message: "branch failed".into(),
+            exit_code: Some(1),
+        })
     }
 
     fn is_available(&self) -> bool {
@@ -166,13 +198,16 @@ async fn phase_runner_parallel_all_pass_collects_failures() {
     let mut cfg = PhaseConfig::single("review", "unused", "hello", "review.md");
     cfg.strategy = StrategyName::Parallel;
     cfg.aggregator = AggregatorName::AllPass;
-    cfg.targets = vec![TargetSpec::new("a"), TargetSpec::new("missing")];
+    cfg.targets = vec![TargetSpec::new("a"), TargetSpec::new("b")];
     cfg.min_responses = 1;
 
-    let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(MockBackend {
-        name: "a",
-        output: "A",
-    })];
+    let backends: Vec<Arc<dyn Backend>> = vec![
+        Arc::new(MockBackend {
+            name: "a",
+            output: "A",
+        }),
+        Arc::new(ErrorBackend { name: "b" }),
+    ];
 
     let err = PhaseRunner::new()
         .run(
@@ -187,7 +222,87 @@ async fn phase_runner_parallel_all_pass_collects_failures() {
         )
         .await
         .unwrap_err();
-    assert_eq!(err.error_class(), "strategy_failed");
+    assert_eq!(err.error_class(), "aggregator_failed");
+    assert!(tmp.path().join("markers/review.failed").is_file());
+}
+
+#[tokio::test]
+async fn phase_runner_parallel_concat_any_fail_three_replicas_completed_and_rejected() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = PhaseConfig::single("review", "unused", "hello", "review.md");
+    cfg.strategy = StrategyName::Parallel;
+    cfg.aggregator = AggregatorName::AnyFail;
+    cfg.verify = VerifyHookName::RunCommand;
+    cfg.targets = vec![
+        TargetSpec::new("a"),
+        TargetSpec::new("b"),
+        TargetSpec::new("c"),
+    ];
+    cfg.min_responses = 3;
+
+    let backends: Vec<Arc<dyn Backend>> = vec![
+        Arc::new(MockBackend {
+            name: "a",
+            output: r#"{"pass": true}"#,
+        }),
+        Arc::new(MockBackend {
+            name: "b",
+            output: r#"{"pass": true}"#,
+        }),
+        Arc::new(MockBackend {
+            name: "c",
+            output: r#"{"pass": true}"#,
+        }),
+    ];
+    let verify: Arc<dyn VerifyHook> = Arc::new(StubVerifyHook {
+        result: VerifyResult::pass(),
+    });
+    PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "review"),
+                verify: Some(verify),
+                run_dir: tmp.path().to_path_buf(),
+            },
+        )
+        .await
+        .expect("any_fail all pass succeeds");
+    assert!(tmp.path().join("markers/review.completed").is_file());
+
+    let tmp = tempfile::tempdir().unwrap();
+    let backends: Vec<Arc<dyn Backend>> = vec![
+        Arc::new(MockBackend {
+            name: "a",
+            output: r#"{"pass": true}"#,
+        }),
+        Arc::new(MockBackend {
+            name: "b",
+            output: r#"{"pass": false}"#,
+        }),
+        Arc::new(MockBackend {
+            name: "c",
+            output: r#"{"pass": true}"#,
+        }),
+    ];
+    let err = PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "review"),
+                verify: Some(Arc::new(StubVerifyHook {
+                    result: VerifyResult::pass(),
+                })),
+                run_dir: tmp.path().to_path_buf(),
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.error_class(), "aggregator_failed");
     assert!(tmp.path().join("markers/review.failed").is_file());
 }
 
@@ -212,7 +327,11 @@ async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failur
         }),
     ];
     let verify: Arc<dyn VerifyHook> = Arc::new(SequenceVerifyHook {
-        results: Mutex::new(vec![VerifyResult::fail("not yet"), VerifyResult::pass()]),
+        results: Mutex::new(vec![
+            VerifyResult::fail("not yet"),
+            VerifyResult::pass(),
+            VerifyResult::pass(),
+        ]),
     });
 
     let outcome = PhaseRunner::new()

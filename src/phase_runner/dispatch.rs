@@ -71,11 +71,11 @@ pub fn canonical_bytes(
     run_dir: &Path,
     output: &crate::strategy::StrategyOutput,
     aggregator: &Aggregator,
-) -> Result<Vec<u8>, PhaseError> {
+) -> Result<(Vec<u8>, u32), PhaseError> {
     if let Some(path) = &output.aggregate_output_path {
         let path = resolve_output_path(run_dir, path);
         if path.is_file() {
-            return Ok(std::fs::read(path)?);
+            return Ok((std::fs::read(path)?, selected_attempt_index(output)));
         }
     }
 
@@ -92,7 +92,7 @@ pub fn canonical_bytes(
                 &[],
                 &crate::strategy::PhaseContext::new(&output.phase, output.run_id),
             )?;
-            Ok(aggregate.text.into_bytes())
+            Ok((aggregate.text.into_bytes(), selected_attempt_index(output)))
         }
         Aggregator::AnyFail => first_success_bytes(run_dir, output),
         Aggregator::Vote { .. } | Aggregator::LLMJudge { .. } => {
@@ -104,11 +104,12 @@ pub fn canonical_bytes(
 fn first_success_bytes(
     run_dir: &Path,
     output: &crate::strategy::StrategyOutput,
-) -> Result<Vec<u8>, PhaseError> {
-    let attempt = output
+) -> Result<(Vec<u8>, u32), PhaseError> {
+    let (idx, attempt) = output
         .attempts
         .iter()
-        .find(|a| {
+        .enumerate()
+        .find(|(_, a)| {
             !a.finish_reasons
                 .contains(&crate::strategy::FinishReason::Error)
         })
@@ -116,21 +117,22 @@ fn first_success_bytes(
             phase: output.phase.clone(),
             message: "no successful attempts".into(),
         })?;
-    Ok(std::fs::read(resolve_output_path(
-        run_dir,
-        &attempt.output_path,
-    ))?)
+    Ok((
+        std::fs::read(resolve_output_path(run_dir, &attempt.output_path))?,
+        idx as u32,
+    ))
 }
 
 fn winning_success_bytes(
     run_dir: &Path,
     output: &crate::strategy::StrategyOutput,
-) -> Result<Vec<u8>, PhaseError> {
-    let attempt = output
+) -> Result<(Vec<u8>, u32), PhaseError> {
+    let (idx, attempt) = output
         .attempts
         .iter()
+        .enumerate()
         .rev()
-        .find(|a| {
+        .find(|(_, a)| {
             !a.finish_reasons
                 .contains(&crate::strategy::FinishReason::Error)
                 && a.verify.status != crate::strategy::VerifyStatus::Fail
@@ -139,10 +141,25 @@ fn winning_success_bytes(
             phase: output.phase.clone(),
             message: "no successful attempts".into(),
         })?;
-    Ok(std::fs::read(resolve_output_path(
-        run_dir,
-        &attempt.output_path,
-    ))?)
+    Ok((
+        std::fs::read(resolve_output_path(run_dir, &attempt.output_path))?,
+        idx as u32,
+    ))
+}
+
+fn selected_attempt_index(output: &crate::strategy::StrategyOutput) -> u32 {
+    output
+        .attempts
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, a)| {
+            !a.finish_reasons
+                .contains(&crate::strategy::FinishReason::Error)
+                && a.verify.status != crate::strategy::VerifyStatus::Fail
+        })
+        .map(|(idx, _)| idx as u32)
+        .unwrap_or(0)
 }
 
 fn aggregate_input_from_attempt_paths(
