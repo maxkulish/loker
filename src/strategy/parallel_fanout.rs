@@ -472,7 +472,10 @@ async fn write_branch_output(
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent).await.map_err(|err| {
                 StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
-                    message: format!("failed to create branch output parent {}: {err}", parent.display()),
+                    message: format!(
+                        "failed to create branch output parent {}: {err}",
+                        parent.display()
+                    ),
                     exit_code: None,
                 })
             })?;

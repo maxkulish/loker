@@ -6,11 +6,7 @@ use crate::run_state::markers::{MarkerError, MarkerWriter};
 
 use super::{PhaseConfig, PhaseError};
 
-pub fn start_attempt(
-    markers: &MarkerWriter,
-    phase: &str,
-    attempt: u32,
-) -> Result<(), MarkerError> {
+pub fn start_attempt(markers: &MarkerWriter, phase: &str, attempt: u32) -> Result<(), MarkerError> {
     markers.write_started(phase, attempt)?;
     Ok(())
 }
@@ -20,7 +16,10 @@ pub fn archive_failed_attempt(
     phase: &str,
     attempt: u32,
 ) -> Result<PathBuf, std::io::Error> {
-    let dir = run_dir.join("attempts").join(phase).join(attempt.to_string());
+    let dir = run_dir
+        .join("attempts")
+        .join(phase)
+        .join(attempt.to_string());
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }
@@ -111,7 +110,8 @@ mod tests {
     fn phase_runner_persist_commit_success_writes_manifest_and_marker_inputs() {
         let tmp = tempfile::tempdir().unwrap();
         let cfg = cfg();
-        let (path, entry) = commit_success(tmp.path(), &cfg, b"hello", 0, uuid::Uuid::nil()).unwrap();
+        let (path, entry) =
+            commit_success(tmp.path(), &cfg, b"hello", 0, uuid::Uuid::nil()).unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"hello");
         assert_eq!(entry.name, "design.md");
         assert!(tmp.path().join("manifest.json").is_file());
@@ -123,7 +123,10 @@ mod tests {
         let cfg = cfg();
         let markers = MarkerWriter::new(tmp.path());
         record_terminal_failure(&markers, tmp.path(), &cfg, 1, "verify_failed").unwrap();
-        assert!(tmp.path().join("attempts/design/0/failure-summary.json").is_file());
+        assert!(tmp
+            .path()
+            .join("attempts/design/0/failure-summary.json")
+            .is_file());
         assert!(tmp.path().join("markers/design.failed").is_file());
     }
 }

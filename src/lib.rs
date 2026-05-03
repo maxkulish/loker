@@ -26,6 +26,6 @@ mod workflow;
 mod workflows;
 
 pub use phase_runner::{
-    AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRunner, PhaseRung,
+    AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRung, PhaseRunner,
     StrategyName, VerifyHookName,
 };

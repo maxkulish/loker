@@ -215,7 +215,8 @@ impl PhaseRunner {
         };
 
         let aggregator = dispatch::resolve_aggregator(cfg.aggregator)?;
-        let bytes = match dispatch::canonical_bytes(&inputs.run_dir, &strategy_output, &aggregator) {
+        let bytes = match dispatch::canonical_bytes(&inputs.run_dir, &strategy_output, &aggregator)
+        {
             Ok(bytes) => bytes,
             Err(err) => {
                 let _ = persist::record_terminal_failure(
@@ -274,18 +275,13 @@ impl PhaseRunner {
         };
 
         let attempt = winning_attempt(&strategy_output);
-        let (artefact_path, manifest_entry) = persist::commit_success(
-            &inputs.run_dir,
-            cfg,
-            &bytes,
-            attempt,
-            inputs.ctx.run_id,
-        )?;
+        let (artefact_path, manifest_entry) =
+            persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, inputs.ctx.run_id)?;
         markers.write_completed(
             &cfg.phase,
             attempt,
             &manifest_entry.sha256,
-            &[cfg.artefact_name.clone()],
+            std::slice::from_ref(&cfg.artefact_name),
         )?;
 
         let strategy_kind = strategy_output.strategy;

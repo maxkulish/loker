@@ -87,11 +87,17 @@ pub fn canonical_bytes(
     match aggregator {
         Aggregator::First => winning_success_bytes(run_dir, output),
         Aggregator::Concat { .. } | Aggregator::AllPass => {
-            let aggregate = aggregator.aggregate(input, &[], &crate::strategy::PhaseContext::new(&output.phase, output.run_id))?;
+            let aggregate = aggregator.aggregate(
+                input,
+                &[],
+                &crate::strategy::PhaseContext::new(&output.phase, output.run_id),
+            )?;
             Ok(aggregate.text.into_bytes())
         }
         Aggregator::AnyFail => first_success_bytes(run_dir, output),
-        Aggregator::Vote { .. } | Aggregator::LLMJudge { .. } => first_success_bytes(run_dir, output),
+        Aggregator::Vote { .. } | Aggregator::LLMJudge { .. } => {
+            first_success_bytes(run_dir, output)
+        }
     }
 }
 
@@ -102,12 +108,18 @@ fn first_success_bytes(
     let attempt = output
         .attempts
         .iter()
-        .find(|a| !a.finish_reasons.contains(&crate::strategy::FinishReason::Error))
+        .find(|a| {
+            !a.finish_reasons
+                .contains(&crate::strategy::FinishReason::Error)
+        })
         .ok_or_else(|| PhaseError::PhaseFailed {
             phase: output.phase.clone(),
             message: "no successful attempts".into(),
         })?;
-    Ok(std::fs::read(resolve_output_path(run_dir, &attempt.output_path))?)
+    Ok(std::fs::read(resolve_output_path(
+        run_dir,
+        &attempt.output_path,
+    ))?)
 }
 
 fn winning_success_bytes(
@@ -119,14 +131,18 @@ fn winning_success_bytes(
         .iter()
         .rev()
         .find(|a| {
-            !a.finish_reasons.contains(&crate::strategy::FinishReason::Error)
+            !a.finish_reasons
+                .contains(&crate::strategy::FinishReason::Error)
                 && a.verify.status != crate::strategy::VerifyStatus::Fail
         })
         .ok_or_else(|| PhaseError::PhaseFailed {
             phase: output.phase.clone(),
             message: "no successful attempts".into(),
         })?;
-    Ok(std::fs::read(resolve_output_path(run_dir, &attempt.output_path))?)
+    Ok(std::fs::read(resolve_output_path(
+        run_dir,
+        &attempt.output_path,
+    ))?)
 }
 
 fn aggregate_input_from_attempt_paths(
@@ -139,7 +155,10 @@ fn aggregate_input_from_attempt_paths(
         .enumerate()
         .map(|(idx, attempt)| {
             let path = resolve_output_path(run_dir, &attempt.output_path);
-            if attempt.finish_reasons.contains(&crate::strategy::FinishReason::Error) {
+            if attempt
+                .finish_reasons
+                .contains(&crate::strategy::FinishReason::Error)
+            {
                 BranchOutcome::Failure(BranchFailure {
                     backend_id: attempt.backend.clone(),
                     family: attempt.family.clone().unwrap_or_else(|| "local".into()),
@@ -176,8 +195,14 @@ mod tests {
 
     #[test]
     fn name_dispatch_resolves_known() {
-        assert!(matches!(resolve_aggregator(AggregatorName::First).unwrap(), Aggregator::First));
-        assert!(matches!(resolve_aggregator(AggregatorName::AllPass).unwrap(), Aggregator::AllPass));
+        assert!(matches!(
+            resolve_aggregator(AggregatorName::First).unwrap(),
+            Aggregator::First
+        ));
+        assert!(matches!(
+            resolve_aggregator(AggregatorName::AllPass).unwrap(),
+            Aggregator::AllPass
+        ));
 
         let single = PhaseConfig::single("p", "mock", "prompt", "out.md");
         assert!(resolve_strategy(&single, None).is_ok());

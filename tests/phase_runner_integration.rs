@@ -104,7 +104,10 @@ async fn single_first_no_verify_emits_one_artefact_and_completed_marker() {
         .await
         .expect("phase run succeeds");
 
-    assert_eq!(std::fs::read_to_string(&outcome.artefact_path).unwrap(), "canonical design");
+    assert_eq!(
+        std::fs::read_to_string(&outcome.artefact_path).unwrap(),
+        "canonical design"
+    );
     assert!(tmp.path().join("markers/design.started.0").is_file());
     assert!(tmp.path().join("markers/design.completed").is_file());
 
@@ -124,8 +127,14 @@ async fn phase_runner_parallel_concat_with_verifier_emits_completed_marker() {
     cfg.min_responses = 2;
 
     let backends: Vec<Arc<dyn Backend>> = vec![
-        Arc::new(MockBackend { name: "a", output: "A" }),
-        Arc::new(MockBackend { name: "b", output: "B" }),
+        Arc::new(MockBackend {
+            name: "a",
+            output: "A",
+        }),
+        Arc::new(MockBackend {
+            name: "b",
+            output: "B",
+        }),
     ];
     let verify: Arc<dyn VerifyHook> = Arc::new(StubVerifyHook {
         result: VerifyResult::pass(),
@@ -193,8 +202,14 @@ async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failur
         loker::PhaseRung::new(Tier::Strong, "strong"),
     ];
     let backends: Vec<Arc<dyn Backend>> = vec![
-        Arc::new(MockBackend { name: "cheap", output: "bad" }),
-        Arc::new(MockBackend { name: "strong", output: "good" }),
+        Arc::new(MockBackend {
+            name: "cheap",
+            output: "bad",
+        }),
+        Arc::new(MockBackend {
+            name: "strong",
+            output: "good",
+        }),
     ];
     let verify: Arc<dyn VerifyHook> = Arc::new(SequenceVerifyHook {
         results: Mutex::new(vec![VerifyResult::fail("not yet"), VerifyResult::pass()]),
@@ -213,7 +228,10 @@ async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failur
         )
         .await
         .expect("escalating recovers");
-    assert_eq!(std::fs::read_to_string(outcome.artefact_path).unwrap(), "good");
+    assert_eq!(
+        std::fs::read_to_string(outcome.artefact_path).unwrap(),
+        "good"
+    );
     assert!(tmp.path().join("markers/implement.completed").is_file());
 
     let tmp = tempfile::tempdir().unwrap();
