@@ -40,7 +40,21 @@ impl RunDir {
     /// Returns `RunDirError::Collision` if both attempts collide (retry-exhausted).
     pub fn create(base_dir: &Path, workflow_name: &str) -> Result<Self, RunDirError> {
         let now = chrono::Utc::now();
-        let mut run_id = uuid::Uuid::new_v4();
+        let run_id = uuid::Uuid::new_v4();
+        Self::create_with_time(base_dir, workflow_name, now, run_id)
+    }
+
+    /// Internal: create a run directory with a specific timestamp and run_id.
+    ///
+    /// This allows tests to pre-determine the first-attempt path and verify
+    /// the collision retry logic. Normal callers should use [`RunDir::create`]
+    /// which generates fresh `now` and `run_id`.
+    fn create_with_time(
+        base_dir: &Path,
+        workflow_name: &str,
+        now: chrono::DateTime<chrono::Utc>,
+        mut run_id: uuid::Uuid,
+    ) -> Result<Self, RunDirError> {
         let slug = slug::slugify(workflow_name);
 
         let dir_name = generate_dir_name(&slug, &now, &run_id);
@@ -58,13 +72,19 @@ impl RunDir {
                 run_id = uuid::Uuid::new_v4();
                 let dir_name = generate_dir_name(&slug, &now, &run_id);
                 path = runs_dir.join(&dir_name);
-                std::fs::create_dir(&path).map_err(|_| RunDirError::Collision(path.clone()))?;
+                std::fs::create_dir(&path).map_err(|e| {
+                    if e.kind() == std::io::ErrorKind::AlreadyExists {
+                        RunDirError::Collision(path.clone())
+                    } else {
+                        // Forward any other I/O error (permission denied, etc.)
+                        e.into()
+                    }
+                })?;
             }
             Err(e) => return Err(e.into()),
         }
 
         // Cleanup guard: remove the leaf directory if subsequent steps fail.
-        // We use Cell<Option<PathBuf>> so disarm() can take &self (not &mut self).
         let guard = CleanupGuard::new(path.clone());
 
         // Write initial manifest.json
@@ -135,14 +155,13 @@ impl RunDir {
 /// Format: `<slug>-<YYYYMMDD>-<HHMMSS>-<short_uuid>`
 ///
 /// Example: `design-review-20260503-104215-a1b2c3d4`
-fn generate_dir_name(slug: &str, now: &chrono::DateTime<chrono::Utc>, run_id: &uuid::Uuid) -> String {
+fn generate_dir_name(
+    slug: &str,
+    now: &chrono::DateTime<chrono::Utc>,
+    run_id: &uuid::Uuid,
+) -> String {
     let uuid_short = &run_id.to_string()[..8];
-    format!(
-        "{}-{}-{}",
-        slug,
-        now.format("%Y%m%d-%H%M%S"),
-        uuid_short
-    )
+    format!("{}-{}-{}", slug, now.format("%Y%m%d-%H%M%S"), uuid_short)
 }
 
 /// A drop-guard that removes the tracked directory on drop unless disarmed.
@@ -214,8 +233,7 @@ mod tests {
         let dir_name = run_dir.path().file_name().unwrap().to_string_lossy();
 
         // Verify format: <slug>-<YYYYMMDD>-<HHMMSS>-<short_uuid>
-        let re =
-            regex::Regex::new(r"^design-doc-tdd-\d{8}-\d{6}-[0-9a-f]{8}$").unwrap();
+        let re = regex::Regex::new(r"^design-doc-tdd-\d{8}-\d{6}-[0-9a-f]{8}$").unwrap();
         assert!(
             re.is_match(&dir_name),
             "directory name '{}' does not match expected pattern",
@@ -307,5 +325,31 @@ mod tests {
         let attempt = run_dir.attempt_dir("design", 0);
         let expected = AttemptDir::new(run_dir.path(), "design", 0);
         assert_eq!(attempt.path(), expected.path());
+    }
+
+    #[test]
+    fn collision_retry_uses_fresh_uuid() {
+        let tmp = tempfile::tempdir().unwrap();
+        let now = chrono::Utc::now();
+        let run_id = uuid::Uuid::new_v4();
+        let slug = slug::slugify("collision-test");
+
+        // Pre-create the first-attempt directory to force a collision
+        let runs_dir = tmp.path().join("runs");
+        std::fs::create_dir_all(&runs_dir).unwrap();
+        let first_attempt_name = generate_dir_name(&slug, &now, &run_id);
+        let first_attempt_path = runs_dir.join(&first_attempt_name);
+        std::fs::create_dir(&first_attempt_path).unwrap();
+
+        // Now call create_with_time — the first path collides, retry succeeds
+        let run_dir = RunDir::create_with_time(tmp.path(), "collision-test", now, run_id).unwrap();
+
+        // The resulting path must be different from the pre-created one
+        assert_ne!(run_dir.path(), first_attempt_path);
+        // The manifest and attempts/ must still be set up correctly
+        assert!(run_dir.manifest_path().exists());
+        assert!(run_dir.path().join("attempts").exists());
+        // The run_id must differ (retry uses a fresh UUID)
+        assert_ne!(run_dir.run_id(), run_id);
     }
 }

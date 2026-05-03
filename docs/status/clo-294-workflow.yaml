@@ -18,7 +18,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T09:39:56.274Z'
-  updated_at: '2026-05-03T10:20:44.371Z'
+  updated_at: '2026-05-03T10:25:00.627Z'
 phases:
   discovery:
     status: complete
@@ -55,10 +55,13 @@ phases:
     plan_file: docs/plans/clo-294-run-directory-layout.md
     approved: true
   implement:
-    status: in_progress
+    status: validating
     commits:
       - 1849d5a
       - 0a2f098
+      - 9cb0617
+      - e55246f
+      - 2341d51
   pr:
     status: pending
   complete:
@@ -156,3 +159,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2+ST3 landed: RunDir struct + mod.rs registration. Commit 0a2f098'
+  - timestamp: '2026-05-03T10:25:00.627Z'
+    action: implementation_complete
+    phase: implement
+    details: 'All sub-tasks landed. make check green. 4 commits: 1849d5a, 0a2f098, 9cb0617, e55246f, 2341d51'

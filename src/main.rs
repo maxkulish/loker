@@ -1180,18 +1180,13 @@ async fn run_workflow(
     let cwd = crate::utils::canonicalize_async(dir).await;
 
     // Create a RunDir for this workflow execution
-    match RunDir::create(&cwd, name) {
-        Ok(run_dir) => {
-            println!(
-                "{} Run directory: {}",
-                "✓".green(),
-                run_dir.path().display()
-            );
-        }
-        Err(e) => {
-            eprintln!("{} Failed to create run directory: {}", "✗".red(), e);
-        }
-    }
+    let run_dir = RunDir::create(&cwd, name)
+        .with_context(|| format!("failed to create run directory for '{}'", name))?;
+    println!(
+        "{} Run directory: {}",
+        "✓".green(),
+        run_dir.path().display()
+    );
 
     let runner = workflow::WorkflowRunner::new(config.clone(), cwd, args)
         .with_explain_validation(explain_validation);
