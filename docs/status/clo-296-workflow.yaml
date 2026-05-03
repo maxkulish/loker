@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T12:36:59.533Z'
-  updated_at: '2026-05-03T13:05:56.711Z'
+  updated_at: '2026-05-03T13:09:54.571Z'
 phases:
   discovery:
     status: complete
@@ -67,6 +67,7 @@ phases:
       implement:
         commits:
           - 1412cce
+          - 8f59092
   pr:
     status: pending
   complete:
@@ -149,5 +150,9 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST1 landed: PriceTable — prices.toml + pricing lookup. Commit 1412cce.'
+  - timestamp: '2026-05-03T13:09:54.571Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: TraceReader — trace.jsonl token aggregation. Commit 8f59092.'
 task_title: '[T-032] Implement summary.json with per-backend tokens + cost_budget_usd warning'
 task_url: https://linear.app/cloud-ai/issue/CLO-296/t-032-implement-summaryjson-with-per-backend-tokens

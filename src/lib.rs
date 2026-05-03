@@ -31,6 +31,10 @@ pub use phase_runner::{
     AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRung, PhaseRunner,
     StrategyName, VerifyHookName,
 };
+pub use summary::{
+    BackendUsage, InMemorySummarySink, PhaseStatus, PriceTable, RunStatus, Summary, SummaryError,
+    SummarySink, SummaryWriter, Totals, TraceReader,
+};
 pub use trace::{
     AttemptSpanContext, BackendSpanResult, InMemorySink, PhaseSpanContext, TraceSink, TraceWriter,
     VerifySpanResult,
