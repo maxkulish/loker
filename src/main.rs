@@ -874,9 +874,7 @@ async fn main() -> Result<()> {
 
             let run_state = RunState::load(&run_dir, effective_ttl)?;
 
-            if let Some(loker::run_state::HeartbeatStatus::Live(ref hb)) =
-                run_state.heartbeat
-            {
+            if let Some(loker::run_state::HeartbeatStatus::Live(ref hb)) = run_state.heartbeat {
                 anyhow::bail!(
                     "run is already in progress (heartbeat live at {})",
                     hb.tick_at
@@ -888,7 +886,11 @@ async fn main() -> Result<()> {
 
             // Phase configs would be derived from workflow here.
             // For now, print status and exit.
-            if run_state.phase_status.values().all(|s| *s == loker::run_state::PhaseStatus::Completed) {
+            if run_state
+                .phase_status
+                .values()
+                .all(|s| *s == loker::run_state::PhaseStatus::Completed)
+            {
                 println!("All phases complete — nothing to resume.");
                 return Ok(());
             }

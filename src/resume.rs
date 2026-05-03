@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 pub mod lock;
 pub mod sweep;
 
@@ -154,33 +156,29 @@ impl ResumeRunner {
 
     /// Execute the resume plan. Returns Ok(()) when the run reaches completion
     /// (either because work was done or because all phases were already done).
-    pub async fn execute(
-        &self,
-        plan: &ResumePlan,
-    ) -> Result<(), ResumeError> {
+    pub async fn execute(&self, plan: &ResumePlan) -> Result<(), ResumeError> {
         let runner = crate::phase_runner::PhaseRunner::new();
 
         for (phase_cfg, action) in &plan.actions {
             match action {
                 PhaseAction::Skip => {
-                    eprintln!("  [resume] skipping '{}': already completed", phase_cfg.phase);
+                    eprintln!(
+                        "  [resume] skipping '{}': already completed",
+                        phase_cfg.phase
+                    );
                 }
                 PhaseAction::Resume { attempt } => {
                     eprintln!(
                         "  [resume] resuming '{}' at attempt {}",
                         phase_cfg.phase, attempt
                     );
-                    archive_current_attempt(&plan.run_dir,
-                        &phase_cfg.phase,
-                        *attempt,
-                    )?;
+                    archive_current_attempt(&plan.run_dir, &phase_cfg.phase, *attempt)?;
                     self.run_phase(&runner, phase_cfg, &plan.run_dir, *attempt)
                         .await?;
                 }
                 PhaseAction::RunFresh => {
                     eprintln!("  [resume] running '{}' fresh", phase_cfg.phase);
-                    self.run_phase(&runner, phase_cfg, &plan.run_dir, 0)
-                        .await?;
+                    self.run_phase(&runner, phase_cfg, &plan.run_dir, 0).await?;
                 }
             }
         }
@@ -195,9 +193,7 @@ impl ResumeRunner {
         run_dir: &std::path::Path,
         _attempt: u32,
     ) -> Result<(), ResumeError> {
-        let ctx = crate::strategy::PhaseContext::new(&cfg.phase,
-            uuid::Uuid::new_v4(),
-        );
+        let ctx = crate::strategy::PhaseContext::new(&cfg.phase, uuid::Uuid::new_v4());
         let prompt = crate::strategy::Prompt::new();
         let inputs = crate::phase_runner::PhaseInputs {
             backends: &self.backends,
@@ -242,7 +238,12 @@ mod planner_tests {
         let phases = vec![
             crate::phase_runner::PhaseConfig::single("design", "openai", "do design", "design.md"),
             crate::phase_runner::PhaseConfig::single("review", "openai", "do review", "review.md"),
-            crate::phase_runner::PhaseConfig::single("verify", "openai", "do verify", "verify.json"),
+            crate::phase_runner::PhaseConfig::single(
+                "verify",
+                "openai",
+                "do verify",
+                "verify.json",
+            ),
         ];
 
         let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
@@ -340,9 +341,9 @@ mod planner_tests {
 
         let run_state = fake_run_state(HashMap::new());
 
-        let phases = vec![
-            crate::phase_runner::PhaseConfig::single("phase1", "openai", "p1", "a1.md"),
-        ];
+        let phases = vec![crate::phase_runner::PhaseConfig::single(
+            "phase1", "openai", "p1", "a1.md",
+        )];
 
         let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
         assert_eq!(plan.actions[0].1, PhaseAction::RunFresh);
@@ -382,26 +383,24 @@ mod planner_tests {
 
         let run_state = RunState {
             run_id: "test".to_string(),
-            entries: vec![
-                crate::manifest::ManifestEntry {
-                    schema_version: 1,
-                    name: "phase1/file.md".to_string(),
-                    kind: crate::manifest::Kind::DesignMd,
-                    sha256: "ff".repeat(32),
-                    phase: Some("phase1".to_string()),
-                    producer: crate::manifest::Producer::Single,
-                    attempt: None,
-                    created_at: Some(chrono::Utc::now()),
-                }
-            ],
+            entries: vec![crate::manifest::ManifestEntry {
+                schema_version: 1,
+                name: "phase1/file.md".to_string(),
+                kind: crate::manifest::Kind::DesignMd,
+                sha256: "ff".repeat(32),
+                phase: Some("phase1".to_string()),
+                producer: crate::manifest::Producer::Single,
+                attempt: None,
+                created_at: Some(chrono::Utc::now()),
+            }],
             dropped_orphans: vec![],
             phase_status,
             heartbeat: None,
         };
 
-        let phases = vec![
-            crate::phase_runner::PhaseConfig::single("phase1", "openai", "p1", "file.md"),
-        ];
+        let phases = vec![crate::phase_runner::PhaseConfig::single(
+            "phase1", "openai", "p1", "file.md",
+        )];
 
         // The plan succeeds because ResumePlanner trusts RunState::load results.
         // SHA verification is done by RunState::load, not by the planner.

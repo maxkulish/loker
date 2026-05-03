@@ -11,10 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///
 /// Returns `Err` on any IO failure (disk-full, permission denied, etc.).
 /// Callers should abort rather than proceed with a dirty run directory.
-pub fn sweep_stale_tmp(
-    run_dir: &Path,
-    ttl_seconds: u64,
-) -> Result<Vec<PathBuf>, io::Error> {
+pub fn sweep_stale_tmp(run_dir: &Path, ttl_seconds: u64) -> Result<Vec<PathBuf>, io::Error> {
     let mut swept = Vec::new();
     let now = SystemTime::now();
     let cutoff = match now.duration_since(UNIX_EPOCH) {
@@ -81,7 +78,9 @@ fn collect_tmp_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), io::Error
             if rel
                 .as_ref()
                 .map(|p| {
-                    p.components().next().map(|c| c.as_os_str() == "_orphan_tmp")
+                    p.components()
+                        .next()
+                        .map(|c| c.as_os_str() == "_orphan_tmp")
                         == Some(true)
                 })
                 .unwrap_or(false)
@@ -89,11 +88,7 @@ fn collect_tmp_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), io::Error
                 continue;
             }
             collect_tmp_files(&path, out)?;
-        } else if path
-            .extension()
-            .and_then(|e| e.to_str())
-            == Some("tmp")
-        {
+        } else if path.extension().and_then(|e| e.to_str()) == Some("tmp") {
             out.push(path);
         }
     }

@@ -72,7 +72,8 @@ fn write_started_marker(tmp: &Path, phase: &str, attempt: u32) {
         heartbeat_ttl_seconds: 300,
     };
     fs::write(
-        tmp.join("markers").join(format!("{phase}.started.{attempt}")),
+        tmp.join("markers")
+            .join(format!("{phase}.started.{attempt}")),
         serde_json::to_string_pretty(&marker).unwrap(),
     )
     .unwrap();
@@ -223,9 +224,10 @@ fn resume_live_writer() {
     let run_state = RunState::load(tmp.path(), 300).unwrap();
 
     // Heartbeat should be classified as Live
-    assert!(
-        matches!(run_state.heartbeat, Some(loker::run_state::HeartbeatStatus::Live(_)))
-    );
+    assert!(matches!(
+        run_state.heartbeat,
+        Some(loker::run_state::HeartbeatStatus::Live(_))
+    ));
 }
 
 // ---------------------------------------------------------------------------

@@ -293,7 +293,11 @@ async fn heartbeat_file_gets_created_and_contains_valid_json() {
     let body: HeartbeatBody = serde_json::from_str(&content).unwrap();
     assert!(body.writer_pid > 0);
     assert!(!body.writer_host.is_empty());
-    assert_eq!(body.ttl_seconds, Some(300), "ttl_seconds should default to 300");
+    assert_eq!(
+        body.ttl_seconds,
+        Some(300),
+        "ttl_seconds should default to 300"
+    );
 }
 
 #[tokio::test]
@@ -321,7 +325,11 @@ async fn heartbeat_file_updated_on_subsequent_ticks() {
         "heartbeat tick should be recent, but age is {}s",
         age.num_seconds()
     );
-    assert_eq!(body.ttl_seconds, Some(300), "ttl_seconds should be persisted");
+    assert_eq!(
+        body.ttl_seconds,
+        Some(300),
+        "ttl_seconds should be persisted"
+    );
 }
 
 #[test]
