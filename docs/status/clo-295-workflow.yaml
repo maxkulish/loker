@@ -27,7 +27,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T12:35:56.289Z'
-  updated_at: '2026-05-03T13:18:01.608Z'
+  updated_at: '2026-05-03T13:19:01.612Z'
 phases:
   discovery:
     status: complete
@@ -70,6 +70,7 @@ phases:
       - 0cc2c8f
       - ac403d2
       - c7e6555
+      - d83cce0
   pr:
     status: pending
   complete:
@@ -164,5 +165,9 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: advisory lock RunLock with fcntl lock, Drop release, 2 unit tests. Commit c7e6555.'
+  - timestamp: '2026-05-03T13:19:01.612Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: stale tmp sweep with recursive walk, mtime check, orphan dir creation, 3 unit tests. Commit d83cce0.'
 task_title: '[T-031] Implement run resumability via status markers'
 task_url: https://linear.app/cloud-ai/issue/CLO-295/t-031-implement-run-resumability-via-status-markers
