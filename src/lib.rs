@@ -12,6 +12,7 @@ pub mod manifest;
 pub mod phase_runner;
 pub mod run_state;
 pub mod strategy;
+pub mod summary;
 pub mod template;
 pub mod trace;
 
