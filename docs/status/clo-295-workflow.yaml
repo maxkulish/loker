@@ -24,10 +24,10 @@ linear:
   priority: High
   branch_actual: feat/clo-295-run-resumability
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-03T12:35:56.289Z'
-  updated_at: '2026-05-03T13:33:02.916Z'
+  updated_at: '2026-05-03T16:42:38.244Z'
 phases:
   discovery:
     status: complete
@@ -65,7 +65,7 @@ phases:
     plan_file: docs/plans/clo-295-run-resumability.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - 0cc2c8f
       - ac403d2
@@ -76,6 +76,13 @@ phases:
       - 633ef43
       - f94c6be
       - fb53825
+    codex_report: docs/reviews/clo-295-claude-fallback-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-295-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-295-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
     status: pending
   complete:
@@ -196,5 +203,16 @@ history:
     action: implementation_complete
     phase: implement
     details: All 9 sub-tasks landed. make check green. 9 commits.
+  - timestamp: '2026-05-03T16:42:26.146Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Validation gate: Codex/Gemini wrappers failed (syntax error). Claude fallback verdict: rework. Synthesis verdict:
+      pivot. Option B accepted — descope to planner+scaffolding. Must-fix items F3/F6/F7/F8 applied. Follow-up CLO-301
+      created for runner execution. make check green.
+  - timestamp: '2026-05-03T16:42:38.244Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
 task_title: '[T-031] Implement run resumability via status markers'
 task_url: https://linear.app/cloud-ai/issue/CLO-295/t-031-implement-run-resumability-via-status-markers
