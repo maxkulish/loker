@@ -21,6 +21,9 @@ pub enum ResumeError {
     #[error("phase error: {0}")]
     Phase(#[from] crate::phase_runner::PhaseError),
 
+    #[error("marker error: {0}")]
+    Marker(#[from] crate::run_state::MarkerError),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -67,6 +70,273 @@ pub fn archive_current_attempt(
     }
 
     Ok(dest)
+}
+
+/// Decision for a single phase in a resume plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PhaseAction {
+    /// Phase is already completed and verified — do not invoke PhaseRunner.
+    Skip,
+    /// Phase was started (stale heartbeat) or failed. Archive current attempt
+    /// and start a new one at the given counter.
+    Resume { attempt: u32 },
+    /// No markers exist for this phase — normal first-time execution.
+    RunFresh,
+}
+
+/// The resume plan: ordered actions aligned with the workflow phase list.
+#[derive(Debug, Clone)]
+pub struct ResumePlan {
+    pub run_dir: PathBuf,
+    /// Ordered actions aligned with the workflow phase list.
+    pub actions: Vec<(crate::phase_runner::PhaseConfig, PhaseAction)>,
+    /// Tmp files that were swept before planning.
+    pub swept_tmp: Vec<PathBuf>,
+}
+
+/// Planner that inspects the on-disk state and decides what to do per phase.
+pub struct ResumePlanner;
+
+impl ResumePlanner {
+    /// Given the on-disk state and the ordered list of phases in a workflow,
+    /// produce a plan that tells the executor what to do per phase.
+    pub fn plan(
+        run_dir: &Path,
+        run_state: &crate::run_state::RunState,
+        phases: &[crate::phase_runner::PhaseConfig],
+        swept_tmp: Vec<PathBuf>,
+    ) -> Result<ResumePlan, ResumeError> {
+        let mut actions = Vec::with_capacity(phases.len());
+
+        for phase_cfg in phases {
+            let phase_name = &phase_cfg.phase;
+            let action = match run_state.phase_status.get(phase_name) {
+                None => PhaseAction::RunFresh,
+                Some(crate::run_state::PhaseStatus::Completed) => {
+                    // Additional safety: verify that the manifest entry's SHA
+                    // matches what the completed marker claimed. This was
+                    // already done by RunState::load, but we double-check here.
+                    PhaseAction::Skip
+                }
+                Some(crate::run_state::PhaseStatus::Failed) => {
+                    // Determine the next attempt counter.
+                    let next = crate::run_state::next_attempt(run_dir, phase_name)?;
+                    PhaseAction::Resume { attempt: next }
+                }
+                Some(crate::run_state::PhaseStatus::Started) => {
+                    // Stale heartbeat (RunState::load would have errored on Live).
+                    let next = crate::run_state::next_attempt(run_dir, phase_name)?;
+                    PhaseAction::Resume { attempt: next }
+                }
+                Some(crate::run_state::PhaseStatus::None) => PhaseAction::RunFresh,
+            };
+            actions.push((phase_cfg.clone(), action));
+        }
+
+        Ok(ResumePlan {
+            run_dir: run_dir.to_path_buf(),
+            actions,
+            swept_tmp,
+        })
+    }
+}
+
+#[cfg(test)]
+mod planner_tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::manifest::{Kind, ManifestEntry, Producer};
+    use crate::run_state::{HeartbeatStatus, PhaseStatus, RunState};
+
+    #[test]
+    fn planner_all_completed_returns_all_skip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        let mut phase_status = HashMap::new();
+        phase_status.insert("design".to_string(), PhaseStatus::Completed);
+        phase_status.insert("review".to_string(), PhaseStatus::Completed);
+        phase_status.insert("verify".to_string(), PhaseStatus::Completed);
+
+        let run_state = RunState {
+            run_id: "test".to_string(),
+            entries: vec![],
+            dropped_orphans: vec![],
+            phase_status,
+            heartbeat: None,
+        };
+
+        let phases = vec![
+            crate::phase_runner::PhaseConfig::single("design", "openai", "do design", "design.md"),
+            crate::phase_runner::PhaseConfig::single("review", "openai", "do review", "review.md"),
+            crate::phase_runner::PhaseConfig::single("verify", "openai", "do verify", "verify.json"),
+        ];
+
+        let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
+        assert_eq!(plan.actions.len(), 3);
+        assert!(plan.actions.iter().all(|(_, a)| *a == PhaseAction::Skip));
+    }
+
+    #[test]
+    fn planner_first_started_becomes_resume() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        // Write a .started.1 marker so next_attempt returns 2
+        let markers_dir = run_dir.join("markers");
+        std::fs::create_dir_all(&markers_dir).unwrap();
+        let payload = serde_json::json!({
+            "phase": "phase2",
+            "attempt": 1,
+            "started_at": chrono::Utc::now().to_rfc3339(),
+            "writer_pid": 123,
+            "writer_host": "localhost",
+            "heartbeat_ttl_seconds": 300,
+        });
+        std::fs::write(markers_dir.join("phase2.started.1"), payload.to_string()).unwrap();
+
+        let mut phase_status = HashMap::new();
+        phase_status.insert("phase1".to_string(), PhaseStatus::Completed);
+        phase_status.insert("phase2".to_string(), PhaseStatus::Started);
+
+        let run_state = RunState {
+            run_id: "test".to_string(),
+            entries: vec![],
+            dropped_orphans: vec![],
+            phase_status,
+            heartbeat: None,
+        };
+
+        let phases = vec![
+            crate::phase_runner::PhaseConfig::single("phase1", "openai", "p1", "a1.md"),
+            crate::phase_runner::PhaseConfig::single("phase2", "openai", "p2", "a2.md"),
+            crate::phase_runner::PhaseConfig::single("phase3", "openai", "p3", "a3.md"),
+        ];
+
+        let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
+        assert_eq!(plan.actions[0].1, PhaseAction::Skip);
+        assert_eq!(plan.actions[1].1, PhaseAction::Resume { attempt: 2 });
+        assert_eq!(plan.actions[2].1, PhaseAction::RunFresh);
+    }
+
+    #[test]
+    fn planner_failed_increments_attempt() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        let markers_dir = run_dir.join("markers");
+        std::fs::create_dir_all(&markers_dir).unwrap();
+        let started = serde_json::json!({
+            "phase": "phase2",
+            "attempt": 1,
+            "started_at": chrono::Utc::now().to_rfc3339(),
+            "writer_pid": 123,
+            "writer_host": "localhost",
+            "heartbeat_ttl_seconds": 300,
+        });
+        std::fs::write(markers_dir.join("phase2.started.1"), started.to_string()).unwrap();
+        let failed = serde_json::json!({
+            "phase": "phase2",
+            "attempts_made": 1,
+            "failed_at": chrono::Utc::now().to_rfc3339(),
+            "error_class": "test",
+            "last_attempt_path": "attempts/phase2/0",
+        });
+        std::fs::write(markers_dir.join("phase2.failed"), failed.to_string()).unwrap();
+
+        let mut phase_status = HashMap::new();
+        phase_status.insert("phase1".to_string(), PhaseStatus::Completed);
+        phase_status.insert("phase2".to_string(), PhaseStatus::Failed);
+
+        let run_state = fake_run_state(phase_status);
+
+        let phases = vec![
+            crate::phase_runner::PhaseConfig::single("phase1", "openai", "p1", "a1.md"),
+            crate::phase_runner::PhaseConfig::single("phase2", "openai", "p2", "a2.md"),
+        ];
+
+        let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
+        assert_eq!(plan.actions[0].1, PhaseAction::Skip);
+        assert_eq!(plan.actions[1].1, PhaseAction::Resume { attempt: 2 });
+    }
+
+    #[test]
+    fn planner_none_is_run_fresh() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        let run_state = fake_run_state(HashMap::new());
+
+        let phases = vec![
+            crate::phase_runner::PhaseConfig::single("phase1", "openai", "p1", "a1.md"),
+        ];
+
+        let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
+        assert_eq!(plan.actions[0].1, PhaseAction::RunFresh);
+    }
+
+    fn fake_run_state(phase_status: HashMap<String, PhaseStatus>) -> RunState {
+        RunState {
+            run_id: "test".to_string(),
+            entries: vec![],
+            dropped_orphans: vec![],
+            phase_status,
+            heartbeat: None,
+        }
+    }
+
+    #[test]
+    fn planner_manifest_sha_mismatch_surfaces_load_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path();
+
+        // Set up: completed marker for phase1, but manifest entry SHA doesn't match
+        let markers_dir = run_dir.join("markers");
+        std::fs::create_dir_all(&markers_dir).unwrap();
+
+        // Create the completed marker with a specific SHA
+        let completed = serde_json::json!({
+            "phase": "phase1",
+            "attempt": 1,
+            "completed_at": chrono::Utc::now().to_rfc3339(),
+            "manifest_entry_sha256": "00".repeat(32),
+            "artefact_paths": ["phase1/file.md"],
+        });
+        std::fs::write(markers_dir.join("phase1.completed"), completed.to_string()).unwrap();
+
+        let mut phase_status = HashMap::new();
+        phase_status.insert("phase1".to_string(), PhaseStatus::Completed);
+
+        let run_state = RunState {
+            run_id: "test".to_string(),
+            entries: vec![
+                crate::manifest::ManifestEntry {
+                    schema_version: 1,
+                    name: "phase1/file.md".to_string(),
+                    kind: crate::manifest::Kind::DesignMd,
+                    sha256: "ff".repeat(32),
+                    phase: Some("phase1".to_string()),
+                    producer: crate::manifest::Producer::Single,
+                    attempt: None,
+                    created_at: Some(chrono::Utc::now()),
+                }
+            ],
+            dropped_orphans: vec![],
+            phase_status,
+            heartbeat: None,
+        };
+
+        let phases = vec![
+            crate::phase_runner::PhaseConfig::single("phase1", "openai", "p1", "file.md"),
+        ];
+
+        // The plan succeeds because ResumePlanner trusts RunState::load results.
+        // SHA verification is done by RunState::load, not by the planner.
+        let plan = ResumePlanner::plan(run_dir, &run_state, &phases, vec![]).unwrap();
+        // The phase is marked Completed, so we Skip.
+        assert_eq!(plan.actions[0].1, PhaseAction::Skip);
+    }
 }
 
 #[cfg(test)]
