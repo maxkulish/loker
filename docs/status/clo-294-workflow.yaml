@@ -15,10 +15,10 @@ linear:
   blocks: []
   blocked_by: []
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-03T09:39:56.274Z'
-  updated_at: '2026-05-03T10:34:24.279Z'
+  updated_at: '2026-05-03T10:43:09.780Z'
 phases:
   discovery:
     status: complete
@@ -70,9 +70,19 @@ phases:
     validation_synthesis_report: docs/reviews/clo-294-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: in_progress
+    status: complete
+    pr_number: 40
+    pr_url: https://github.com/maxkulish/loker/pull/40
+    ci_passed: true
+    reviews_addressed: true
+    merge_commit: b743348aef874644948a62c8e68eac3d20514b5d
+    merged_at: '2026-05-03T10:41:37Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: b743348aef874644948a62c8e68eac3d20514b5d
+    merged_at: '2026-05-03T10:41:37Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-03T09:39:56.274Z'
     action: workflow_started
@@ -184,3 +194,41 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-03T10:35:53.074Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #40 opened: https://github.com/maxkulish/loker/pull/40'
+  - timestamp: '2026-05-03T10:38:31.872Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format (pass, 14s), clippy (pass, 1m14s), test (pass, 2m34s)'
+  - timestamp: '2026-05-03T10:40:58.852Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      1 thread resolved (gemini-code-assist: run_dir scope boundary). Reply posted with /gemini review trailer. Gemini
+      re-review: accepted rationale, no further concerns.
+  - timestamp: '2026-05-03T10:41:09.698Z'
+    action: pr_ready
+    phase: pr
+    details: 'PR phase complete. PR #40: CI green, all reviews addressed, 1 thread resolved.'
+  - timestamp: '2026-05-03T10:41:12.843Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-03T10:42:08.075Z'
+    action: pr_merged
+    phase: complete
+    details: 'PR #40 merged. Merge commit b743348.'
+  - timestamp: '2026-05-03T10:42:20.130Z'
+    action: pr_merged
+    phase: pr
+    details: Merge commit b743348
+  - timestamp: '2026-05-03T10:42:35.272Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
+  - timestamp: '2026-05-03T10:43:09.780Z'
+    action: workflow_complete
+    phase: complete
+    details: 'Task CLO-294 fully completed. PR #40 merged. Unblocks T-031 (resumability).'
