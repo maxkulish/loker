@@ -11,6 +11,7 @@ use crate::strategy::{
     StrategyOutput, TokenUsageReport, VerifyOutcome, SCHEMA_VERSION,
 };
 use async_trait::async_trait;
+use std::path::Path;
 use std::sync::Arc;
 
 /// Single-call strategy keyed by `backend` name (matched against
@@ -68,6 +69,9 @@ impl Strategy for SingleModel {
             .map(TokenUsageReport::from)
             .unwrap_or_default();
 
+        let output_path = "attempts/0.txt".to_string();
+        write_strategy_output(&ctx.cwd, &output_path, &query.stdout).await?;
+
         let attempt = Attempt {
             tier: None,
             family: None,
@@ -75,7 +79,7 @@ impl Strategy for SingleModel {
             model: pick_model(&query, prompt),
             finish_reasons: vec![FinishReason::Stop],
             usage,
-            output_path: "attempts/0.txt".to_string(),
+            output_path,
             verify: VerifyOutcome::skipped(),
         };
 
@@ -91,4 +95,26 @@ impl Strategy for SingleModel {
             verify: None,
         })
     }
+}
+
+async fn write_strategy_output(
+    cwd: &Path,
+    output_path: &str,
+    text: &str,
+) -> Result<(), StrategyError> {
+    let path = cwd.join(output_path);
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(|err| {
+            StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+                message: format!("failed to create output parent {}: {err}", parent.display()),
+                exit_code: None,
+            })
+        })?;
+    }
+    tokio::fs::write(&path, text).await.map_err(|err| {
+        StrategyError::Backend(crate::backend::BackendError::ExecutionFailed {
+            message: format!("failed to write strategy output {}: {err}", path.display()),
+            exit_code: None,
+        })
+    })
 }
