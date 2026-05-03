@@ -1,0 +1,158 @@
+task_id: CLO-294
+task_type: development
+classification_reason: ''
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-03T09:39:56.274Z'
+  updated_at: '2026-05-03T10:20:44.371Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: >-
+      New RunDir abstraction in src/run_state/run_dir.rs. Format: runs/<workflow_slug>-<YYYYMMDD-HHMMSS>-<short_uuid>/.
+      Pre-creates manifest.json, trace.jsonl, attempts/. Add slug crate dependency.
+    approaches_identified: 1
+    approved: true
+    baseline_score: 8
+    discovery_debt: 0
+    problem_framed: true
+  design:
+    status: complete
+    discovery_context_used: true
+    design_doc: docs/designs/clo-294-run-dir-layout.md
+    draft_ready: true
+    draft_source: pi-designer
+    applied_suggestions:
+      - 'F1: Added base_dir parameter to RunDir::create (create_in_cwd convenience wrapper)'
+      - 'F2: Removed ''reserves trace.jsonl'' from goals — trace writer creates on first append'
+      - 'F3: Added cleanup guard to atomic creation protocol (remove leaf dir on partial failure)'
+      - 'F5: Documented AttemptDir::create() responsibility on attempt_dir accessor'
+      - 'F6: Added debug_assert note for run_id consistency'
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-294-design-gemini.md
+    review_synthesis: docs/reviews/clo-294-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    finalized: true
+    plannotator_annotations: ''
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-294-run-directory-layout.md
+    approved: true
+  implement:
+    status: in_progress
+    commits:
+      - 1849d5a
+      - 0a2f098
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-03T09:39:56.274Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-294 as development
+  - timestamp: '2026-05-03T09:41:40.476Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: T-030 RunDir implementation with mechanical code changes (path layout,
+      collision-resistant directory creation, accessors). Linear metadata: team=Cloud-ai, project=Loker,
+      status_at_start=Backlog, priority=High,
+      branch_suggested=kmamemo/clo-294-t-030-implement-run-directory-layout-runsltworkflowgt, blocks=[],
+      blocked_by=[CLO-292], title='[T-030] Implement run directory layout runs/<workflow>-<timestamp>-<short-uuid>/'
+  - timestamp: '2026-05-03T09:42:01.962Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-03T09:42:59.947Z'
+    action: discovery_report_created
+    phase: discovery
+    details: >-
+      Discovery complete. Problem: PhaseRunner receives a bare PathBuf run_dir — no RunDir abstraction exists to create
+      runs/<slug>-<timestamp>-<uuid>/ layout. Key findings: (1) uuid v4 + chrono available for timestamp; (2) slug crate
+      needs adding to Cargo.toml; (3) Manifest::new(run_id) creates the correct manifest shape; (4) RunDir should live
+      in src/run_state/run_dir.rs following attempt_dir pattern; (5) CLI plumbing from loker run <workflow> to
+      PhaseRunner run_dir is the gap T-030 fills.
+  - timestamp: '2026-05-03T09:43:04.165Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approved. Approach: New RunDir abstraction in src/run_state/run_dir.rs. Format:
+      runs/<workflow_slug>-<YYYYMMDD-HHMMSS>-<short_uuid>/. Pre-creates manifest.json, trace.jsonl, attempts/. Add slug
+      crate dependency. Baseline: 8/10. Discovery debt: none. PRD exists in issue body (FR-22).
+  - timestamp: '2026-05-03T09:43:19.717Z'
+    action: phase_complete
+    phase: discovery
+    details: 'Discovery complete for CLO-294. Approach: new RunDir abstraction. Slug + uuid + chrono approach decided.'
+  - timestamp: '2026-05-03T09:43:32.295Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-03T09:44:25.185Z'
+    action: design_started
+    phase: design
+    details: >-
+      Beginning design phase for CLO-294. No prior design doc exists. Discovery context loaded (approach_chosen, prior
+      findings). Proceeding to create design document.
+  - timestamp: '2026-05-03T09:48:03.836Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc created at docs/designs/clo-294-run-dir-layout.md. Proceeding to AI review phase.
+  - timestamp: '2026-05-03T09:55:44.964Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 3 applied suggestions (F1: added base_dir param, F2: removed trace.jsonl
+      from pre-creation, F3: added cleanup guard), 0 flagged/contradictions. External reviewers failed (Gemini
+      trust/approval mode, Ollama/opencode error); manual fallback review performed.
+  - timestamp: '2026-05-03T10:04:38.471Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-03T10:04:53.966Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase. 5 applied suggestions, 0 flagged. Plannotator session closed with no annotations.
+  - timestamp: '2026-05-03T10:04:58.172Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-03T10:11:32.855Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-294-run-directory-layout.md
+  - timestamp: '2026-05-03T10:11:43.587Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 6 sub-tasks queued: ST1 (slug dep), ST2 (RunDir struct), ST3 (mod.rs), ST4 (tests), ST5 (CLI wire),
+      ST6 (make check).
+  - timestamp: '2026-05-03T10:11:47.477Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-03T10:13:55.506Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: add slug = 0.1.6 dependency. Commit 1849d5a'
+  - timestamp: '2026-05-03T10:20:44.371Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2+ST3 landed: RunDir struct + mod.rs registration. Commit 0a2f098'
