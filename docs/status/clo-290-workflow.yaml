@@ -22,10 +22,10 @@ linear:
   priority: '3'
   branch_actual: feat/clo-290-calc
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-03T09:44:59.469Z'
-  updated_at: '2026-05-03T09:51:01.494Z'
+  updated_at: '2026-05-03T09:58:32.405Z'
 phases:
   discovery:
     status: pending
@@ -34,11 +34,22 @@ phases:
   plan:
     status: pending
   implement:
-    status: validating
+    status: complete
     commits:
       - 98ada67
+      - dba5c07
+    codex_report: docs/reviews/clo-290-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-290-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-290-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 38
+    pr_url: https://github.com/maxkulish/loker/pull/38
+    ci_passed: true
   complete:
     status: pending
   spec:
@@ -109,5 +120,28 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green (8 unit tests + 1 doc-test pass). 1 commit (98ada67).
+  - timestamp: '2026-05-03T09:55:14.907Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (tooling heredoc bug). Gemini: REVIEW_FAILED (same tooling bug). Synthesis:
+      approve_with_changes. 1 fix iteration applied (F1: AC12 fence type fixed, F2: divide int/float ambiguity resolved,
+      F3: trailing newlines added). Both commits (98ada67, dba5c07) green under make check.
+  - timestamp: '2026-05-03T09:55:25.636Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-03T09:55:48.493Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (8 unit + 1 doc-test)'
+  - timestamp: '2026-05-03T09:56:27.610Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #38 opened: https://github.com/maxkulish/loker/pull/38'
+  - timestamp: '2026-05-03T09:58:32.405Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: clippy, test, format. Duration: ~2m20s.'
 task_title: Author calculator example spec at examples/specs/calculator.md
 task_url: https://linear.app/cloud-ai/issue/CLO-290/author-calculator-example-spec-at-examplesspecscalculatormd

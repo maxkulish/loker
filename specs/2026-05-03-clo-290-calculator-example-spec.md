@@ -48,7 +48,7 @@ Run each verification command from AC1–AC12 and confirm all pass. No additiona
 | 3 | Four operations named | `rg "add\|subtract\|multiply\|divide" examples/specs/calculator.md` | at least 4 occurrences | `rg "add\|subtract\|multiply\|divide" examples/specs/calculator.md | wc -l` |
 | 4 | Division-by-zero error handling | `rg "division by zero\|typed error" -i examples/specs/calculator.md` | non-empty match | `rg "division by zero\|typed error" -i examples/specs/calculator.md` |
 | 5 | 3+ acceptance examples | count concrete `add(`, `divide(` examples | ≥3 | `rg "add\([0-9]" examples/specs/calculator.md | wc -l` |
-| 6 | Rust valid syntax | code blocks in Acceptance | valid Rust | `rg "```rust" -A5 examples/specs/calculator.md \| rg -v "^```$" > /tmp/check_rust.rs && rustfmt --check /tmp/check_rust.rs` |
+| 6 | Text language tag | `` ```text ``` `` fence present, no `` ```rust ``` `` in Acceptance | correct tag | `rg "^```text$" examples/specs/calculator.md && ! rg "^```rust$" examples/specs/calculator.md` |
 
 ## 5. Edge cases
 

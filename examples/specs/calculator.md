@@ -32,7 +32,7 @@ This library serves as the integration test target for the Loker M6 phase-runner
 
 ## Acceptance
 
-```
+```text
 add(2, 3) == 5
 add(-1, 1) == 0
 subtract(10, 4) == 6
