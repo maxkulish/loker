@@ -62,6 +62,10 @@ pub struct HeartbeatBody {
     pub writer_pid: u32,
     pub writer_host: String,
     pub tick_at: DateTime<Utc>,
+    /// TTL that was active when the heartbeat was written (seconds).
+    /// If absent, callers should fall back to a default (usually 300).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttl_seconds: Option<u64>,
 }
 
 /// Configuration for a heartbeat task.
@@ -142,6 +146,7 @@ impl HeartbeatWriter {
         let heartbeat_path = config.run_dir.join("heartbeat.json");
         let writer_pid = config.writer_pid;
         let writer_host = config.writer_host;
+        let ttl_seconds = config.ttl_seconds;
 
         tokio::spawn(async move {
             // Ensure the markers directory exists.
@@ -166,6 +171,7 @@ impl HeartbeatWriter {
                     writer_pid,
                     writer_host: writer_host.clone(),
                     tick_at: Utc::now(),
+                    ttl_seconds: Some(ttl_seconds),
                 };
 
                 let json = match serde_json::to_string_pretty(&body) {
@@ -204,6 +210,19 @@ pub fn is_stale(heartbeat: &HeartbeatBody, now: &DateTime<Utc>, ttl_seconds: u64
     let ttl = chrono::Duration::seconds(ttl_seconds as i64);
     let cutoff = *now - ttl;
     heartbeat.tick_at < cutoff
+}
+
+/// Read the `ttl_seconds` value from a heartbeat file on disk.
+///
+/// Returns `None` if the file does not exist or if the field is absent.
+pub fn read_ttl(run_dir: &std::path::Path) -> Option<u64> {
+    let path = run_dir.join("heartbeat.json");
+    if !path.exists() {
+        return None;
+    }
+    let text = std::fs::read_to_string(&path).ok()?;
+    let body: HeartbeatBody = serde_json::from_str(&text).ok()?;
+    body.ttl_seconds
 }
 
 // ---------------------------------------------------------------------------
