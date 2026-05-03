@@ -79,14 +79,10 @@ pub fn canonical_bytes(
         }
     }
 
-    if matches!(aggregator, Aggregator::First) {
-        return winning_success_bytes(run_dir, output);
-    }
-
-    let input = aggregate_input_from_attempt_paths(run_dir, output)?;
     match aggregator {
-        Aggregator::First => unreachable!("Aggregator::First is handled by early return"),
+        Aggregator::First => winning_success_bytes(run_dir, output),
         Aggregator::Concat { .. } | Aggregator::AllPass => {
+            let input = aggregate_input_from_attempt_paths(run_dir, output)?;
             let aggregate = aggregator.aggregate(
                 input,
                 &[],
