@@ -194,15 +194,16 @@ fn stale_heartbeat_is_reported() {
     });
     fs::write(tmp.path().join("heartbeat.json"), heartbeat.to_string()).unwrap();
 
-    match RunState::load(tmp.path(), 60).unwrap_err() {
-        LoadError::StaleWriter {
-            last_tick,
+    let run_state = RunState::load(tmp.path(), 60).unwrap();
+    match run_state.heartbeat {
+        Some(loker::run_state::HeartbeatStatus::Stale {
             ttl_seconds,
-        } => {
+            last_tick,
+        }) => {
             assert_eq!(ttl_seconds, 60);
             assert!(last_tick <= stale);
         }
-        other => panic!("unexpected error: {other}"),
+        other => panic!("unexpected heartbeat: {other:?}"),
     }
 }
 
@@ -219,15 +220,13 @@ fn live_heartbeat_is_reported() {
     });
     fs::write(tmp.path().join("heartbeat.json"), heartbeat.to_string()).unwrap();
 
-    match RunState::load(tmp.path(), 300).unwrap_err() {
-        LoadError::LiveWriter {
-            writer_pid,
-            writer_host,
-        } => {
-            assert_eq!(writer_pid, 77);
-            assert_eq!(writer_host, "host-x");
+    let run_state = RunState::load(tmp.path(), 300).unwrap();
+    match run_state.heartbeat {
+        Some(loker::run_state::HeartbeatStatus::Live(hb)) => {
+            assert_eq!(hb.writer_pid, 77);
+            assert_eq!(hb.writer_host, "host-x");
         }
-        other => panic!("unexpected error: {other}"),
+        other => panic!("unexpected heartbeat: {other:?}"),
     }
 }
 
@@ -248,13 +247,57 @@ fn empty_manifest_loads_empty_runstate() {
 }
 
 #[test]
+fn missing_markers_directory_keeps_all_entries() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (entry1, payload1) = build_entry_payload("design/design.md", b"entry one");
+    let (entry2, payload2) = build_entry_payload("review/review.md", b"entry two");
+    write_manifest_with_run_state(
+        tmp.path(),
+        vec![(entry1.clone(), payload1), (entry2.clone(), payload2)],
+        "run-009",
+    );
+
+    let run_state = RunState::load(tmp.path(), 300).unwrap();
+    assert_eq!(run_state.entries.len(), 2);
+    assert_eq!(run_state.dropped_orphans.len(), 0);
+}
+
+#[test]
+fn markers_without_completed_hashes_keeps_all_entries() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (entry1, payload1) = build_entry_payload("design/design.md", b"entry one");
+    let (entry2, payload2) = build_entry_payload("review/review.md", b"entry two");
+    write_manifest_with_run_state(
+        tmp.path(),
+        vec![(entry1.clone(), payload1), (entry2.clone(), payload2)],
+        "run-009b",
+    );
+
+    marker_started(tmp.path(), "design");
+    fs::write(
+        tmp.path().join("markers/design.failed"),
+        serde_json::json!({
+            "phase": "design",
+            "attempts_made": 1,
+            "failed_at": Utc::now().to_rfc3339(),
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let run_state = RunState::load(tmp.path(), 300).unwrap();
+    assert_eq!(run_state.entries.len(), 2);
+    assert_eq!(run_state.dropped_orphans.len(), 0);
+}
+
+#[test]
 fn phase_status_is_derived_from_markers() {
     let tmp = tempfile::tempdir().unwrap();
     let (design_entry, design_payload) = build_entry_payload("design/design.md", b"done now");
     write_manifest_with_run_state(
         tmp.path(),
         vec![(design_entry.clone(), design_payload)],
-        "run-009",
+        "run-010",
     );
 
     marker_completed(tmp.path(), "design", &design_entry.sha256);
@@ -277,7 +320,7 @@ fn changes_dir_entry_is_verified_with_digest() {
 
     let dir_entry_digest = {
         let digest_root = tmp.path().join("changes");
-        fs::create_dir_all(&digest_root.join("sub")).unwrap();
+        fs::create_dir_all(digest_root.join("sub")).unwrap();
         fs::write(digest_root.join("a.txt"), b"alpha").unwrap();
         fs::write(digest_root.join("sub/b.txt"), b"beta").unwrap();
         loker::manifest::dir_digest(&digest_root).unwrap()

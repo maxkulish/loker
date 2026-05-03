@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 use crate::manifest::{dir_digest, Kind, Manifest, ManifestEntry};
 
+/// Per-phase resume status inferred from marker presence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PhaseStatus {
     Started,
@@ -14,23 +15,34 @@ pub enum PhaseStatus {
     None,
 }
 
-#[derive(Debug, Clone)]
+/// Indicates whether the run is currently being written to or stale.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeartbeatStatus {
+    /// Writer heartbeat is present and within TTL.
     Live(Heartbeat),
+    /// Writer heartbeat is present but older than TTL.
     Stale {
+        /// Last heartbeat tick timestamp.
         last_tick: DateTime<Utc>,
+        /// TTL window used by the caller, in seconds.
         ttl_seconds: u64,
     },
+    /// No heartbeat file exists.
     Missing,
 }
 
-#[derive(Debug, Clone)]
+/// Snapshot of `heartbeat.json` loaded from disk.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Heartbeat {
+    /// OS process id that wrote the heartbeat.
     pub writer_pid: i64,
+    /// Host name of the writer.
     pub writer_host: String,
+    /// Timestamp of the last heartbeat tick.
     pub tick_at: DateTime<Utc>,
 }
 
+/// Typed errors emitted while loading run state from a run directory.
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     #[error("manifest schema mismatch: expected {expected}, found {found} at {path}")]
@@ -75,6 +87,7 @@ pub struct RunState {
     pub entries: Vec<ManifestEntry>,
     pub dropped_orphans: Vec<ManifestEntry>,
     pub phase_status: HashMap<String, PhaseStatus>,
+    pub heartbeat: Option<HeartbeatStatus>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,35 +104,44 @@ struct HeartbeatMarker {
     tick_at: DateTime<Utc>,
 }
 
+#[derive(Debug)]
+struct MarkerScanState {
+    phase_status: HashMap<String, PhaseStatus>,
+    completed_hashes: HashSet<String>,
+    has_completed_markers: bool,
+}
+
 impl RunState {
     /// Load and validate run state from `<run_dir>/manifest.json`.
     ///
-    /// Resume path contract:
-    /// - Drop entries not referenced by any `*.completed` marker.
-    /// - Verify referenced artefact hashes against on-disk data before returning state.
-    /// - Return a typed `LoadError` for schema/artefact/heartbeat issues.
+    /// Resume contract:
+    /// - Load manifest and verify schema.
+    /// - Drop orphaned entries only when marker metadata exists.
+    /// - Verify kept entries' on-disk digests.
+    /// - Detect live/stale heartbeat state.
     pub fn load(run_dir: &Path, heartbeat_ttl_seconds: u64) -> Result<Self, LoadError> {
         let manifest = Self::load_manifest(run_dir)?;
-        let (phase_status, completed_hashes) = Self::load_markers(run_dir)?;
+        let marker_scan = Self::load_markers(run_dir)?;
 
-        let (entries, dropped_orphans) = Self::orphan_sweep(manifest.entries, &completed_hashes);
+        let (entries, dropped_orphans) = if marker_scan.has_completed_markers {
+            Self::orphan_sweep(manifest.entries, &marker_scan.completed_hashes)
+        } else {
+            (manifest.entries, Vec::new())
+        };
 
-        // Fail fast on heartbeat state if present.
-        if let Some(heartbeat) = Self::read_heartbeat(run_dir)? {
-            let now = Utc::now();
-            let age = now.signed_duration_since(heartbeat.tick_at);
+        let phase_status = marker_scan.phase_status;
+
+        let heartbeat = Self::read_heartbeat(run_dir)?.map(|hb| {
+            let age = Utc::now().signed_duration_since(hb.tick_at);
             if age > Duration::seconds(heartbeat_ttl_seconds as i64) {
-                return Err(LoadError::StaleWriter {
-                    last_tick: heartbeat.tick_at,
+                HeartbeatStatus::Stale {
+                    last_tick: hb.tick_at,
                     ttl_seconds: heartbeat_ttl_seconds,
-                });
+                }
+            } else {
+                HeartbeatStatus::Live(hb)
             }
-
-            return Err(LoadError::LiveWriter {
-                writer_pid: heartbeat.writer_pid,
-                writer_host: heartbeat.writer_host,
-            });
-        }
+        });
 
         Self::verify_entries(run_dir, &entries)?;
 
@@ -128,6 +150,7 @@ impl RunState {
             entries,
             dropped_orphans,
             phase_status,
+            heartbeat,
         })
     }
 
@@ -157,15 +180,18 @@ impl RunState {
         Ok(manifest)
     }
 
-    fn load_markers(
-        run_dir: &Path,
-    ) -> Result<(HashMap<String, PhaseStatus>, HashSet<String>), LoadError> {
+    fn load_markers(run_dir: &Path) -> Result<MarkerScanState, LoadError> {
         let mut status = HashMap::new();
         let mut completed = HashSet::new();
+        let mut has_completed_markers = false;
         let markers_dir = run_dir.join("markers");
 
         if !markers_dir.exists() {
-            return Ok((status, completed));
+            return Ok(MarkerScanState {
+                phase_status: status,
+                completed_hashes: completed,
+                has_completed_markers: false,
+            });
         }
 
         for dir_entry in std::fs::read_dir(&markers_dir)? {
@@ -178,6 +204,9 @@ impl RunState {
             let Some(phase) = marker_phase(file_name) else {
                 continue;
             };
+            if file_name.ends_with(".completed") {
+                has_completed_markers = true;
+            }
 
             if file_name.ends_with(".completed") {
                 if let Ok(text) = std::fs::read_to_string(&path) {
@@ -199,7 +228,11 @@ impl RunState {
             }
         }
 
-        Ok((status, completed))
+        Ok(MarkerScanState {
+            phase_status: status,
+            completed_hashes: completed,
+            has_completed_markers,
+        })
     }
 
     fn verify_entries(run_dir: &Path, entries: &[ManifestEntry]) -> Result<(), LoadError> {
@@ -207,6 +240,11 @@ impl RunState {
             let path = run_dir.join(&entry.name);
             match entry.kind {
                 Kind::ChangesDir => {
+                    if !path.exists() {
+                        return Err(LoadError::ArtefactMissing {
+                            path: path.display().to_string(),
+                        });
+                    }
                     let computed = dir_digest(&path).map_err(LoadError::Io)?;
                     if computed != entry.sha256 {
                         return Err(LoadError::ArtefactCorrupt {
