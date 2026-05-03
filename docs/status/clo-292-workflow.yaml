@@ -19,7 +19,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-03T06:24:24.357Z'
-  updated_at: '2026-05-03T07:27:01.777Z'
+  updated_at: '2026-05-03T07:27:45.096Z'
 phases:
   discovery:
     status: complete
@@ -80,6 +80,8 @@ phases:
     validation_fix_iteration_count: 1
   pr:
     status: in_progress
+    pr_url: https://github.com/maxkulish/loker/pull/37
+    pr_number: 37
   complete:
     status: pending
 history:
@@ -242,3 +244,11 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-03T07:27:31.938Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #37 opened: https://github.com/maxkulish/loker/pull/37'
+  - timestamp: '2026-05-03T07:27:45.096Z'
+    action: linear_pr_updated
+    phase: pr
+    details: 'Moved CLO-292 to In Review and posted PR #37 link.'
