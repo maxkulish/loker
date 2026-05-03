@@ -4,3 +4,7 @@
 //! file-backed and in-memory implementations.
 
 pub mod prices;
+pub mod reader;
+
+pub use prices::PriceTable;
+pub use reader::{BackendUsage, TraceReader, TraceReaderError};
