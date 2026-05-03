@@ -114,6 +114,16 @@ fn latest_pointer_resolves_to_last_completed() {
     let tmp = tempfile::tempdir().unwrap();
 
     // Simulate attempts 0, 1, 2 with attempt 2 completing
+    // We need to create the attempt dirs so latest points to them
+    for n in [0, 1, 2] {
+        let dir = tmp
+            .path()
+            .join("attempts")
+            .join("design")
+            .join(n.to_string());
+        std::fs::create_dir_all(&dir).unwrap();
+    }
+
     LatestPointer::update(tmp.path(), "design", 0).unwrap();
     LatestPointer::update(tmp.path(), "design", 1).unwrap();
     LatestPointer::update(tmp.path(), "design", 2).unwrap();

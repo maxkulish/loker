@@ -22,7 +22,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T06:22:03.922Z'
-  updated_at: '2026-05-03T06:45:25.598Z'
+  updated_at: '2026-05-03T06:51:26.156Z'
 phases:
   discovery:
     status: complete
@@ -64,6 +64,9 @@ phases:
     approved: true
   implement:
     status: pending
+    phases.implement.commits:
+      - 658183d
+    phases.implement.status: validating
   pr:
     status: pending
   complete:
@@ -158,5 +161,11 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-03T06:51:26.156Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All 6 sub-tasks landed. make check green. 1 commit (658183d). 9 new tests in tests/run_state_attempts.rs (all
+      pass). 5 existing tests updated in tests/run_state_markers.rs (all pass).
 task_title: Implement attempt directories runs/<id>/attempts/<phase>/<n>/
 task_url: https://linear.app/cloud-ai/issue/CLO-286/implement-attempt-directories

@@ -3,9 +3,14 @@ use std::path::{Path, PathBuf};
 
 use crate::run_state::atomic_write;
 
-/// Best-effort convenience pointer to the latest completed attempt.
+/// Best-effort convenience pointer to the latest attempt.
 ///
-/// On Unix, creates a symlink `run_dir/<phase>/latest → ../attempts/<phase>/<n>/`.
+/// On Unix, creates a symlink `run_dir/<phase>/latest`.
+/// - If the attempt directory still exists (in-progress or failed), the target
+///   is `../attempts/<phase>/<n>/`.
+/// - If the attempt was promoted to canonical, the target is `./` (the
+///   canonical phase directory itself).
+///
 /// If symlinks are unavailable (Windows without privileges, or the call fails),
 /// falls back to writing a `latest.json` pointer file with the same metadata.
 pub struct LatestPointer;
@@ -16,11 +21,26 @@ impl LatestPointer {
     /// This is best-effort: errors are logged (via `eprintln`) and returned
     /// but do **not** block the caller.  A phase can complete successfully
     /// even if the convenience pointer cannot be created.
+    ///
+    /// # Note
+    /// If the attempt directory was promoted (no longer exists), the pointer
+    /// resolves to the canonical phase directory (`./`).  Callers should
+    /// not propagate errors with `?`; use `.ok()` or log them.
     pub fn update(run_dir: &Path, phase: &str, attempt: u32) -> io::Result<()> {
         let phase_dir = run_dir.join(phase);
         std::fs::create_dir_all(&phase_dir)?;
 
-        let target = PathBuf::from(format!("../attempts/{phase}/{attempt}/"));
+        // If the attempt dir still exists (in-progress or failed), point to it.
+        // If it was promoted, point to the canonical phase directory itself.
+        let attempt_dir = run_dir
+            .join("attempts")
+            .join(phase)
+            .join(attempt.to_string());
+        let target: PathBuf = if attempt_dir.exists() {
+            PathBuf::from(format!("../attempts/{phase}/{attempt}/"))
+        } else {
+            PathBuf::from(".")
+        };
 
         // Best-effort symlink on Unix
         #[cfg(unix)]
@@ -40,9 +60,14 @@ impl LatestPointer {
 
         // Fallback (non-Unix or symlink failed): write latest.json
         let pointer = phase_dir.join("latest.json");
+        let path_str = if attempt_dir.exists() {
+            format!("attempts/{phase}/{attempt}/")
+        } else {
+            format!("{phase}/")
+        };
         let body = serde_json::json!({
             "attempt": attempt,
-            "path": format!("attempts/{phase}/{attempt}/"),
+            "path": path_str,
             "updated_at": chrono::Utc::now().to_rfc3339(),
         });
         atomic_write(&pointer, body.to_string().as_bytes())?;
@@ -94,6 +119,10 @@ mod tests {
     #[test]
     fn latest_pointer_updates_and_resolves() {
         let tmp = tempfile::tempdir().unwrap();
+        // Create the attempt dir so latest points to it (not canonical)
+        let attempt_dir = tmp.path().join("attempts").join("design").join("2");
+        std::fs::create_dir_all(&attempt_dir).unwrap();
+
         LatestPointer::update(tmp.path(), "design", 2).unwrap();
 
         let resolved = LatestPointer::resolve(tmp.path(), "design").unwrap();
@@ -103,6 +132,15 @@ mod tests {
     #[test]
     fn latest_pointer_overwrites_previous() {
         let tmp = tempfile::tempdir().unwrap();
+        for (phase, attempt) in [("design", 0), ("design", 1)] {
+            let dir = tmp
+                .path()
+                .join("attempts")
+                .join(phase)
+                .join(attempt.to_string());
+            std::fs::create_dir_all(&dir).unwrap();
+        }
+
         LatestPointer::update(tmp.path(), "design", 0).unwrap();
         LatestPointer::update(tmp.path(), "design", 1).unwrap();
 
@@ -113,6 +151,11 @@ mod tests {
     #[test]
     fn latest_pointer_cross_phase_isolation() {
         let tmp = tempfile::tempdir().unwrap();
+        let d3 = tmp.path().join("attempts").join("design").join("3");
+        std::fs::create_dir_all(&d3).unwrap();
+        let r1 = tmp.path().join("attempts").join("review").join("1");
+        std::fs::create_dir_all(&r1).unwrap();
+
         LatestPointer::update(tmp.path(), "design", 3).unwrap();
         LatestPointer::update(tmp.path(), "review", 1).unwrap();
 
@@ -120,6 +163,17 @@ mod tests {
         let r = LatestPointer::resolve(tmp.path(), "review").unwrap();
         assert!(d.to_string_lossy().contains("attempts/design/3"));
         assert!(r.to_string_lossy().contains("attempts/review/1"));
+    }
+
+    #[test]
+    fn latest_pointer_points_to_canonical_after_promotion() {
+        let tmp = tempfile::tempdir().unwrap();
+        // No attempt dir → should point to canonical
+        LatestPointer::update(tmp.path(), "design", 2).unwrap();
+
+        let resolved = LatestPointer::resolve(tmp.path(), "design").unwrap();
+        // Should resolve to the canonical phase directory
+        assert!(resolved.to_string_lossy().contains("design"));
     }
 
     #[test]

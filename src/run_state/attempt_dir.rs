@@ -57,6 +57,12 @@ impl AttemptDir {
         }
     }
 
+    /// No-op: the attempt directory is already at the archive location.
+    /// Exists for API symmetry with `promote_to_canonical`.
+    pub fn archive_on_failure(&self) -> io::Result<()> {
+        Ok(())
+    }
+
     /// Recursively copy a directory tree.
     fn copy_tree(src: &Path, dst: &Path) -> io::Result<()> {
         std::fs::create_dir_all(dst)?;
