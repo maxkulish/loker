@@ -107,114 +107,61 @@ decisions.
 Never loop indefinitely on reviewer suggestions. Raw reviewer reports are
 inputs; only the synthesis report drives fixes.
 
-### 4.1 Build validation prompt
+### 4.1 Run the validation gate via `lok`
 
-Use the same prompt for Codex and Gemini:
+The codex+gemini+synthesis pipeline lives in
+`.lok/workflows/implement-gate.toml`. Do **not** reinvent it inline. The
+LLM running this phase MUST invoke `lok` and let the workflow engine
+manage prompt assembly, parallel reviewer dispatch, output validation,
+and review-file writes.
 
-```text
-You are a senior code reviewer. Review all changes on this branch against
-this task's design document and implementation plan.
+Anti-pattern (do not do this): writing a `/tmp/run_validation.sh` that
+shells out to `codex exec` and `gemini` directly. That bypasses the
+workflow's output validators, fallback logic, and synthesis step, and it
+hardcodes models that drift over time. Always go through `lok`.
 
-Inputs:
-- Branch: feat/clo-XX-...
-- Design: docs/designs/clo-XX-<slug>.md
-- Plan: docs/plans/clo-XX-<slug>.md
-- Diff: git diff main...HEAD
-
-Check for correctness, completeness, regressions, code quality, security,
-schema/API compatibility, and scope creep.
-
-Output markdown with findings grouped by severity. End with:
-## Verdict
-approve | approve_with_changes | rework
-```
-
-### 4.2 Run Codex and Gemini concurrently
+### 4.2 Invoke the implement-gate workflow
 
 ```bash
-# Codex validation (background)
-{
-  cat .pi/agents/codex-pre-pr.md
-  printf '\nYou are a senior code reviewer. Review all changes on this branch against this task'\''s design document and implementation plan.\n\n'
-  printf 'Inputs:\n'
-  printf '- Branch: feat/clo-XX-...\n'
-  printf '- Design: docs/designs/clo-XX-<slug>.md\n'
-  printf '- Plan: docs/plans/clo-XX-<slug>.md\n'
-  printf '- Diff: git diff main...HEAD\n'
-  printf '\n'
-} | codex exec -m gpt-5.4 > docs/reviews/clo-XX-codex-validation.md &
-PID_CODEX=$!
-
-# Gemini validation (background)
-GEMINI_VALIDATE_PROMPT=$(
-cat .pi/agents/gemini-architect.md
-printf '\nYou are a senior code reviewer. Review all changes on this branch against this task'\''s design document and implementation plan.\n\n'
-printf 'Inputs:\n'
-printf '- Branch: feat/clo-XX-...\n'
-printf '- Design: docs/designs/clo-XX-<slug>.md\n'
-printf '- Plan: docs/plans/clo-XX-<slug>.md\n'
-printf '- Diff: git diff main...HEAD\n'
-)
-
-gemini --model gemini-3.1-pro-preview \
-  -p "$GEMINI_VALIDATE_PROMPT" \
-  > docs/reviews/clo-XX-gemini-validation.md &
-PID_GEMINI=$!
-
-wait $PID_CODEX; CODEX_EXIT=$?
-wait $PID_GEMINI; GEMINI_EXIT=$?
+# arg.1 = task ID (lowercase),  arg.2 = branch name
+lok workflow run implement-gate clo-XX feat/clo-XX-<slug>
 ```
 
-If either binary is unavailable or fails due tooling/sandbox limitations,
-write a concrete skip/failure reason into that report file. Do not treat a
-tooling failure as a code finding; the synthesis must account for it.
+Optional environment overrides:
 
-### 4.3 Run synthesis reviewer
+| Variable | Default | Purpose |
+|---|---|---|
+| `CODEX_MODEL` | `gpt-5.5` | Codex model used for the codex reviewer |
+| `GEMINI_MODEL` | `gemini-3.1-pro-preview` | Primary Gemini model |
+| `GEMINI_FALLBACK_MODEL` | `gemini-2.5-pro` | Used if the primary returns empty |
 
-Run a third model after both raw reports exist. It reads the design, plan,
-diff, and both raw reports, then writes:
+The workflow writes (and the rest of this phase reads):
 
-`docs/reviews/clo-XX-validation-synthesis.md`
+- `docs/reviews/clo-XX-codex-validation.md`
+- `docs/reviews/clo-XX-gemini-validation.md`
+- `docs/reviews/clo-XX-validation-synthesis.md`
 
-Synthesis prompt:
+If both external reviewers fail, the workflow runs a Claude fallback and
+writes `docs/reviews/clo-XX-claude-fallback-validation.md`. The synthesis
+step still runs and produces the binding verdict.
 
-```text
-You are the validation synthesis reviewer. Combine the Codex and Gemini
-reports for CLO-XX.
+If `lok workflow run` exits non-zero or any of the three required files
+is missing/empty, treat the gate as failed: do **not** transition phases.
+Investigate the failure (re-run with `--verbose`, inspect the reviewer
+report files), fix the root cause, and re-run the workflow. Never patch
+around it by hand-writing review files.
 
-Read:
-- Design: docs/designs/clo-XX-<slug>.md
-- Plan: docs/plans/clo-XX-<slug>.md
-- Codex report: docs/reviews/clo-XX-codex-validation.md
-- Gemini report: docs/reviews/clo-XX-gemini-validation.md
-- Diff: git diff main...HEAD
+### 4.3 Synthesis verdict
 
-Decide which findings are:
-- Must fix before PR (in-scope correctness/regression/security/schema issue)
-- Nice-to-have / out of scope
-- False positive / tooling artifact
-- Pivot/fundamental scope issue requiring user decision
+The synthesis report (`docs/reviews/clo-XX-validation-synthesis.md`)
+ends with a `## Verdict` line that is exactly one of:
 
-Output:
-## Verdict
+```
 approve | approve_with_changes | pivot | rework
-
-## Must Fix Before PR
-- ...
-
-## Out of Scope / Deferred
-- ...
-
-## False Positives / Tooling Artifacts
-- ...
-
-## Recommendation
-Proceed, apply one fix iteration, or stop for user decision.
 ```
 
-Use an available third model/provider. If no third model is available,
-synthesize manually from the two reports and clearly state that in the
-synthesis report.
+The synthesis prompt and verdict rules live in the workflow file. Do
+not duplicate them here.
 
 ### 4.4 Act on synthesis verdict
 
