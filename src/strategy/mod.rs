@@ -321,6 +321,8 @@ pub struct Attempt {
     pub usage: TokenUsageReport,
     pub output_path: String,
     pub verify: VerifyOutcome,
+    #[serde(skip)]
+    pub duration: std::time::Duration,
 }
 
 /// Schema-aligned reason a backend stopped producing tokens.
@@ -337,6 +339,18 @@ pub enum FinishReason {
     ToolCalls,
     ContentFilter,
     Error,
+}
+
+impl FinishReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Stop => "stop",
+            Self::Length => "length",
+            Self::ToolCalls => "tool_calls",
+            Self::ContentFilter => "content_filter",
+            Self::Error => "error",
+        }
+    }
 }
 
 /// Token counts using the schema's wire names (`input_tokens`,

@@ -151,6 +151,7 @@ impl Strategy for ParallelFanOut {
                                 usage,
                                 output_path,
                                 verify: VerifyOutcome::skipped(),
+                                duration: query.duration,
                             };
                             attempts.push(offender.clone());
                             let output = StrategyOutput {
@@ -198,6 +199,7 @@ impl Strategy for ParallelFanOut {
                         usage,
                         output_path,
                         verify: VerifyOutcome::skipped(),
+                        duration: query.duration,
                     });
 
                     if !is_any_fail
@@ -235,6 +237,7 @@ impl Strategy for ParallelFanOut {
                         usage: TokenUsageReport::default(),
                         output_path,
                         verify: VerifyOutcome::skipped(),
+                        duration: std::time::Duration::ZERO,
                     };
 
                     if is_any_fail {

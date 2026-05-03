@@ -13,6 +13,7 @@ pub mod phase_runner;
 pub mod run_state;
 pub mod strategy;
 pub mod template;
+pub mod trace;
 
 mod apply_verify;
 mod cache;
@@ -28,4 +29,8 @@ mod workflows;
 pub use phase_runner::{
     AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRung, PhaseRunner,
     StrategyName, VerifyHookName,
+};
+pub use trace::{
+    AttemptSpanContext, BackendSpanResult, InMemorySink, PhaseSpanContext, TraceSink, TraceWriter,
+    VerifySpanResult,
 };
