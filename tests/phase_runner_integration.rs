@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
-use loker::manifest::Manifest;
+use loker::manifest::{Kind, Manifest, Producer};
 use loker::strategy::verify::{VerifyContext, VerifyError, VerifyHook, VerifyResult};
 use loker::strategy::{PhaseContext, Prompt, TargetSpec, Tier};
 use loker::{AggregatorName, PhaseConfig, PhaseInputs, PhaseRunner, StrategyName, VerifyHookName};
@@ -146,6 +146,10 @@ async fn single_first_no_verify_emits_one_artefact_and_completed_marker() {
     let manifest = Manifest::load(&tmp.path().join("manifest.json")).unwrap();
     assert_eq!(manifest.entries.len(), 1);
     assert_eq!(manifest.entries[0].name, "design.md");
+    assert_eq!(manifest.entries[0].kind, Kind::DesignMd);
+    assert_eq!(manifest.entries[0].producer, Producer::Single);
+    assert_eq!(manifest.entries[0].phase.as_deref(), Some("design"));
+    assert_eq!(manifest.entries[0].attempt, Some(0));
 }
 
 #[tokio::test]
@@ -153,6 +157,8 @@ async fn phase_runner_parallel_concat_with_verifier_emits_completed_marker() {
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "unused", "hello", "review.md");
     cfg.strategy = StrategyName::Parallel;
+    cfg.producer = Producer::Parallel;
+    cfg.artefact_kind = Kind::ReviewMd;
     cfg.aggregator = AggregatorName::Concat;
     cfg.verify = VerifyHookName::RunCommand;
     cfg.targets = vec![TargetSpec::new("a"), TargetSpec::new("b")];
@@ -197,6 +203,8 @@ async fn phase_runner_parallel_all_pass_collects_failures() {
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "unused", "hello", "review.md");
     cfg.strategy = StrategyName::Parallel;
+    cfg.producer = Producer::Parallel;
+    cfg.artefact_kind = Kind::ReviewMd;
     cfg.aggregator = AggregatorName::AllPass;
     cfg.targets = vec![TargetSpec::new("a"), TargetSpec::new("b")];
     cfg.min_responses = 1;
@@ -231,6 +239,8 @@ async fn phase_runner_parallel_concat_any_fail_three_replicas_completed_and_reje
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "unused", "hello", "review.md");
     cfg.strategy = StrategyName::Parallel;
+    cfg.producer = Producer::Parallel;
+    cfg.artefact_kind = Kind::ReviewMd;
     cfg.aggregator = AggregatorName::AnyFail;
     cfg.verify = VerifyHookName::RunCommand;
     cfg.targets = vec![
@@ -311,6 +321,7 @@ async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failur
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("implement", "unused", "hello", "impl.md");
     cfg.strategy = StrategyName::EscalatingRetry;
+    cfg.producer = Producer::Escalating;
     cfg.verify = VerifyHookName::LlmVerifier;
     cfg.rungs = vec![
         loker::PhaseRung::new(Tier::Cheap, "cheap"),

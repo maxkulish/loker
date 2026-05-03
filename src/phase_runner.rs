@@ -192,12 +192,17 @@ impl PhaseRunner {
         cfg: &PhaseConfig,
         inputs: PhaseInputs<'_>,
     ) -> Result<PhaseOutcome, PhaseError> {
+        validate_config(cfg)?;
         let markers = crate::run_state::markers::MarkerWriter::new(&inputs.run_dir);
         persist::start_attempt(&markers, &cfg.phase, 0)?;
 
+        let mut ctx = inputs.ctx;
+        ctx.cwd = inputs.run_dir.clone();
+        let run_id = ctx.run_id;
+
         let strategy = dispatch::resolve_strategy(cfg, inputs.verify.clone())?;
         let strategy_output = match strategy
-            .execute(inputs.backends, &inputs.prompt, &inputs.ctx)
+            .execute(inputs.backends, &inputs.prompt, &ctx)
             .await
         {
             Ok(output) => output,
@@ -208,13 +213,15 @@ impl PhaseRunner {
                     ),
                     other => PhaseError::StrategyFailed(other),
                 };
-                let _ = persist::record_terminal_failure(
+                if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
                     &inputs.run_dir,
                     cfg,
                     1,
                     phase_err.error_class(),
-                );
+                ) {
+                    eprintln!("failed to persist terminal failure marker: {persist_err}");
+                }
                 return Err(phase_err);
             }
         };
@@ -228,13 +235,15 @@ impl PhaseRunner {
             match dispatch::canonical_bytes(&inputs.run_dir, &strategy_output, &aggregator) {
                 Ok(bytes) => bytes,
                 Err(err) => {
-                    let _ = persist::record_terminal_failure(
+                    if let Err(persist_err) = persist::record_terminal_failure(
                         &markers,
                         &inputs.run_dir,
                         cfg,
                         strategy_output.attempts.len().max(1) as u32,
                         err.error_class(),
-                    );
+                    ) {
+                        eprintln!("failed to persist terminal failure marker: {persist_err}");
+                    }
                     return Err(err);
                 }
             };
@@ -249,16 +258,15 @@ impl PhaseRunner {
                     cfg.verify
                 ))
             })?;
+            let selected = strategy_output.attempts.get(selected_attempt as usize);
             let ctx = crate::strategy::VerifyContext {
                 stdout: String::from_utf8_lossy(&bytes).into_owned(),
                 stderr: None,
                 exit_code: None,
-                backend_name: strategy_output
-                    .attempts
-                    .last()
+                backend_name: selected
                     .map(|a| a.backend.clone())
-                    .unwrap_or_else(|| "phase_runner".into()),
-                model: strategy_output.attempts.last().map(|a| a.model.clone()),
+                    .unwrap_or_else(|| "aggregate".into()),
+                model: selected.map(|a| a.model.clone()),
                 structured: None,
                 duration: std::time::Duration::ZERO,
             };
@@ -269,13 +277,15 @@ impl PhaseRunner {
                     attempt: selected_attempt,
                     result,
                 };
-                let _ = persist::record_terminal_failure(
+                if let Err(persist_err) = persist::record_terminal_failure(
                     &markers,
                     &inputs.run_dir,
                     cfg,
                     strategy_output.attempts.len().max(1) as u32,
                     phase_err.error_class(),
-                );
+                ) {
+                    eprintln!("failed to persist terminal failure marker: {persist_err}");
+                }
                 return Err(phase_err);
             }
             Some(result)
@@ -283,7 +293,7 @@ impl PhaseRunner {
 
         let attempt = selected_attempt;
         let (artefact_path, manifest_entry) =
-            persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, inputs.ctx.run_id)?;
+            persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, run_id)?;
         markers.write_completed(
             &cfg.phase,
             attempt,
@@ -302,12 +312,19 @@ impl PhaseRunner {
     }
 }
 
-fn winning_attempt(output: &StrategyOutput) -> u32 {
-    output
-        .attempts
-        .iter()
-        .rposition(|a| a.verify.status != crate::strategy::VerifyStatus::Fail)
-        .unwrap_or_else(|| output.attempts.len().saturating_sub(1)) as u32
+fn validate_config(cfg: &PhaseConfig) -> Result<(), PhaseError> {
+    let expected = match cfg.strategy {
+        StrategyName::Single => Producer::Single,
+        StrategyName::Parallel => Producer::Parallel,
+        StrategyName::EscalatingRetry => Producer::Escalating,
+    };
+    if cfg.producer != expected {
+        return Err(PhaseError::InvalidConfig(format!(
+            "producer {:?} does not match strategy {:?}; expected {:?}",
+            cfg.producer, cfg.strategy, expected
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

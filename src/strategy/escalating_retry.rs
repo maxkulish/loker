@@ -468,9 +468,6 @@ async fn write_strategy_output(
     output_path: &str,
     text: &str,
 ) -> Result<(), StrategyError> {
-    if cwd == Path::new(".") {
-        return Ok(());
-    }
     let path = cwd.join(output_path);
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {

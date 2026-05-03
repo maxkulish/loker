@@ -83,9 +83,9 @@ pub fn canonical_bytes(
         return winning_success_bytes(run_dir, output);
     }
 
-    let input = aggregate_input_from_attempt_paths(run_dir, output);
+    let input = aggregate_input_from_attempt_paths(run_dir, output)?;
     match aggregator {
-        Aggregator::First => winning_success_bytes(run_dir, output),
+        Aggregator::First => unreachable!("Aggregator::First is handled by early return"),
         Aggregator::Concat { .. } | Aggregator::AllPass => {
             let aggregate = aggregator.aggregate(
                 input,
@@ -165,7 +165,7 @@ fn selected_attempt_index(output: &crate::strategy::StrategyOutput) -> u32 {
 fn aggregate_input_from_attempt_paths(
     run_dir: &Path,
     output: &crate::strategy::StrategyOutput,
-) -> AggregateInput {
+) -> Result<AggregateInput, PhaseError> {
     let branches = output
         .attempts
         .iter()
@@ -176,23 +176,23 @@ fn aggregate_input_from_attempt_paths(
                 .finish_reasons
                 .contains(&crate::strategy::FinishReason::Error)
             {
-                BranchOutcome::Failure(BranchFailure {
+                Ok(BranchOutcome::Failure(BranchFailure {
                     backend_id: attempt.backend.clone(),
                     family: attempt.family.clone().unwrap_or_else(|| "local".into()),
                     index: idx + 1,
                     reason: "backend error".into(),
-                })
+                }))
             } else {
-                BranchOutcome::Success(BranchSuccess {
+                Ok(BranchOutcome::Success(BranchSuccess {
                     backend_id: attempt.backend.clone(),
                     family: attempt.family.clone().unwrap_or_else(|| "local".into()),
                     index: idx + 1,
-                    output: std::fs::read_to_string(path).unwrap_or_default(),
-                })
+                    output: std::fs::read_to_string(path)?,
+                }))
             }
         })
-        .collect();
-    AggregateInput { branches }
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    Ok(AggregateInput { branches })
 }
 
 fn resolve_output_path(run_dir: &Path, path: &str) -> std::path::PathBuf {

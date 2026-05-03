@@ -33,6 +33,11 @@ pub fn commit_success(
 ) -> Result<(PathBuf, ManifestEntry), PhaseError> {
     std::fs::create_dir_all(run_dir)?;
     let artefact_path = run_dir.join(&cfg.artefact_name);
+    if let Some(parent) = artefact_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
     atomic_write(&artefact_path, bytes)?;
 
     let entry = ManifestEntry::from_payload(
