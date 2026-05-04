@@ -88,7 +88,7 @@ impl RunDir {
         let guard = CleanupGuard::new(path.clone());
 
         // Write initial manifest.json
-        let manifest = Manifest::new(run_id.to_string());
+        let manifest = Manifest::new(run_id.to_string(), Some(workflow_name.to_string()));
         let manifest_json = manifest.to_json()?;
         atomic_write(&path.join("manifest.json"), manifest_json.as_bytes())?;
 

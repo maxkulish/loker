@@ -834,7 +834,7 @@ mod tests {
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("test-run-uuid");
+        let mut manifest = Manifest::new("test-run-uuid", None);
         manifest
             .append(
                 ManifestEntry::from_payload(
@@ -919,7 +919,7 @@ output_per_mtok = 30.0
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("budget-test");
+        let mut manifest = Manifest::new("budget-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(
@@ -976,7 +976,7 @@ output_per_mtok = 150.0
         .unwrap();
 
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("noprice-test");
+        let mut manifest = Manifest::new("noprice-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(

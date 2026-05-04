@@ -54,7 +54,7 @@ pub fn commit_success(
     let mut manifest = if manifest_path.exists() {
         Manifest::load(&manifest_path)?
     } else {
-        Manifest::new(run_id.to_string())
+        Manifest::new(run_id.to_string(), None)
     };
     manifest.append(entry.clone(), &manifest_path)?;
     Ok((artefact_path, entry))

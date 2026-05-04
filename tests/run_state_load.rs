@@ -60,7 +60,7 @@ fn write_manifest_with_run_state(
     entries: Vec<(loker::manifest::ManifestEntry, Vec<u8>)>,
     run_id: &str,
 ) -> Manifest {
-    let mut manifest = Manifest::new(run_id);
+    let mut manifest = Manifest::new(run_id, None);
     for (entry, bytes) in entries {
         let relpath = Path::new(&entry.name);
         let abs = tmp.join(relpath);
@@ -233,7 +233,7 @@ fn live_heartbeat_is_reported() {
 #[test]
 fn empty_manifest_loads_empty_runstate() {
     let tmp = tempfile::tempdir().unwrap();
-    let manifest = Manifest::new("run-008");
+    let manifest = Manifest::new("run-008", None);
     fs::write(
         tmp.path().join("manifest.json"),
         manifest.to_json().unwrap(),
@@ -407,6 +407,7 @@ fn changes_dir_entry_is_verified_with_digest() {
     let manifest = Manifest {
         run_id: "run-010".to_string(),
         schema_version: 1,
+        workflow_name: None,
         entries: vec![manifest_entry.clone()],
     };
     fs::write(

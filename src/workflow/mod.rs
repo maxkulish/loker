@@ -276,6 +276,81 @@ impl Workflow {
     pub fn step_timeout(&self, step: &Step) -> Option<u64> {
         step.timeout.or(self.timeout)
     }
+
+    /// Convert workflow steps to `PhaseConfig` list for `PhaseRunner`.
+    ///
+    /// Shell steps (`step.shell.is_some()`) are excluded — they run via
+    /// `WorkflowRunner`'s shell path, not `PhaseRunner`.
+    pub fn to_phase_configs(&self) -> Vec<crate::phase_runner::PhaseConfig> {
+        use crate::manifest::{Kind, Producer};
+        use crate::phase_runner::{
+            AggregatorName, PhaseConfig, PhaseRung, StrategyName, VerifyHookName,
+        };
+        use crate::strategy::{TargetSpec, Tier};
+        self.steps
+            .iter()
+            .filter(|s| s.shell.is_none())
+            .map(|step| {
+                let backends = step.get_backends();
+                let backend_str = backends.first().cloned();
+                let aggregator = match step.get_consensus_strategy() {
+                    crate::consensus::ConsensusStrategy::First => AggregatorName::First,
+                    crate::consensus::ConsensusStrategy::Synthesis => AggregatorName::First,
+                    crate::consensus::ConsensusStrategy::Vote => AggregatorName::Vote,
+                    crate::consensus::ConsensusStrategy::WeightedVote => AggregatorName::Vote,
+                };
+                let strategy = if step.retries > 0 {
+                    StrategyName::EscalatingRetry
+                } else if backends.len() > 1 {
+                    StrategyName::Parallel
+                } else {
+                    StrategyName::Single
+                };
+                let verify = if step.apply_edits || step.verify.is_some() {
+                    VerifyHookName::RunCommand
+                } else {
+                    VerifyHookName::None
+                };
+                let targets = if backends.len() > 1 {
+                    backends.iter().map(TargetSpec::new).collect()
+                } else {
+                    Vec::new()
+                };
+                let rungs = if step.retries > 0 {
+                    vec![PhaseRung::new(
+                        Tier::Medium,
+                        backend_str.clone().unwrap_or_default(),
+                    )]
+                } else {
+                    Vec::new()
+                };
+                let artefact_kind = match step.output_format.as_deref() {
+                    Some("json") => Kind::VerifyJson,
+                    Some("lines") => Kind::ResponseJson,
+                    _ => Kind::DesignMd,
+                };
+                PhaseConfig {
+                    phase: step.name.clone(),
+                    strategy,
+                    aggregator,
+                    verify,
+                    artefact_name: step.name.clone(),
+                    artefact_kind,
+                    producer: if backends.len() > 1 {
+                        Producer::Parallel
+                    } else {
+                        Producer::Single
+                    },
+                    prompt_template: step.prompt.clone(),
+                    backend: backend_str,
+                    targets,
+                    min_responses: 1,
+                    rungs,
+                    pass_failure_context: false,
+                }
+            })
+            .collect()
+    }
 }
 
 /// Configuration for step output validation.

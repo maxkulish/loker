@@ -210,7 +210,7 @@ impl ResumeRunner {
         runner: &crate::phase_runner::PhaseRunner,
         cfg: &crate::phase_runner::PhaseConfig,
         run_dir: &std::path::Path,
-        _attempt: u32,
+        attempt: u32,
         run_id: uuid::Uuid,
     ) -> Result<(), ResumeError> {
         let ctx = crate::strategy::PhaseContext::new(&cfg.phase, run_id);
@@ -224,7 +224,7 @@ impl ResumeRunner {
             trace: None,
         };
 
-        let _outcome = runner.run(cfg, inputs).await?;
+        let _outcome = runner.run(cfg, inputs, attempt).await?;
         Ok(())
     }
 }
@@ -234,8 +234,7 @@ mod planner_tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::manifest::{Kind, ManifestEntry, Producer};
-    use crate::run_state::{HeartbeatStatus, PhaseStatus, RunState};
+    use crate::run_state::{PhaseStatus, RunState};
 
     #[test]
     fn planner_all_completed_returns_all_skip() {

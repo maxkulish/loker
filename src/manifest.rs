@@ -86,6 +86,9 @@ pub struct Manifest {
     #[serde(rename = "loker.run_id")]
     pub run_id: String,
     pub schema_version: u32,
+    /// Workflow name from which this run was created. Set by `RunDir::create()`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_name: Option<String>,
     pub entries: Vec<ManifestEntry>,
 }
 
@@ -170,10 +173,11 @@ impl ManifestEntry {
 
 impl Manifest {
     /// Create an empty manifest for a given run id.
-    pub fn new(run_id: impl Into<String>) -> Self {
+    pub fn new(run_id: impl Into<String>, workflow_name: Option<String>) -> Self {
         Self {
             run_id: run_id.into(),
             schema_version: 1,
+            workflow_name,
             entries: Vec::new(),
         }
     }
@@ -355,7 +359,7 @@ mod tests {
 
     #[test]
     fn empty_manifest_roundtrips() {
-        let manifest = Manifest::new("run-001");
+        let manifest = Manifest::new("run-001", None);
         let json = manifest.to_json().unwrap();
         let loaded: Manifest = Manifest::from_json(&json).unwrap();
         assert_eq!(manifest.run_id, loaded.run_id);

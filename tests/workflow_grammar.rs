@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use loker::workflow::grammar::{BackendRef, InputRef, Strategy, Workflow, WorkflowError};
+use loker::workflow::grammar::{BackendRef, Strategy, Workflow, WorkflowError};
 
 /// Helper: read a fixture file and parse it.
 fn parse_fixture(name: &str) -> Result<Workflow, Vec<WorkflowError>> {

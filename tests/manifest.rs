@@ -33,7 +33,7 @@ fn entry_payload(name: &str, kind: Kind, producer: Producer) -> (ManifestEntry, 
 fn empty_manifest_roundtrips() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("manifest.json");
-    let manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
     // Write via simple fs write for empty manifest test
     let json = manifest.to_json().unwrap();
     fs::write(&path, json).unwrap();
@@ -47,7 +47,7 @@ fn empty_manifest_roundtrips() {
 fn append_and_reload_preserves_entries() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("manifest.json");
-    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
 
     let (entry1, _payload1) = entry_payload("design/design.md", Kind::DesignMd, Producer::Single);
     let (entry2, _payload2) =
@@ -70,7 +70,7 @@ fn atomic_crash_before_rename_leaves_tmp() {
     let path = tmp.path().join("manifest.json");
 
     // Write initial manifest
-    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
     let (entry, _payload) = entry_payload("design/design.md", Kind::DesignMd, Producer::Single);
     manifest.append(entry, &path).unwrap();
 
@@ -98,7 +98,7 @@ fn atomic_crash_after_rename_before_parent_fsync() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("manifest.json");
 
-    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
     let (entry, _payload) = entry_payload("design/design.md", Kind::DesignMd, Producer::Single);
     manifest.append(entry, &path).unwrap();
 
@@ -126,7 +126,7 @@ fn sha256_mismatch_returns_schema_error() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("manifest.json");
 
-    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
     let (entry, _payload) = entry_payload("design/design.md", Kind::DesignMd, Producer::Single);
     manifest.append(entry, &path).unwrap();
     let loaded = Manifest::load(&path).unwrap();
@@ -163,7 +163,7 @@ fn orphan_sweep_drops_unreferenced_entries() {
     let markers_dir = tmp.path().join("markers");
     fs::create_dir(&markers_dir).unwrap();
 
-    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
     let (entry1, _payload1) = entry_payload("design/design.md", Kind::DesignMd, Producer::Single);
     let (entry2, _payload2) = entry_payload("review/review.md", Kind::ReviewMd, Producer::Single);
 
@@ -241,7 +241,7 @@ fn generated_manifest_validates_against_schema() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("manifest.json");
 
-    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    let mut manifest = Manifest::new("a1b2c3d4-e5f6-7890-abcd-ef1234567890", None);
     let (entry, _payload) = entry_payload("design/design.md", Kind::DesignMd, Producer::Single);
     manifest.append(entry, &path).unwrap();
 

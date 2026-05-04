@@ -195,12 +195,13 @@ impl PhaseRunner {
         &self,
         cfg: &PhaseConfig,
         inputs: PhaseInputs<'_>,
+        initial_attempt: u32,
     ) -> Result<PhaseOutcome, PhaseError> {
         validate_config(cfg)?;
         let phase_start = std::time::Instant::now();
         let trace_sink = inputs.trace;
         let markers = crate::run_state::markers::MarkerWriter::new(&inputs.run_dir);
-        persist::start_attempt(&markers, &cfg.phase, 0)?;
+        persist::start_attempt(&markers, &cfg.phase, initial_attempt)?;
 
         let mut ctx = inputs.ctx;
         ctx.cwd = inputs.run_dir.clone();
@@ -249,7 +250,7 @@ impl PhaseRunner {
                     &markers,
                     &inputs.run_dir,
                     cfg,
-                    1,
+                    initial_attempt + 1,
                     phase_err.error_class(),
                 ) {
                     eprintln!("failed to persist terminal failure marker: {persist_err}");
@@ -283,8 +284,9 @@ impl PhaseRunner {
             }
         }
 
-        for attempt in 1..strategy_output.attempts.len() {
-            persist::start_attempt(&markers, &cfg.phase, attempt as u32)?;
+        let strategy_attempt_base = initial_attempt;
+        for i in 1..strategy_output.attempts.len() {
+            persist::start_attempt(&markers, &cfg.phase, strategy_attempt_base + i as u32)?;
         }
 
         let aggregator = dispatch::resolve_aggregator(cfg.aggregator)?;
@@ -304,7 +306,7 @@ impl PhaseRunner {
                         &markers,
                         &inputs.run_dir,
                         cfg,
-                        strategy_output.attempts.len().max(1) as u32,
+                        initial_attempt + strategy_output.attempts.len().max(1) as u32,
                         err.error_class(),
                     ) {
                         eprintln!("failed to persist terminal failure marker: {persist_err}");
@@ -380,7 +382,7 @@ impl PhaseRunner {
                     &markers,
                     &inputs.run_dir,
                     cfg,
-                    strategy_output.attempts.len().max(1) as u32,
+                    initial_attempt + strategy_output.attempts.len().max(1) as u32,
                     phase_err.error_class(),
                 ) {
                     eprintln!("failed to persist terminal failure marker: {persist_err}");
