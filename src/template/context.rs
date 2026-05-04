@@ -27,6 +27,7 @@ impl Object for LazyEnv {
 /// Provides the same variable paths as the regex interpolation system:
 /// `steps.{name}.output`, `steps.{name}.{field}`, `steps.{name}.success`,
 /// `env.{VAR}`, `arg.{N}` (1-indexed), `workflow.backends`,
+/// `spec`, `var.{name}`,
 /// `item`, `item.{field}`, `index`.
 #[allow(dead_code)]
 pub struct TemplateContext {
@@ -43,6 +44,27 @@ impl TemplateContext {
     ///   sequence indexing
     /// - `backends`: backend names used (will be capitalized, deduplicated, joined)
     pub fn new(steps: &HashMap<String, StepResult>, args: &[String], backends: &[String]) -> Self {
+        Self::new_with_extras(
+            steps,
+            args,
+            backends,
+            None,
+            &std::collections::HashMap::new(),
+        )
+    }
+
+    /// Build a template context with optional spec content and template vars.
+    ///
+    /// Extends `new()` with:
+    /// - `spec`: the spec file content as a top-level string
+    /// - `vars`: a map of template variable names to values, accessible as `var.{name}`
+    pub fn new_with_extras(
+        steps: &HashMap<String, StepResult>,
+        args: &[String],
+        backends: &[String],
+        spec: Option<String>,
+        vars: &std::collections::HashMap<String, String>,
+    ) -> Self {
         let mut root = std::collections::BTreeMap::new();
 
         // Build steps namespace
@@ -114,6 +136,19 @@ impl TemplateContext {
         };
         workflow_map.insert("backends".to_string(), Value::from(backends_str));
         root.insert("workflow".to_string(), Value::from_serialize(&workflow_map));
+
+        // Spec content ({{ spec }})
+        if let Some(ref spec_content) = spec {
+            root.insert("spec".to_string(), Value::from(spec_content.clone()));
+        }
+
+        // Template vars ({{ var.<name> }})
+        let vars_map: std::collections::BTreeMap<String, Value> = vars
+            .iter()
+            .map(|(k, v)| (k.clone(), Value::from(v.clone())))
+            .collect();
+        // Always expose `var` namespace so `{{ var.<name> }}` resolves even when empty
+        root.insert("var".to_string(), Value::from_serialize(&vars_map));
 
         Self {
             values: Value::from_serialize(&root),

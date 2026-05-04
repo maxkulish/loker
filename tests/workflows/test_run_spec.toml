@@ -1,0 +1,6 @@
+name = "test-run-spec"
+description = "Test --spec flag injection only"
+
+[[steps]]
+name = "show_spec"
+shell = "echo 'spec: {{ spec }}'"
