@@ -12,9 +12,13 @@
 pub mod llm_verifier;
 pub mod run_command;
 pub mod test_runner;
+pub mod human_verifier;
 pub mod verify;
 
 // Re-export the core types so `strategy::verify::FailureReason` etc. work.
+pub use human_verifier::{
+    HumanDecision, HumanResponse, HumanSeverity, HumanVerifier, HumanVerifierConfig,
+};
 pub use verify::{
     FailureReason, SandboxViolation, VerifyContext, VerifyError, VerifyHook, VerifyResult,
 };
