@@ -105,6 +105,9 @@ pub struct ResumePlan {
     pub actions: Vec<(crate::phase_runner::PhaseConfig, PhaseAction)>,
     /// Tmp files that were swept before planning.
     pub swept_tmp: Vec<PathBuf>,
+    /// The original run ID, preserved across resume attempts so that
+    /// traces and backend records remain consistently associated.
+    pub run_id: uuid::Uuid,
 }
 
 /// Planner that inspects the on-disk state and decides what to do per phase.
@@ -150,6 +153,8 @@ impl ResumePlanner {
             run_dir: run_dir.to_path_buf(),
             actions,
             swept_tmp,
+            run_id: uuid::Uuid::parse_str(&run_state.run_id)
+                .unwrap_or_else(|_| uuid::Uuid::new_v4()),
         })
     }
 }
@@ -186,12 +191,13 @@ impl ResumeRunner {
                         phase_cfg.phase, attempt
                     );
                     archive_current_attempt(&plan.run_dir, &phase_cfg.phase, attempt - 1)?;
-                    self.run_phase(&runner, phase_cfg, &plan.run_dir, *attempt)
+                    self.run_phase(&runner, phase_cfg, &plan.run_dir, *attempt, plan.run_id)
                         .await?;
                 }
                 PhaseAction::RunFresh => {
                     eprintln!("  [resume] running '{}' fresh", phase_cfg.phase);
-                    self.run_phase(&runner, phase_cfg, &plan.run_dir, 0).await?;
+                    self.run_phase(&runner, phase_cfg, &plan.run_dir, 0, plan.run_id)
+                        .await?;
                 }
             }
         }
@@ -205,8 +211,9 @@ impl ResumeRunner {
         cfg: &crate::phase_runner::PhaseConfig,
         run_dir: &std::path::Path,
         _attempt: u32,
+        run_id: uuid::Uuid,
     ) -> Result<(), ResumeError> {
-        let ctx = crate::strategy::PhaseContext::new(&cfg.phase, uuid::Uuid::new_v4());
+        let ctx = crate::strategy::PhaseContext::new(&cfg.phase, run_id);
         let prompt = crate::strategy::Prompt::new();
         let inputs = crate::phase_runner::PhaseInputs {
             backends: &self.backends,

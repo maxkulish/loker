@@ -31,8 +31,13 @@ impl RunLock {
             .open(&lock_path)
             .map_err(ResumeError::Io)?;
 
-        file.try_lock_exclusive()
-            .map_err(|_| ResumeError::LockInUse)?;
+        file.try_lock_exclusive().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::WouldBlock {
+                ResumeError::LockInUse
+            } else {
+                ResumeError::Io(e)
+            }
+        })?;
 
         Ok(Self { file })
     }

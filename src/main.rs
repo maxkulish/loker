@@ -885,15 +885,6 @@ async fn main() -> Result<()> {
             println!("Run state loaded for {}", run_dir.display());
             println!("  phases: {:?}", run_state.phase_status);
 
-            if run_state
-                .phase_status
-                .values()
-                .all(|s| *s == loker::run_state::PhaseStatus::Completed)
-            {
-                println!("All phases complete — nothing to resume.");
-                return Ok(());
-            }
-
             drop(lock);
 
             anyhow::bail!(

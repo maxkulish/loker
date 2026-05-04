@@ -27,7 +27,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-03T12:35:56.289Z'
-  updated_at: '2026-05-03T16:42:38.244Z'
+  updated_at: '2026-05-03T17:03:19.371Z'
 phases:
   discovery:
     status: complete
@@ -84,7 +84,10 @@ phases:
     validation_synthesis_report: docs/reviews/clo-295-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 42
+    pr_url: https://github.com/maxkulish/loker/pull/42
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -214,5 +217,13 @@ history:
     action: phase_transition
     phase: implement
     details: Transitioned from implement to pr
+  - timestamp: '2026-05-03T16:46:03.741Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #42 opened: https://github.com/maxkulish/loker/pull/42'
+  - timestamp: '2026-05-03T17:03:19.371Z'
+    action: ci_passed
+    phase: pr
+    details: 'All CI checks passing: format (14s), clippy (1m11s), test (2m31s)'
 task_title: '[T-031] Implement run resumability via status markers'
 task_url: https://linear.app/cloud-ai/issue/CLO-295/t-031-implement-run-resumability-via-status-markers

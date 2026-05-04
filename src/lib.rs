@@ -10,7 +10,8 @@ pub mod backend;
 pub mod family;
 pub mod manifest;
 pub mod phase_runner;
-pub mod resume;
+#[doc(hidden)]
+pub mod resume; // scaffolding; execution wiring deferred to CLO-301
 pub mod run_state;
 pub mod strategy;
 pub mod template;

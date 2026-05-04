@@ -22,37 +22,46 @@ pub fn sweep_stale_tmp(run_dir: &Path, ttl_seconds: u64) -> Result<Vec<PathBuf>,
     let mut tmp_files = Vec::new();
     collect_tmp_files(run_dir, &mut tmp_files)?;
 
-    if tmp_files.is_empty() {
+    // Filter to stale files only (fail fast on mtime errors)
+    let stale: Vec<PathBuf> = tmp_files
+        .into_iter()
+        .filter_map(|path| {
+            match fs::metadata(&path) {
+                Ok(meta) => match meta.modified() {
+                    Ok(t) => match t.duration_since(UNIX_EPOCH) {
+                        Ok(dur) => {
+                            if dur.as_secs() < cutoff {
+                                Some(Ok(path))
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_) => None, // before epoch → not stale
+                    },
+                    Err(e) => Some(Err(e)),
+                },
+                Err(e) => Some(Err(e)),
+            }
+        })
+        .collect::<Result<Vec<_>, io::Error>>()?;
+
+    if stale.is_empty() {
         return Ok(swept);
     }
 
-    // Build destination directory
+    // Build destination directory only when we have something to move
     let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S-%3f").to_string();
     let orphan_dir = run_dir.join("attempts").join("_orphan_tmp").join(&ts);
     fs::create_dir_all(&orphan_dir)?;
 
-    for path in tmp_files {
-        let mtime = match fs::metadata(&path) {
-            Ok(meta) => match meta.modified() {
-                Ok(t) => match t.duration_since(UNIX_EPOCH) {
-                    Ok(dur) => dur.as_secs(),
-                    Err(_) => continue,
-                },
-                Err(_) => continue,
-            },
-            Err(e) => return Err(e),
-        };
-
-        if mtime < cutoff {
-            // Move relative to run_dir to preserve tree structure
-            let rel = path.strip_prefix(run_dir).unwrap_or(&path);
-            let dest = orphan_dir.join(rel);
-            if let Some(parent) = dest.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::rename(&path, &dest)?;
-            swept.push(dest);
+    for path in stale {
+        let rel = path.strip_prefix(run_dir).unwrap_or(&path);
+        let dest = orphan_dir.join(rel);
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)?;
         }
+        fs::rename(&path, &dest)?;
+        swept.push(dest);
     }
 
     // Sync the orphan directory parent to guarantee rename visibility
@@ -72,19 +81,15 @@ fn collect_tmp_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), io::Error
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
+
+        // Skip symlinks to avoid recursing outside the run directory
+        if path.symlink_metadata()?.file_type().is_symlink() {
+            continue;
+        }
+
         if path.is_dir() {
-            // Skip the attempts/_orphan_tmp subtree to avoid re-sweeping
-            let rel = path.strip_prefix(dir).ok();
-            if rel
-                .as_ref()
-                .map(|p| {
-                    p.components()
-                        .next()
-                        .map(|c| c.as_os_str() == "_orphan_tmp")
-                        == Some(true)
-                })
-                .unwrap_or(false)
-            {
+            // Skip the attempts/ subtree entirely to preserve archived data
+            if path.file_name().map(|n| n == "attempts").unwrap_or(false) {
                 continue;
             }
             collect_tmp_files(&path, out)?;
