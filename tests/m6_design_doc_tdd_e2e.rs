@@ -376,7 +376,9 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures) {
 // ---------------------------------------------------------------------------
 
 /// The full four-phase pipeline against mocked backends exits cleanly and
-/// produces a run directory. No assertion on artefact bodies.
+/// produces a run directory. Asserts rendered prompts contain expected
+/// spec and upstream phase content (proves CLO-289 template substitution
+/// flows end-to-end).
 #[test]
 fn m6_smoke_test_mocked_pipeline_exits_zero() {
     let (run_dir, phase_runs, _fixtures) = run_mocked_design_doc_tdd();
@@ -395,6 +397,23 @@ fn m6_smoke_test_mocked_pipeline_exits_zero() {
 
     let names: Vec<&str> = phase_runs.iter().map(|r| r.name.as_str()).collect();
     assert_eq!(names, vec!["design", "review", "implement", "verify"]);
+
+    // F4: Assert template substitution works end-to-end
+    // design prompt must contain the calculator spec content
+    assert!(
+        phase_runs[0].rendered_prompt.contains("Calculator"),
+        "design rendered prompt should contain calculator spec content"
+    );
+    // review prompt must contain the design output (upstream phase reference)
+    assert!(
+        phase_runs[1].rendered_prompt.contains("Architecture"),
+        "review rendered prompt should contain design fixture output"
+    );
+    // implement prompt must contain the review output
+    assert!(
+        phase_runs[2].rendered_prompt.contains("Verdict"),
+        "implement rendered prompt should contain review fixture output"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -683,20 +702,23 @@ fn m6_summary_and_resume() {
     );
 
     // --- Resume idempotency ---
+    // All phases must have completed markers written to markers/
     let markers_path = run_dir.path().join("markers");
-    if markers_path.exists() {
-        let marker_entries: Vec<_> = std::fs::read_dir(&markers_path)
-            .expect("markers/ should be readable")
-            .filter_map(|e| e.ok())
-            .collect();
+    assert!(
+        markers_path.exists(),
+        "markers/ must exist after completed run"
+    );
+    let marker_entries: Vec<_> = std::fs::read_dir(&markers_path)
+        .expect("markers/ should be readable")
+        .filter_map(|e| e.ok())
+        .collect();
 
-        for phase_name in &["design", "review", "implement", "verify"] {
-            let completed_marker = format!("{phase_name}.completed");
-            let has_completed = marker_entries
-                .iter()
-                .any(|e| e.file_name().to_string_lossy() == completed_marker);
-            assert!(has_completed, "marker '{completed_marker}' should exist");
-        }
+    for phase_name in &["design", "review", "implement", "verify"] {
+        let completed_marker = format!("{phase_name}.completed");
+        let has_completed = marker_entries
+            .iter()
+            .any(|e| e.file_name().to_string_lossy() == completed_marker);
+        assert!(has_completed, "marker '{completed_marker}' should exist");
     }
 }
 
@@ -704,8 +726,22 @@ fn m6_summary_and_resume() {
 // ST9: Live mode (gated)
 // ---------------------------------------------------------------------------
 
+/// Live mode structural assertions against a real TensorZero gateway.
+/// Silently skipped when `LOKER_M6_INTEGRATION` is not set.
+/// When enabled, requires a running TensorZero gateway (CLO-252).
 #[test]
-#[ignore = "requires LOKER_M6_INTEGRATION=1"]
 fn m6_live_mode_structural() {
-    unimplemented!("Live mode not yet implemented. Set LOKER_M6_INTEGRATION=1 and configure a TensorZero gateway.");
+    if std::env::var("LOKER_M6_INTEGRATION").is_err() {
+        eprintln!("SKIP: LOKER_M6_INTEGRATION not set");
+        return;
+    }
+    // Live mode: runs the same pipeline through real TensorZero backends.
+    // Asserts structural properties (files exist, JSON parses, manifest
+    // entries present) without byte-equality on artefact bodies.
+    //
+    // Implementation requires a running TensorZero gateway (CLO-252).
+    // For now, this is a placeholder that documents the env gate.
+    unimplemented!(
+        "Live mode requires TensorZero gateway. Set LOKER_M6_INTEGRATION=1 and configure a gateway per CLO-252."
+    );
 }
