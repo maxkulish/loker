@@ -45,6 +45,9 @@ make check                                     # fmt + clippy + test (pre-merge 
 cargo test -q                                  # 466 unit + 6 integration as of M0
 cargo run --bin loker -- doctor                # smoke-test the CLI
 LOKER_TZ_INTEGRATION=1 cargo test              # opt-in TensorZero gateway tests
+
+# TensorZero Tier-2 stack (needed for integration test):
+#   cd deploy/tensorzero && docker compose up -d
 ```
 
 `make release` auto-versions `YYYYMMDD.0.X`, tags, builds, installs, and
@@ -70,7 +73,14 @@ to `/usr/local/bin/lok`; the binary is `loker` (separate cleanup).
 when `LOKER_TZ_INTEGRATION` is unset, so plain `cargo test` is unaffected.
 To run it:
 
-1. `cd tensorzero && docker compose up -d` to start the Tier-2 stack.
+1. Start the Tier-2 stack from the canonical deploy path:
+   ```
+   cd deploy/tensorzero
+   cp ../../tensorzero/.env.example .env   # fill in OPENAI_API_KEY
+   docker compose up -d
+   ```
+   (The older `tensorzero/docker-compose.yml` at the project root still works
+   for backward compatibility, `cd tensorzero && docker compose up -d`.)
 2. Wait for `curl -fsS "${TENSORZERO_GATEWAY_URL:-http://localhost:3000}/health"`
    to return 200. Note: for the probe, `TENSORZERO_GATEWAY_URL` must be the
    gateway *root* (e.g. `http://host:3000`), not the `…/openai/v1`-suffixed
