@@ -5,9 +5,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
-use loker::strategy::verify::{
-    HumanDecision, HumanResponse, HumanSeverity, HumanVerifierConfig,
-};
+use loker::strategy::verify::{HumanDecision, HumanResponse, HumanSeverity, HumanVerifierConfig};
 use loker::strategy::{PhaseContext, Prompt};
 use loker::{PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
 

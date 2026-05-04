@@ -65,8 +65,9 @@ pub fn resolve_verify_hook(
     match &cfg.verify {
         VerifyHookName::None => Ok(None),
         VerifyHookName::RunCommand | VerifyHookName::LlmVerifier => Ok(verify),
-        VerifyHookName::HumanVerifier(cfg) => Ok(Some(std::sync::Arc::new(HumanVerifier::new(cfg.clone()))),
-        ),
+        VerifyHookName::HumanVerifier(cfg) => {
+            Ok(Some(std::sync::Arc::new(HumanVerifier::new(cfg.clone()))))
+        }
     }
 }
 
@@ -207,8 +208,8 @@ fn resolve_output_path(run_dir: &Path, path: &str) -> std::path::PathBuf {
 mod tests {
     use super::*;
     use crate::phase_runner::{AggregatorName, PhaseConfig, StrategyName};
+    use crate::strategy::verify::{HumanDecision, HumanSeverity, HumanVerifierConfig};
     use crate::strategy::TargetSpec;
-    use crate::strategy::verify::{HumanDecision, HumanVerifierConfig, HumanSeverity};
     use std::path::PathBuf;
 
     #[test]
@@ -246,7 +247,9 @@ mod tests {
             decision_options: vec![HumanDecision::Approve],
         });
 
-        let hook = resolve_verify_hook(&single, None).unwrap().expect("hook should exist");
+        let hook = resolve_verify_hook(&single, None)
+            .unwrap()
+            .expect("hook should exist");
         assert_eq!(hook.name(), "HumanVerifier");
     }
 }

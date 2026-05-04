@@ -11,11 +11,14 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::run_state::atomic_write;
-use crate::strategy::verify::{FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult};
+use crate::strategy::verify::{
+    FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult,
+};
 
 const SCHEMA_VERSION: u32 = 1;
 
 /// Configuration passed to `VerifyHookName::HumanVerifier`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HumanVerifierConfig {
     pub run_dir: PathBuf,
     pub run_id: String,
@@ -121,14 +124,15 @@ impl HumanVerifier {
         Ok(Some(response))
     }
 
-    fn consume_response(&self) -> Result<(), VerifyError> {
+    fn consume_response(&self, suffix: &str) -> Result<(), VerifyError> {
         let source = self.response_path();
         if !source.exists() {
             return Ok(());
         }
         let destination = source.with_file_name(format!(
-            "{}.json.handled.{}",
+            "{}.json.{}.{}",
             self.config.phase,
+            suffix,
             Utc::now().timestamp_millis()
         ));
 
@@ -229,8 +233,7 @@ impl VerifyHook for HumanVerifier {
                 self.ensure_pending_file(&payload)?;
                 let reason = FailureReason::new(format!(
                     "malformed or missing human response for {}: {}",
-                    self.config.phase,
-                    err
+                    self.config.phase, err
                 ));
                 return Ok(VerifyResult::Fail { reason });
             }
@@ -245,6 +248,7 @@ impl VerifyHook for HumanVerifier {
                         &summary,
                         preview_lines,
                     );
+                    self.consume_response("mismatched")?;
                     self.ensure_pending_file(&payload)?;
                     let reason = FailureReason::new(format!(
                         "response phase mismatch for {}: expected {}",
@@ -253,7 +257,7 @@ impl VerifyHook for HumanVerifier {
                     return Ok(VerifyResult::Fail { reason });
                 }
 
-                self.consume_response()?;
+                self.consume_response("handled")?;
 
                 match response.decision {
                     HumanDecision::Approve => Ok(VerifyResult::pass()),
@@ -262,9 +266,9 @@ impl VerifyHook for HumanVerifier {
                         self.config.phase,
                         response.global_comment.unwrap_or_default()
                     ))),
-                    HumanDecision::CommentOnly => {
-                        Ok(VerifyResult::fail("human comment_only is not treated as approval"))
-                    }
+                    HumanDecision::CommentOnly => Ok(VerifyResult::fail(
+                        "human comment_only is not treated as approval",
+                    )),
                 }
             }
             None => {
@@ -326,10 +330,10 @@ mod tests {
         }
     }
 
-    fn write_response(path: &PathBuf, decision: HumanDecision, comment: Option<&str>) {
+    fn write_response(path: &PathBuf, phase: &str, decision: HumanDecision, comment: Option<&str>) {
         let response = HumanResponse {
             schema_version: SCHEMA_VERSION,
-            phase: "review".into(),
+            phase: phase.into(),
             claimed_by: "human".into(),
             decided_at: "2026-05-04T00:00:00Z".into(),
             decision,
@@ -381,7 +385,10 @@ mod tests {
 
         let response_json = serde_json::to_value(response.clone()).unwrap();
         assert_eq!(response_json["decision"], "approve");
-        assert_eq!(serde_json::from_value::<HumanResponse>(response_json).unwrap(), response);
+        assert_eq!(
+            serde_json::from_value::<HumanResponse>(response_json).unwrap(),
+            response
+        );
     }
 
     #[test]
@@ -413,14 +420,13 @@ mod tests {
     async fn returns_fail_when_response_missing() {
         let tmp = tempfile::tempdir().unwrap();
         let hook = hook(&tmp, HumanSeverity::High);
-        let result = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        let result = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
 
         assert!(matches!(result, VerifyResult::Fail { .. }));
-        assert!(tmp
-            .path()
-            .join("pending")
-            .join("review.json")
-            .is_file());
+        assert!(tmp.path().join("pending").join("review.json").is_file());
 
         let text = fs::read_to_string(tmp.path().join("pending/review.json")).unwrap();
         let request: PendingRequest = serde_json::from_str(&text).unwrap();
@@ -434,16 +440,23 @@ mod tests {
 
         let response_path = hook.response_path();
 
-        write_response(&response_path, HumanDecision::Approve, None);
-        let ok = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        write_response(&response_path, "review", HumanDecision::Approve, None);
+        let ok = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
         assert!(ok.is_pass());
 
         write_response(
             &response_path,
+            "review",
             HumanDecision::Reject,
             Some("Needs additional context around security section"),
         );
-        let fail = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        let fail = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
         assert!(fail.is_fail());
 
         if let VerifyResult::Fail { reason } = fail {
@@ -454,11 +467,44 @@ mod tests {
 
         write_response(
             &response_path,
+            "review",
             HumanDecision::CommentOnly,
             Some("Looks okay as next step"),
         );
-        let pending = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        let pending = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
         assert!(pending.is_fail());
+    }
+
+    #[tokio::test]
+    async fn phase_mismatch_is_consumed_after_fail() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hook = hook(&tmp, HumanSeverity::Medium);
+        let response_path = hook.response_path();
+
+        write_response(&response_path, "design", HumanDecision::Approve, None);
+        let mismatch = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(mismatch.is_fail());
+
+        assert!(!response_path.exists());
+        let responses_dir = tmp.path().join("responses");
+        let consumed = responses_dir
+            .read_dir()
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .to_string()
+                    .contains("review.json.mismatched.")
+            });
+        assert!(consumed);
     }
 
     #[tokio::test]
@@ -467,8 +513,11 @@ mod tests {
         let hook = hook(&tmp, HumanSeverity::Medium);
         let response_path = hook.response_path();
 
-        write_response(&response_path, HumanDecision::Approve, None);
-        let ok = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        write_response(&response_path, "review", HumanDecision::Approve, None);
+        let ok = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
         assert!(ok.is_pass());
 
         assert!(!response_path.exists());
@@ -482,7 +531,7 @@ mod tests {
                     .file_name()
                     .to_string_lossy()
                     .to_string()
-                    .starts_with("review.json.handled.")
+                    .contains("review.json.handled.")
             });
         assert!(consumed);
     }
@@ -498,7 +547,10 @@ mod tests {
         }
         fs::write(&response_path, b"{not valid json}").unwrap();
 
-        let pending = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        let pending = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
         assert!(pending.is_fail());
         assert!(tmp.path().join("pending/review.json").is_file());
     }

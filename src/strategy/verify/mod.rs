@@ -9,10 +9,10 @@
 //! - [`RunCommand`] — shells out and maps exit status (CLO-271).
 //! - [`TestRunner`] — parses structured test output (CLO-273).
 
+pub mod human_verifier;
 pub mod llm_verifier;
 pub mod run_command;
 pub mod test_runner;
-pub mod human_verifier;
 pub mod verify;
 
 // Re-export the core types so `strategy::verify::FailureReason` etc. work.
