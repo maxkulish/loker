@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-04T12:26:46.558Z'
-  updated_at: '2026-05-04T12:37:42.927Z'
+  updated_at: '2026-05-04T12:39:58.950Z'
 phases:
   discovery:
     status: complete
@@ -60,6 +60,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - 546c09f
   pr:
     status: pending
   complete:
@@ -131,5 +133,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-04T12:39:58.950Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: create fixture directory with mock response data (tests/fixtures/m6/). Commit 546c09f.'
 task_title: M6 end-to-end integration test on calculator spec
 task_url: https://linear.app/cloud-ai/issue/CLO-291/m6-end-to-end-integration-test-on-calculator-spec
