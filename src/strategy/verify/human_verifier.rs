@@ -38,6 +38,10 @@ pub struct HumanVerifier {
 
 impl HumanVerifier {
     pub fn new(config: HumanVerifierConfig) -> Self {
+        assert!(
+            !config.decision_options.is_empty(),
+            "decision_options must not be empty"
+        );
         Self { config }
     }
 
@@ -124,6 +128,12 @@ impl HumanVerifier {
             .map_err(|err| format!("failed to read response file {}: {err}", path.display()))?;
         let response: HumanResponse = serde_json::from_str(&text)
             .map_err(|err| format!("failed to parse response file {}: {err}", path.display()))?;
+        if response.schema_version != SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported schema version: expected {}, got {}",
+                SCHEMA_VERSION, response.schema_version
+            ));
+        }
         Ok(Some(response))
     }
 
@@ -253,8 +263,8 @@ impl VerifyHook for HumanVerifier {
                     );
                     self.ensure_pending_file(&payload)?;
                     let reason = FailureReason::new(format!(
-                        "response phase mismatch for {}: expected {}",
-                        self.config.phase, response.phase
+                        "response phase mismatch for {}: expected {}, got {}",
+                        self.config.phase, self.config.phase, response.phase
                     ));
                     return Ok(VerifyResult::Fail { reason });
                 }
@@ -555,6 +565,66 @@ mod tests {
             fs::create_dir_all(parent).unwrap();
         }
         fs::write(&response_path, b"{not valid json}").unwrap();
+
+        let pending = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(pending.is_fail());
+        assert!(tmp.path().join("pending/review.json").is_file());
+    }
+
+    #[tokio::test]
+    async fn rejects_response_with_unexpected_decision() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hook = HumanVerifier::new(HumanVerifierConfig {
+            run_dir: tmp.path().to_path_buf(),
+            run_id: "run-1".into(),
+            workflow: "wf".into(),
+            phase: "review".into(),
+            artefact_name: "review.md".into(),
+            artefact_kind: Kind::ReviewMd,
+            severity: HumanSeverity::Medium,
+            decision_options: vec![HumanDecision::Approve],
+        });
+        let response_path = hook.response_path();
+
+        write_response(
+            &response_path,
+            "review",
+            HumanDecision::Reject,
+            Some("nope"),
+        );
+        let fail = hook
+            .verify(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(fail.is_fail());
+    }
+
+    #[tokio::test]
+    async fn rejects_response_with_unknown_schema_version() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hook = hook(&tmp, HumanSeverity::Medium);
+        let response_path = hook.response_path();
+
+        let response = HumanResponse {
+            schema_version: 99,
+            phase: "review".into(),
+            claimed_by: "human".into(),
+            decided_at: "2026-05-04T00:00:00Z".into(),
+            decision: HumanDecision::Approve,
+            global_comment: None,
+            inline_comments_path: None,
+        };
+        if let Some(parent) = response_path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(
+            &response_path,
+            serde_json::to_vec_pretty(&response).unwrap(),
+        )
+        .unwrap();
 
         let pending = hook
             .verify(&context_with_output("candidate output"))
