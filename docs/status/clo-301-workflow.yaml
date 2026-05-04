@@ -1,61 +1,3 @@
-<<<<<<< HEAD
-task_id: clo-301
-task_type: development
-classification_reason: >-
-  Title describes wiring ResumeRunner::execute() end-to-end - a development task adding code (struct method, integration
-  with PhaseRunner, status-marker resume protocol). No Type: marker or [spec]/[ops] label present.
-task_profile:
-  has_backend: false
-  has_frontend: false
-  has_data_model: false
-  has_external_deps: false
-  skip_probe: false
-pending_human_action: null
-linear:
-  team: Cloud-ai
-  project: Loker
-  status_at_start: Backlog
-  blocks: []
-  blocked_by: []
-  branch_actual: feat/clo-301-resume-runner
-workflow:
-  current_phase: complete
-  status: complete
-  created_at: '2026-05-04T13:35:00.000Z'
-  updated_at: '2026-05-04T14:37:04.000Z'
-phases:
-  discovery:
-    status: complete
-  design:
-    status: complete
-  plan:
-    status: complete
-  implement:
-    status: complete
-  pr:
-    status: complete
-    pr_number: 46
-    pr_url: https://github.com/maxkulish/loker/pull/46
-    ci_passed: true
-    reviews_addressed: true
-    approved: true
-    merge_commit: 4bf4ddc
-    merged_at: '2026-05-04T14:37:04Z'
-  complete:
-    status: complete
-    merge_commit: 4bf4ddc
-    merged_at: '2026-05-04T14:37:04Z'
-    aggregation_files_skip_reason: No aggregation files in repo
-    aggregation_files_updated: false
-history:
-  - timestamp: '2026-05-04T14:37:04.000Z'
-    action: workflow_complete
-    phase: complete
-    details: 'Task CLO-301 fully completed. PR #46 merged in 4bf4ddc. ResumeRunner::execute() wired end-to-end.'
-task_title: wire ResumeRunner::execute() end-to-end
-task_url: https://linear.app/cloud-ai/issue/CLO-301/wire-resumerunner-execute-end-to-end
-||||||| ece5c9b
-=======
 task_id: clo-301
 task_type: development
 classification_reason: >-
@@ -74,13 +16,14 @@ linear:
   status_at_start: Backlog
   blocks: []
   blocked_by: []
+  branch_actual: feat/clo-301-resume-runner
   branch_suggested: kmamemo/clo-301-t-031-follow-up-wire-resumerunner-execution-end-to-end
   priority: '2'
 workflow:
-  current_phase: pr
+  current_phase: complete
   status: complete
   created_at: '2026-05-04T12:28:46.214Z'
-  updated_at: '2026-05-04T14:16:04.525Z'
+  updated_at: '2026-05-04T14:37:04.000Z'
 phases:
   discovery:
     status: complete
@@ -119,11 +62,20 @@ phases:
     validation_synthesis_report: docs/reviews/clo-301-validation-synthesis.md
     validation_synthesis_verdict: approve
   pr:
-    status: in_progress
-    ci_passed: true
+    status: complete
+    pr_number: 46
     pr_url: https://github.com/maxkulish/loker/pull/46
+    ci_passed: true
+    reviews_addressed: true
+    approved: true
+    merge_commit: 4bf4ddc
+    merged_at: '2026-05-04T14:37:04Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 4bf4ddc
+    merged_at: '2026-05-04T14:37:04Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-04T12:28:46.214Z'
     action: workflow_started
@@ -247,6 +199,17 @@ history:
     action: ci_passed
     phase: pr
     details: 'All required checks passing: format ✅, clippy ✅, test ✅'
+  - timestamp: '2026-05-04T14:37:04.000Z'
+    action: pr_merged
+    phase: pr
+    details: 'PR #46 merged. Merge commit 4bf4ddc.'
+  - timestamp: '2026-05-04T14:37:04.000Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-04T14:37:04.000Z'
+    action: workflow_complete
+    phase: complete
+    details: 'Task CLO-301 fully completed. PR #46 merged in 4bf4ddc. ResumeRunner::execute() wired end-to-end.'
 task_title: '[T-031-follow-up] Wire ResumeRunner execution end-to-end'
 task_url: https://linear.app/cloud-ai/issue/CLO-301/t-031-follow-up-wire-resumerunner-execution-end-to-end
->>>>>>> 4bf4ddc5ca0a9d59393b3297fcd385c5e78a89af
