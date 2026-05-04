@@ -4,6 +4,7 @@
 // active callers.
 #![allow(dead_code)]
 
+pub mod aggregator;
 mod apply_verify;
 mod backend;
 mod cache;
@@ -13,22 +14,21 @@ mod consensus;
 mod context;
 mod debate;
 mod delegation;
+pub mod family;
 mod git_agent;
+pub mod manifest;
 mod output;
+pub mod phase_runner;
+pub mod resume;
 mod role;
+pub mod run_state;
 mod spawn;
+pub mod strategy;
 mod tasks;
 mod team;
 mod template;
-mod utils;
-pub mod manifest;
-pub mod phase_runner;
-pub mod family;
-pub mod aggregator;
-pub mod run_state;
 pub mod trace;
-pub mod strategy;
-pub mod resume;
+mod utils;
 pub mod workflow;
 mod workflows;
 
@@ -900,11 +900,10 @@ async fn main() -> Result<()> {
                 ),
             };
 
-
             // Find and load the workflow definition
-            let source = workflow::find_workflow(&workflow_name).await.with_context(|| {
-                format!("Failed to locate workflow '{}'", workflow_name)
-            })?;
+            let source = workflow::find_workflow(&workflow_name)
+                .await
+                .with_context(|| format!("Failed to locate workflow '{}'", workflow_name))?;
             let wf = workflow::load_workflow_from_source(source).await?;
             let phase_configs = wf.to_phase_configs();
             if phase_configs.is_empty() {

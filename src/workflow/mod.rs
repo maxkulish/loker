@@ -282,10 +282,10 @@ impl Workflow {
     /// Shell steps (`step.shell.is_some()`) are excluded — they run via
     /// `WorkflowRunner`'s shell path, not `PhaseRunner`.
     pub fn to_phase_configs(&self) -> Vec<crate::phase_runner::PhaseConfig> {
+        use crate::manifest::{Kind, Producer};
         use crate::phase_runner::{
             AggregatorName, PhaseConfig, PhaseRung, StrategyName, VerifyHookName,
         };
-        use crate::manifest::{Kind, Producer};
         use crate::strategy::{TargetSpec, Tier};
         self.steps
             .iter()
@@ -306,20 +306,21 @@ impl Workflow {
                 } else {
                     StrategyName::Single
                 };
-                let verify = if step.apply_edits {
-                    VerifyHookName::RunCommand
-                } else if step.verify.is_some() {
+                let verify = if step.apply_edits || step.verify.is_some() {
                     VerifyHookName::RunCommand
                 } else {
                     VerifyHookName::None
                 };
                 let targets = if backends.len() > 1 {
-                    backends.iter().map(|b| TargetSpec::new(b)).collect()
+                    backends.iter().map(TargetSpec::new).collect()
                 } else {
                     Vec::new()
                 };
                 let rungs = if step.retries > 0 {
-                    vec![PhaseRung::new(Tier::Medium, backend_str.clone().unwrap_or_default())]
+                    vec![PhaseRung::new(
+                        Tier::Medium,
+                        backend_str.clone().unwrap_or_default(),
+                    )]
                 } else {
                     Vec::new()
                 };
