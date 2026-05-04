@@ -1,8 +1,8 @@
 # CLAUDE.md - loker
 
-Active milestone: **M4 - Verify hooks**. M1/M2/M3 shipped.
+Active milestone: **M6 - Reference workflow**. M1/M2/M3/M4/M5 shipped.
 
-Open in Phase 4: CLO-271 (RunCommand), CLO-273 (TestRunner, blocked by 271).
+Open in Phase 7: CLO-289 (prompt templates), CLO-291 (e2e on calculator spec, blocked by 289).
 
 ## Read first
 
