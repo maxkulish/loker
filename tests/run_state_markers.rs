@@ -19,7 +19,7 @@ fn temp_run_dir() -> (tempfile::TempDir, MarkerWriter) {
 
 #[test]
 fn marker_roundtrip_started() {
-    let (tmp, writer) = temp_run_dir();
+    let (_tmp, writer) = temp_run_dir();
     let phase = "design";
     let attempt = 0;
 
@@ -39,7 +39,7 @@ fn marker_roundtrip_started() {
 
 #[test]
 fn marker_roundtrip_completed() {
-    let (tmp, writer) = temp_run_dir();
+    let (_tmp, writer) = temp_run_dir();
     let phase = "design";
     let attempt = 0;
     let sha = "abc123deadbeef";
@@ -62,7 +62,7 @@ fn marker_roundtrip_completed() {
 
 #[test]
 fn marker_roundtrip_failed() {
-    let (tmp, writer) = temp_run_dir();
+    let (_tmp, writer) = temp_run_dir();
     let phase = "design";
     let attempts_made = 3;
     let error_class = "PhaseError::ArtefactSchemaMismatch";
@@ -90,7 +90,7 @@ fn marker_roundtrip_failed() {
 #[test]
 fn atomic_write_leaves_no_temporary_files_on_success() {
     // Verify that after a successful atomic write, no temporary files are left behind.
-    let (tmp, writer) = temp_run_dir();
+    let (_tmp, writer) = temp_run_dir();
     // Write a marker normally.
     writer.write_started("design", 0).unwrap();
 
@@ -110,7 +110,7 @@ fn atomic_write_leaves_no_temporary_files_on_success() {
 
 #[test]
 fn atomic_rename_tmp_cleaned_after_success() {
-    let (tmp, writer) = temp_run_dir();
+    let (_tmp, writer) = temp_run_dir();
     writer.write_started("design", 0).unwrap();
     writer.write_completed("design", 0, "sha", &[]).unwrap();
     writer.write_failed("design", 1, "err", "path").unwrap();

@@ -20,9 +20,9 @@ linear:
   priority: '2'
 workflow:
   current_phase: pr
-  status: in_progress
+  status: complete
   created_at: '2026-05-04T12:28:46.214Z'
-  updated_at: '2026-05-04T13:42:58.912Z'
+  updated_at: '2026-05-04T13:45:29.701Z'
 phases:
   discovery:
     status: complete
@@ -61,7 +61,9 @@ phases:
     validation_synthesis_report: docs/reviews/clo-301-validation-synthesis.md
     validation_synthesis_verdict: approve
   pr:
-    status: pending
+    status: complete
+    ci_passed: false
+    pr_url: https://github.com/maxkulish/loker/pull/46
   complete:
     status: pending
 history:
@@ -167,5 +169,15 @@ history:
     action: implementation_complete
     phase: implement
     details: Implementation complete. Validation approved. Ready for PR phase.
+  - timestamp: '2026-05-04T13:45:10.788Z'
+    action: pr_created
+    phase: pr
+    details: PR created at https://github.com/maxkulish/loker/pull/46
+  - timestamp: '2026-05-04T13:45:29.701Z'
+    action: workflow_complete
+    phase: pr
+    details: >-
+      CLO-301 implementation complete. PR at https://github.com/maxkulish/loker/pull/46. Note: Linear issue CLO-301 was
+      archived mid-session — status update skipped.
 task_title: '[T-031-follow-up] Wire ResumeRunner execution end-to-end'
 task_url: https://linear.app/cloud-ai/issue/CLO-301/t-031-follow-up-wire-resumerunner-execution-end-to-end

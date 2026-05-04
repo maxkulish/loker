@@ -234,8 +234,7 @@ mod planner_tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::manifest::{Kind, ManifestEntry, Producer};
-    use crate::run_state::{HeartbeatStatus, PhaseStatus, RunState};
+    use crate::run_state::{PhaseStatus, RunState};
 
     #[test]
     fn planner_all_completed_returns_all_skip() {

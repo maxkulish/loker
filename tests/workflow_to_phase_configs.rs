@@ -18,6 +18,7 @@ fn workflow_phases(phases_json: &[serde_json::Value]) -> Workflow {
 }
 
 /// Build a single-phase workflow with the given phase name and base fields.
+#[allow(dead_code)]
 fn phase(name: &str) -> serde_json::Value {
     serde_json::json!({
         "name": name,
