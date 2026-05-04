@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-04T19:34:18.852Z'
-  updated_at: '2026-05-04T20:17:41.624Z'
+  updated_at: '2026-05-04T20:21:40.053Z'
 phases:
   discovery:
     status: complete
@@ -52,7 +52,9 @@ phases:
     approved: true
     plan_file: docs/plans/clo-309-run-cli.md
   implement:
-    status: pending
+    status: validating
+    commits:
+      - d7d60ce
   pr:
     status: pending
   complete:
@@ -126,5 +128,13 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-04T20:18:50.826Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: CLI --spec/--var/--rerun flags + template wiring + integration tests. Commit d7d60ce'
+  - timestamp: '2026-05-04T20:21:40.053Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 1 commit (d7d60ce).
 task_title: '[T-040] `loker run <workflow>` CLI subcommand'
 task_url: https://linear.app/cloud-ai/issue/CLO-309/t-040-loker-run-workflow-cli-subcommand

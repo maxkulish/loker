@@ -347,10 +347,8 @@ enum Commands {
     #[command(subcommand)]
     Workflow(WorkflowCommands),
 
-    /// Run a workflow with the new phase-based engine (CLO-309).
-    ///
-    /// Supports --spec to inject a spec file, --var for template variables,
-    /// and --rerun to force re-execution of completed phases.
+    /// Run a workflow. Step-based today; phase-based wiring lands in T-041.
+    /// Supports --spec, --var, --rerun (rerun forwarded for forward compatibility).
     Run {
         /// Workflow name or path to .toml file
         name: String,
@@ -1352,19 +1350,15 @@ async fn run_workflow(
         None => None,
     };
 
-    // --- Rerun logic: delete status markers for specified phases ---
-    // This forces the workflow engine to re-execute those phases.
-    for phase_name in rerun_phases {
+    // --- Rerun: forward-compat with phase-based runner (T-041) ---
+    // The step-based runner is stateless (always executes all steps from scratch),
+    // so --rerun is a no-op today. Effective once the phase-based runner is wired.
+    if !rerun_phases.is_empty() {
         println!(
-            "{} Forcing re-execution of phase '{}'",
+            "{} --rerun phase={} accepted (no-op for step-based runner; effective in T-041)",
             "↻".yellow(),
-            phase_name
+            rerun_phases.join(", --rerun phase=")
         );
-        // NOTE: The actual marker cleanup happens at the workflow-runner level.
-        // The run_workflow wrapper passes the rerun list to the runner,
-        // which deletes <phase>.completed and <phase>.failed markers before
-        // execution. However, for the legacy step-based runner, we clear
-        // status markers directly here.
     }
 
     let run_dir = RunDir::create(&cwd, name)

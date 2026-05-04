@@ -1546,6 +1546,8 @@ pub struct WorkflowRunner {
     /// Template variables from --var flags, keyed by name.
     vars: std::collections::HashMap<String, String>,
     /// Phase names to force re-execute via --rerun phase=<name>.
+    /// Reserved for T-041 (phase-based runner marker deletion).
+    #[allow(dead_code)]
     rerun_phases: Vec<String>,
 }
 
