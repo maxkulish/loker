@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-03T12:36:59.533Z'
-  updated_at: '2026-05-03T13:18:40.715Z'
+  updated_at: '2026-05-04T07:19:16.045Z'
 phases:
   discovery:
     status: complete
@@ -62,13 +62,26 @@ phases:
     plan_file: docs/plans/clo-296-summary-json.md
     approved: true
   implement:
-    status: pending
+    status: validating
     phases:
       implement:
         commits:
           - 1412cce
           - 8f59092
           - d76507d
+    commits:
+      - 1412cce
+      - 8f59092
+      - d76507d
+      - a2f5e95
+      - e1eb3d3
+    codex_report: docs/reviews/clo-296-codex-validation.md
+    codex_validated: true
+    codex_verdict: rework
+    gemini_validation_report: docs/reviews/clo-296-gemini-validation.md
+    validation_fix_iteration_count: 0
+    validation_synthesis_report: docs/reviews/clo-296-validation-synthesis.md
+    validation_synthesis_verdict: rework
   pr:
     status: pending
   complete:
@@ -159,5 +172,28 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: SummaryWriter — summary.json emission + manifest registration. Commit d76507d.'
+  - timestamp: '2026-05-04T07:14:06.612Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: SummaryWriter::finalize integration wiring — prices.toml path resolution fix. Commit a2f5e95.'
+  - timestamp: '2026-05-04T07:14:09.802Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST5 landed: 5 integration tests in tests/summary.rs — single_phase_success, multi_backend_parallel,
+      failed_phase_emitted, price_table_miss_no_panic, budget_exceeded_warning. Commit e1eb3d3.
+  - timestamp: '2026-05-04T07:14:55.757Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All sub-tasks landed. make check green. 5 commits: 1412cce (ST1), 8f59092 (ST2), d76507d (ST3), a2f5e95 (ST4),
+      e1eb3d3 (ST5).
+  - timestamp: '2026-05-04T07:19:16.045Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: FAILED (shell heredoc quoting bug). Gemini: FAILED (shell scripting issue). Claude fallback: 9 findings.
+      Synthesis: rework — 5 Must Fix items identified. Waiting on user decisions for F1 (PhaseStatus enum naming) and F3
+      (prices.toml resolution strategy) before applying bounded fix iteration.
 task_title: '[T-032] Implement summary.json with per-backend tokens + cost_budget_usd warning'
 task_url: https://linear.app/cloud-ai/issue/CLO-296/t-032-implement-summaryjson-with-per-backend-tokens

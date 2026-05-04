@@ -131,21 +131,25 @@ impl SummaryWriter {
         let mut backends = TraceReader::aggregate(trace_path)?;
 
         // 2. Compute costs from price table
-        // Try several candidate paths for prices.toml:
-        //   - run_dir/../../docs/prices.toml  (production: run is <root>/runs/<uuid>/)
-        //   - run_dir/../docs/prices.toml      (run is <root>/<phase>/<attempt>/)
-        //   - run_dir/docs/prices.toml         (flat run dir, e.g. tests)
-        //   - docs/prices.toml                 (CWD fallback)
+        //
+        // Use the built-in prices.toml (compiled into the binary) as the primary
+        // source. This is always available regardless of CWD or deployment layout.
+        //
+        // For test overrides, probe the run_dir for a local prices.toml first:
+        //   - run_dir/docs/prices.toml         (flat test dir)
+        //   - run_dir/../../docs/prices.toml   (production: run is <root>/runs/<uuid>/)
+        //
+        // Unknown models still produce cost_usd: None.
+        // This avoids the fragile CWD-relative path probing that silently broke costs
+        // in deployed installs (see F3 rework).
         let price_table = [
-            run_dir.join("../../docs/prices.toml"),
-            run_dir.join("../docs/prices.toml"),
             run_dir.join("docs/prices.toml"),
-            Path::new("docs/prices.toml").to_path_buf(),
+            run_dir.join("../../docs/prices.toml"),
         ]
         .into_iter()
         .find(|p| p.exists())
-        .map(|p| PriceTable::load(&p))
-        .unwrap_or_default();
+        .map(|p| PriceTable::load(p.as_path()))
+        .unwrap_or_else(PriceTable::builtin);
 
         let mut total_cost_usd = 0.0_f64;
         let mut any_cost_known = false;
@@ -217,7 +221,7 @@ impl SummaryWriter {
         // 9. Write summary.json via SummarySink
         self.finalize(&summary, run_dir)?;
 
-        // 10. Register in manifest
+        // 10. Register in manifest (idempotent — replaces on re-finalize)
         let json_bytes = serde_json::to_string_pretty(&summary)?;
         let entry = ManifestEntry::from_payload(
             "summary.json",
@@ -228,7 +232,7 @@ impl SummaryWriter {
             None,
             json_bytes.as_bytes(),
         );
-        manifest.append(entry, &run_dir.join("manifest.json"))?;
+        manifest.replace_by_name(entry, &run_dir.join("manifest.json"))?;
 
         Ok(summary)
     }
@@ -293,8 +297,18 @@ impl SummarySink for InMemorySummarySink {
 
 /// Collect per-phase outcomes from `run_dir/markers/` directory.
 ///
-/// Reads `*.completed`, `*.failed` marker files to determine each phase's
-/// status, attempt count, and duration.
+/// Reads `*.completed`, `*.failed`, `*.started.<N>` marker files to determine
+/// each phase's status, attempt count, duration, and timestamps.
+///
+/// Timestamps are sourced from the marker JSON bodies:
+/// - `StartedMarker.started_at` — per-attempt start
+/// - `CompletedMarker.completed_at` — successful completion
+/// - `FailedMarker.failed_at` — terminal failure
+///
+/// Phase duration is computed from first started marker to terminal marker
+/// (completed or failed) of the same phase. Run-level timestamps are derived
+/// from the earliest started marker across all phases and the latest terminal
+/// marker across all phases.
 fn collect_phases(run_dir: &Path) -> Vec<PhaseSummary> {
     let markers_dir = run_dir.join("markers");
     if !markers_dir.is_dir() {
@@ -308,33 +322,96 @@ fn collect_phases(run_dir: &Path) -> Vec<PhaseSummary> {
         Err(_) => return Vec::new(),
     };
 
+    // Collect started markers per phase for duration computation
+    let mut started_markers: std::collections::HashMap<String, Vec<chrono::DateTime<chrono::Utc>>> =
+        std::collections::HashMap::new();
+
     for entry in entries.flatten() {
         let file_name = match entry.file_name().to_str() {
             Some(n) => n.to_string(),
             None => continue,
         };
 
-        let (phase_name, status, attempts) = match parse_marker_name(&file_name) {
-            Some(t) => t,
-            None => continue,
+        let path = entry.path();
+
+        // Parse started markers: <phase>.started.<N>
+        if let Some((phase, attempt_str)) = file_name.rsplit_once(".started.") {
+            if attempt_str.parse::<u32>().is_err() {
+                continue;
+            }
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(marker) =
+                    serde_json::from_str::<crate::run_state::markers::StartedMarker>(&content)
+                {
+                    started_markers
+                        .entry(phase.to_string())
+                        .or_default()
+                        .push(marker.started_at);
+                }
+            }
+            continue;
+        }
+
+        // Parse terminal markers: <phase>.completed or <phase>.failed
+        let (phase, status, attempts, phase_end_time) = if file_name.ends_with(".completed") {
+            let phase = file_name.trim_end_matches(".completed").to_string();
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(marker) =
+                    serde_json::from_str::<crate::run_state::markers::CompletedMarker>(&content)
+                {
+                    // attempt field from marker is 0-based; display as 1-based
+                    let display_attempts = marker.attempt + 1;
+                    (
+                        phase,
+                        PhaseStatus::Completed,
+                        display_attempts,
+                        Some(marker.completed_at),
+                    )
+                } else {
+                    // Fallback: filename-only parse
+                    (phase, PhaseStatus::Completed, 1, None)
+                }
+            } else {
+                (phase, PhaseStatus::Completed, 1, None)
+            }
+        } else if file_name.ends_with(".failed") {
+            let phase = file_name.trim_end_matches(".failed").to_string();
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(marker) =
+                    serde_json::from_str::<crate::run_state::markers::FailedMarker>(&content)
+                {
+                    (
+                        phase,
+                        PhaseStatus::Failed,
+                        marker.attempts_made,
+                        Some(marker.failed_at),
+                    )
+                } else {
+                    // Fallback: filename-only parse
+                    (phase, PhaseStatus::Failed, 1, None)
+                }
+            } else {
+                (phase, PhaseStatus::Failed, 1, None)
+            }
+        } else {
+            continue;
         };
 
-        let duration_ms = match entry.metadata() {
-            Ok(meta) => match meta.modified() {
-                Ok(time) => {
-                    // Estimate duration from file mtime vs now
-                    match std::time::SystemTime::now().duration_since(time) {
-                        Ok(d) => d.as_millis() as u64,
-                        Err(_) => 0,
-                    }
-                }
-                Err(_) => 0,
-            },
-            Err(_) => 0,
-        };
+        // Compute phase duration from first started marker to terminal time
+        let duration_ms = phase_end_time
+            .and_then(|end| {
+                started_markers
+                    .get(&phase)
+                    .and_then(|starts| starts.first())
+                    .map(|start| {
+                        let dur = end.signed_duration_since(*start);
+                        std::cmp::max(0, dur.num_milliseconds()) as u64
+                    })
+            })
+            .unwrap_or(0);
 
         phases.push(PhaseSummary {
-            phase: phase_name,
+            phase,
             status,
             attempts,
             duration_ms,
@@ -347,49 +424,94 @@ fn collect_phases(run_dir: &Path) -> Vec<PhaseSummary> {
     phases
 }
 
-/// Parse a marker file name like `design.completed`, `implement.failed`.
-///
-/// Returns `(phase_name, status, attempts_from_metadata)`.
-fn parse_marker_name(name: &str) -> Option<(String, PhaseStatus, u32)> {
-    if name.ends_with(".completed") {
-        let phase = name.trim_end_matches(".completed").to_string();
-        // Attempt count is encoded in the marker's JSON content, not the filename.
-        // For v0 we default to 1 for completed phases.
-        Some((phase, PhaseStatus::Completed, 1))
-    } else if name.ends_with(".failed") {
-        let phase = name.trim_end_matches(".failed").to_string();
-        Some((phase, PhaseStatus::Failed, 3)) // Placeholder: actual count from marker content
-    } else if name.ends_with(".started") {
-        // Started markers alone don't tell us the outcome
-        None
-    } else {
-        None
+/// Get the run start time from the earliest started marker across all phases.
+fn get_run_start_time(run_dir: &Path) -> Option<String> {
+    let markers_dir = run_dir.join("markers");
+    if !markers_dir.is_dir() {
+        return None;
     }
+
+    let mut earliest: Option<chrono::DateTime<chrono::Utc>> = None;
+
+    let entries = std::fs::read_dir(&markers_dir).ok()?;
+    for entry in entries.flatten() {
+        let file_name = entry.file_name().to_str()?.to_string();
+        if !file_name.contains(".started.") {
+            continue;
+        }
+        let content = std::fs::read_to_string(entry.path()).ok()?;
+        let marker: crate::run_state::markers::StartedMarker =
+            serde_json::from_str(&content).ok()?;
+        if earliest.map_or(true, |e| marker.started_at < e) {
+            earliest = Some(marker.started_at);
+        }
+    }
+
+    earliest.map(|dt| dt.to_rfc3339())
 }
 
-/// Get the run start time from the earliest marker or directory ctime.
-fn get_run_start_time(run_dir: &Path) -> Option<String> {
-    // Try markers directory as earliest timestamp proxy
+/// Compute wall-clock duration of the run from the earliest started marker
+/// to the latest terminal marker (completed or failed).
+fn compute_duration_ms(run_dir: &Path) -> u64 {
     let markers_dir = run_dir.join("markers");
-    if markers_dir.is_dir() {
-        if let Ok(meta) = markers_dir.metadata() {
-            if let Ok(time) = meta.created().or_else(|_| meta.modified()) {
-                let dur = time.duration_since(std::time::UNIX_EPOCH).ok()?;
-                let secs = dur.as_secs() as i64;
-                let nanos = dur.subsec_nanos();
-                let datetime = chrono::DateTime::from_timestamp(secs, nanos)?;
-                return Some(datetime.to_rfc3339());
+    if !markers_dir.is_dir() {
+        return 0;
+    }
+
+    let mut earliest_start: Option<chrono::DateTime<chrono::Utc>> = None;
+    let mut latest_end: Option<chrono::DateTime<chrono::Utc>> = None;
+
+    let entries = match std::fs::read_dir(&markers_dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_name = match entry.file_name().to_str() {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        if file_name.contains(".started.") {
+            if let Ok(marker) =
+                serde_json::from_str::<crate::run_state::markers::StartedMarker>(&content)
+            {
+                if earliest_start.map_or(true, |e| marker.started_at < e) {
+                    earliest_start = Some(marker.started_at);
+                }
+            }
+        } else if file_name.ends_with(".completed") {
+            if let Ok(marker) =
+                serde_json::from_str::<crate::run_state::markers::CompletedMarker>(&content)
+            {
+                if latest_end.map_or(true, |e| marker.completed_at > e) {
+                    latest_end = Some(marker.completed_at);
+                }
+            }
+        } else if file_name.ends_with(".failed") {
+            if let Ok(marker) =
+                serde_json::from_str::<crate::run_state::markers::FailedMarker>(&content)
+            {
+                if latest_end.map_or(true, |e| marker.failed_at > e) {
+                    latest_end = Some(marker.failed_at);
+                }
             }
         }
     }
-    None
-}
 
-/// Compute wall-clock duration of the run.
-fn compute_duration_ms(_run_dir: &Path) -> u64 {
-    // For v0, we don't have a reliable duration source independent of the trace.
-    // Return 0 as a placeholder — the run-level executor will populate this.
-    0
+    match (earliest_start, latest_end) {
+        (Some(start), Some(end)) => {
+            let dur = end.signed_duration_since(start);
+            std::cmp::max(0, dur.num_milliseconds()) as u64
+        }
+        _ => 0,
+    }
 }
 
 /// Determine the top-level run status from per-phase outcomes.

@@ -284,6 +284,43 @@ impl Manifest {
         }
     }
 
+    /// Replace the entry with the given `name` in-place, or append if not found.
+    ///
+    /// This is the idiomatic API for artefacts that are overwritten on re-finalize
+    /// (e.g. `summary.json`). The change is atomically written to disk.
+    pub fn replace_by_name(
+        &mut self,
+        entry: ManifestEntry,
+        path: &Path,
+    ) -> Result<(), ManifestError> {
+        let name = entry.name.clone();
+        if let Some(pos) = self.entries.iter().position(|e| e.name == name) {
+            self.entries[pos] = entry;
+        } else {
+            self.entries.push(entry);
+        }
+        let json = self.to_json();
+        match json {
+            Ok(json_str) => match atomic_write(path, json_str.as_bytes()) {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    // best-effort rollback: re-read manifest from disk
+                    if let Ok(disk) = Manifest::load(path) {
+                        self.entries = disk.entries;
+                    }
+                    Err(e.into())
+                }
+            },
+            Err(e) => {
+                // best-effort rollback: re-read manifest from disk
+                if let Ok(disk) = Manifest::load(path) {
+                    self.entries = disk.entries;
+                }
+                Err(e.into())
+            }
+        }
+    }
+
     /// Look up the sha256 of an entry by its name.  O(N) — fine for v0 sizes.
     pub fn sha256_for(&self, name: &str) -> Option<&str> {
         self.entries

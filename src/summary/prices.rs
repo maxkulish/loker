@@ -84,6 +84,23 @@ impl PriceTable {
     pub fn is_empty(&self) -> bool {
         self.prices.is_empty()
     }
+
+    /// Load the default price table compiled into the binary from `docs/prices.toml`.
+    ///
+    /// This is the primary source of pricing data for production use. It is always
+    /// available (no filesystem dependency) and guaranteed to parse correctly at
+    /// compile time. Unknown models still return `None` from [`lookup`]/[`compute_cost`].
+    ///
+    /// To override prices for testing, construct a [`PriceTable`] via file [`load`]
+    /// and pass it to [`crate::SummaryWriter::write_summary`] via a custom wrapper
+    /// (or create a test-specific prices.toml in the run dir).
+    pub fn builtin() -> Self {
+        let content = include_str!("../../docs/prices.toml");
+        #[allow(clippy::unwrap_used)]
+        let raw: HashMap<String, ModelPrice> = toml::from_str(content)
+            .expect("docs/prices.toml must be valid TOML (checked at compile time)");
+        PriceTable { prices: raw }
+    }
 }
 
 #[cfg(test)]

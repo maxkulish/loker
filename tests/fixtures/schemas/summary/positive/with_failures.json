@@ -29,7 +29,7 @@
   "phases": [
     {
       "phase": "design",
-      "status": "success",
+      "status": "completed",
       "attempts": 1,
       "duration_ms": 102000,
       "strategy": "parallel"

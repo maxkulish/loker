@@ -82,7 +82,9 @@ mod summary_integration_tests {
         assert_eq!(summary.backends[0].output_tokens, 275);
 
         // Verify cost: 150/1M * $15 + 275/1M * $75 = $0.00225 + $0.020625 = $0.022875
-        let cost = summary.backends[0].cost_usd.expect("cost_usd should be Some");
+        let cost = summary.backends[0]
+            .cost_usd
+            .expect("cost_usd should be Some");
         assert!((cost - 0.022875).abs() < 0.001);
 
         // Verify phase
@@ -445,7 +447,11 @@ mod summary_integration_tests {
         );
 
         // Verify all variants produce valid JSON
-        for (_, s) in [("exceeded", &summary), ("no_budget", &summary2), ("generous", &summary3)] {
+        for (_, s) in [
+            ("exceeded", &summary),
+            ("no_budget", &summary2),
+            ("generous", &summary3),
+        ] {
             let json = serde_json::to_value(s).unwrap();
             assert!(json.get("loker.run_id").is_some());
             assert!(json.get("totals").is_some());
