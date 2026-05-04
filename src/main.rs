@@ -14,6 +14,9 @@ mod consensus;
 mod context;
 mod debate;
 mod delegation;
+// Module declarations mirror lib.rs for the binary crate tree.
+// `pub` is used to satisfy `pub use` re-exports within submodules;
+// binary crates cannot be imported by external consumers.
 pub mod family;
 mod git_agent;
 pub mod manifest;
@@ -896,7 +899,8 @@ async fn main() -> Result<()> {
                 Some(name) => name,
                 None => anyhow::bail!(
                     "Cannot resume: manifest.json has no workflow_name field. \
-                     This run was created with an older loker version."
+                     This run was created with an older loker version or without a workflow spec. \
+                     To resume, add \"workflow_name\": \"<name>\" to runs/<id>/manifest.json manually."
                 ),
             };
 
