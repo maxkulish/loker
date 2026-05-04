@@ -47,6 +47,7 @@ cargo run --bin loker -- doctor                # smoke-test the CLI
 LOKER_TZ_INTEGRATION=1 cargo test              # opt-in TensorZero gateway tests
 
 # TensorZero Tier-2 stack (needed for integration test):
+#   cd deploy/tensorzero && cp .env.example .env  # fill in OPENAI_API_KEY
 #   cd deploy/tensorzero && docker compose up -d
 ```
 

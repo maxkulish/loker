@@ -33,3 +33,19 @@ PROCEED_WITH_FIXES. Two bounded edits before opening the PR:
 2. Resolve the env-template duplication (F2) — preferred path: keep `deploy/tensorzero/.env.example` and update the three doc sites (`README.md:82`, `deploy/tensorzero/README.md:11`, `deploy/tensorzero/docker-compose.yml:7` comment) to `cp .env.example .env`.
 
 Optionally fold F3 (one-line docstring) into the same iteration. F4 should be tracked as a follow-up Linear ticket but does not block. Codex/Gemini wrapper scripts have a heredoc bug that should be fixed separately so future syntheses aren't single-reviewer.
+
+## Re-validation
+
+Fix iteration applied (commit `d2d2908`):
+
+| Finding | Status | Details |
+|---------|--------|---------|
+| F1 — `.gitignore` for `deploy/tensorzero/.env` | ✅ FIXED | Added `deploy/tensorzero/.env` to `.gitignore` |
+| F2 — Orphan `.env.example` | ✅ FIXED | Updated all 4 doc sites (`README.md`, `deploy/tensorzero/README.md`, `deploy/tensorzero/docker-compose.yml` comment, `docs/handoff.md`) to reference local `cp .env.example .env` |
+| F3 — Stale integration test docstring | ✅ FIXED | Updated `tests/tensorzero_integration.rs:25` to `cd deploy/tensorzero && docker compose up -d` |
+| F4 — Duplicate compose files | 📋 DEFERRED | Create follow-up Linear ticket to schedule removal of legacy `tensorzero/docker-compose.yml` |
+| F5 — Workflow tracker | ℹ️ NO ACTION | Existing repo convention |
+
+`make check` — ✅ passes.
+
+**Re-validation verdict**: `approve` — all Must Fix items resolved. Ready for PR.

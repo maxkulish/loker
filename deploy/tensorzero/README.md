@@ -16,10 +16,10 @@ docker compose up -d
 
 # 3. Verify the gateway is healthy
 curl http://localhost:3000/health
-# Expected: {"gateway":"ok","clickhouse":"ok"}
+# Expected: JSON response with "gateway":"ok" (exact fields depend on TensorZero version)
 
-# 4. Open the TensorZero UI
-open http://localhost:4000
+# 4. Open the TensorZero UI (macOS: use `open`; Linux: use `xdg-open` or browse manually)
+#    http://localhost:4000
 ```
 
 ## Services
