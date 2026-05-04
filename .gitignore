@@ -1,6 +1,7 @@
 /target/
 /runs/
 tensorzero/.env
+deploy/tensorzero/.env
 
 # Node (pi extensions)
 node_modules/

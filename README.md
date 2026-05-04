@@ -72,6 +72,20 @@ loker is provider-agnostic. It speaks to:
 - **HTTP backend** via [TensorZero](https://www.tensorzero.com/) gateway
   with ClickHouse-backed observability - new in M1
 
+## Deployment (TensorZero Tier 2)
+
+A one-command Docker Compose recipe for the TensorZero stack (gateway +
+ClickHouse + UI) lives at [`deploy/tensorzero/`](deploy/tensorzero/).
+
+```bash
+cd deploy/tensorzero
+cp .env.example .env   # fill in OPENAI_API_KEY
+docker compose up -d
+```
+
+See [`deploy/tensorzero/README.md`](deploy/tensorzero/README.md) for setup
+instructions, service details, and how to run the integration test.
+
 ## What works today (inherited from lok)
 
 ```bash
