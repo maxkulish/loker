@@ -22,7 +22,7 @@
 //! test"). TL;DR:
 //!
 //! ```sh
-//! cd tensorzero && docker compose up -d
+//! cd deploy/tensorzero && docker compose up -d
 //! LOKER_TZ_INTEGRATION=1 cargo test --test tensorzero_integration
 //! ```
 

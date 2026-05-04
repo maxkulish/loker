@@ -8,7 +8,7 @@ against a real backend without manual setup.
 
 ```sh
 # 1. Copy and edit the env template with your API keys
-cp ../../tensorzero/.env.example .env
+cp .env.example .env
 # Edit .env: set OPENAI_API_KEY (required), ANTHROPIC_API_KEY (optional)
 
 # 2. Start the stack

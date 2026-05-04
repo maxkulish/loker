@@ -79,7 +79,7 @@ ClickHouse + UI) lives at [`deploy/tensorzero/`](deploy/tensorzero/).
 
 ```bash
 cd deploy/tensorzero
-cp ../../tensorzero/.env.example .env   # fill in OPENAI_API_KEY
+cp .env.example .env   # fill in OPENAI_API_KEY
 docker compose up -d
 ```
 

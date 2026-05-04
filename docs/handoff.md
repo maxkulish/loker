@@ -76,7 +76,7 @@ To run it:
 1. Start the Tier-2 stack from the canonical deploy path:
    ```
    cd deploy/tensorzero
-   cp ../../tensorzero/.env.example .env   # fill in OPENAI_API_KEY
+   cp .env.example .env   # fill in OPENAI_API_KEY
    docker compose up -d
    ```
    (The older `tensorzero/docker-compose.yml` at the project root still works
