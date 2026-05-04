@@ -105,8 +105,8 @@ pub trait SummarySink: Send + Sync {
 }
 
 /// File-backed `SummarySink` that writes `runs/<id>/summary.json`
-/// via atomic write (tmp + fsync + rename) and registers the artefact
-/// in the manifest.
+/// via atomic write (tmp + fsync + rename). Manifest registration is
+/// handled by `write_summary()` after the bytes are written.
 pub struct SummaryWriter {
     fsync: bool,
 }

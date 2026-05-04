@@ -6,7 +6,7 @@
 # from trace.jsonl.
 #
 # Prices are in USD per million tokens. Missing entries produce
-# cost_unknown: true in the summary — the summary is still emitted.
+# cost_usd: null in the summary — the summary is still emitted.
 #
 # Source: provider published pricing as of 2026-05.
 # This file is re-reviewed periodically; operator edits are welcome.

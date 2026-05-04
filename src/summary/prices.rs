@@ -3,7 +3,8 @@
 //! Provides `PriceTable` that loads `<backend>:<model>` keyed prices
 //! from a TOML file and computes USD cost for given token counts.
 //! Parse errors are non-fatal — the table logs a warning and returns
-//! empty, so every backend gets `cost_unknown`.
+//! empty, so every backend reports `cost_usd: null` (represented as
+//! `Option::None`).
 
 use serde::Deserialize;
 use std::collections::HashMap;
