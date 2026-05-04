@@ -25,7 +25,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-03T12:36:59.533Z'
-  updated_at: '2026-05-04T07:44:44.096Z'
+  updated_at: '2026-05-04T07:48:48.836Z'
 phases:
   discovery:
     status: complete
@@ -86,6 +86,7 @@ phases:
     status: in_progress
     pr_number: 43
     pr_url: https://github.com/maxkulish/loker/pull/43
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -215,5 +216,9 @@ history:
     action: pr_created
     phase: pr
     details: 'PR #43 opened: https://github.com/maxkulish/loker/pull/43'
+  - timestamp: '2026-05-04T07:48:48.836Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format, clippy, test all green'
 task_title: '[T-032] Implement summary.json with per-backend tokens + cost_budget_usd warning'
 task_url: https://linear.app/cloud-ai/issue/CLO-296/t-032-implement-summaryjson-with-per-backend-tokens

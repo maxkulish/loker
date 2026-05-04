@@ -174,9 +174,9 @@ impl SummaryWriter {
         // 3. Collect per-phase outcomes from markers
         let phases = collect_phases(run_dir);
 
-        // 4. Compute duration and timestamps
+        // 4. Compute duration and timestamps from marker data
         let now = chrono::Utc::now();
-        let finished_at = now.to_rfc3339();
+        let finished_at = compute_finished_at(run_dir).unwrap_or_else(|| now.to_rfc3339());
         let started_at = get_run_start_time(run_dir).unwrap_or_else(|| now.to_rfc3339());
         let duration_ms = compute_duration_ms(run_dir);
 
@@ -317,106 +317,119 @@ fn collect_phases(run_dir: &Path) -> Vec<PhaseSummary> {
 
     let mut phases: Vec<PhaseSummary> = Vec::new();
 
-    let entries = match std::fs::read_dir(&markers_dir) {
-        Ok(e) => e,
-        Err(_) => return Vec::new(),
-    };
-
-    // Collect started markers per phase for duration computation
+    // First pass: collect all started markers (regardless of read_dir order).
+    // Use a separate read_dir iteration so terminal marker parsing never races
+    // with started marker collection.
     let mut started_markers: std::collections::HashMap<String, Vec<chrono::DateTime<chrono::Utc>>> =
         std::collections::HashMap::new();
 
-    for entry in entries.flatten() {
-        let file_name = match entry.file_name().to_str() {
-            Some(n) => n.to_string(),
-            None => continue,
-        };
+    if let Ok(started_entries) = std::fs::read_dir(&markers_dir) {
+        for entry in started_entries.flatten() {
+            let file_name = match entry.file_name().to_str() {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            if let Some((phase, attempt_str)) = file_name.rsplit_once(".started.") {
+                if attempt_str.parse::<u32>().is_err() {
+                    continue;
+                }
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    if let Ok(marker) =
+                        serde_json::from_str::<crate::run_state::markers::StartedMarker>(&content)
+                    {
+                        started_markers
+                            .entry(phase.to_string())
+                            .or_default()
+                            .push(marker.started_at);
+                    }
+                }
+            }
+        }
+    }
 
-        let path = entry.path();
+    // Second pass: process terminal markers and compute phase durations.
+    // duration_ms uses the earliest started marker (min) for the phase,
+    // not insertion order (read_dir is nondeterministic).
+    if let Ok(terminal_entries) = std::fs::read_dir(&markers_dir) {
+        for entry in terminal_entries.flatten() {
+            let file_name = match entry.file_name().to_str() {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
 
-        // Parse started markers: <phase>.started.<N>
-        if let Some((phase, attempt_str)) = file_name.rsplit_once(".started.") {
-            if attempt_str.parse::<u32>().is_err() {
+            let path = entry.path();
+
+            // Skip started markers — handled in first pass
+            if file_name.contains(".started.") {
                 continue;
             }
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(marker) =
-                    serde_json::from_str::<crate::run_state::markers::StartedMarker>(&content)
-                {
-                    started_markers
-                        .entry(phase.to_string())
-                        .or_default()
-                        .push(marker.started_at);
-                }
-            }
-            continue;
-        }
 
-        // Parse terminal markers: <phase>.completed or <phase>.failed
-        let (phase, status, attempts, phase_end_time) = if file_name.ends_with(".completed") {
-            let phase = file_name.trim_end_matches(".completed").to_string();
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(marker) =
-                    serde_json::from_str::<crate::run_state::markers::CompletedMarker>(&content)
-                {
-                    // attempt field from marker is 0-based; display as 1-based
-                    let display_attempts = marker.attempt + 1;
-                    (
-                        phase,
-                        PhaseStatus::Completed,
-                        display_attempts,
-                        Some(marker.completed_at),
-                    )
+            // Parse terminal markers: <phase>.completed or <phase>.failed
+            let (phase, status, attempts, phase_end_time) = if file_name.ends_with(".completed") {
+                let phase = file_name.trim_end_matches(".completed").to_string();
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(marker) =
+                        serde_json::from_str::<crate::run_state::markers::CompletedMarker>(&content)
+                    {
+                        // attempt field from marker is 0-based; display as 1-based
+                        let display_attempts = marker.attempt + 1;
+                        (
+                            phase,
+                            PhaseStatus::Completed,
+                            display_attempts,
+                            Some(marker.completed_at),
+                        )
+                    } else {
+                        // Fallback: filename-only parse
+                        (phase, PhaseStatus::Completed, 1, None)
+                    }
                 } else {
-                    // Fallback: filename-only parse
                     (phase, PhaseStatus::Completed, 1, None)
                 }
-            } else {
-                (phase, PhaseStatus::Completed, 1, None)
-            }
-        } else if file_name.ends_with(".failed") {
-            let phase = file_name.trim_end_matches(".failed").to_string();
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(marker) =
-                    serde_json::from_str::<crate::run_state::markers::FailedMarker>(&content)
-                {
-                    (
-                        phase,
-                        PhaseStatus::Failed,
-                        marker.attempts_made,
-                        Some(marker.failed_at),
-                    )
+            } else if file_name.ends_with(".failed") {
+                let phase = file_name.trim_end_matches(".failed").to_string();
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(marker) =
+                        serde_json::from_str::<crate::run_state::markers::FailedMarker>(&content)
+                    {
+                        (
+                            phase,
+                            PhaseStatus::Failed,
+                            marker.attempts_made,
+                            Some(marker.failed_at),
+                        )
+                    } else {
+                        // Fallback: filename-only parse
+                        (phase, PhaseStatus::Failed, 1, None)
+                    }
                 } else {
-                    // Fallback: filename-only parse
                     (phase, PhaseStatus::Failed, 1, None)
                 }
             } else {
-                (phase, PhaseStatus::Failed, 1, None)
-            }
-        } else {
-            continue;
-        };
+                continue;
+            };
 
-        // Compute phase duration from first started marker to terminal time
-        let duration_ms = phase_end_time
-            .and_then(|end| {
-                started_markers
-                    .get(&phase)
-                    .and_then(|starts| starts.first())
-                    .map(|start| {
-                        let dur = end.signed_duration_since(*start);
-                        std::cmp::max(0, dur.num_milliseconds()) as u64
+            // Compute phase duration from earliest started marker to terminal time.
+            // Use min() for deterministic ordering regardless of read_dir order.
+            let duration_ms = phase_end_time
+                .and_then(|end| {
+                    started_markers.get(&phase).and_then(|starts| {
+                        starts.iter().min().map(|earliest_start| {
+                            let dur = end.signed_duration_since(*earliest_start);
+                            std::cmp::max(0, dur.num_milliseconds()) as u64
+                        })
                     })
-            })
-            .unwrap_or(0);
+                })
+                .unwrap_or(0);
 
-        phases.push(PhaseSummary {
-            phase,
-            status,
-            attempts,
-            duration_ms,
-            strategy: None, // Strategy info is not in marker files currently
-        });
+            phases.push(PhaseSummary {
+                phase,
+                status,
+                attempts,
+                duration_ms,
+                strategy: None,
+            });
+        }
     }
 
     // Sort by phase name for deterministic output
@@ -433,21 +446,87 @@ fn get_run_start_time(run_dir: &Path) -> Option<String> {
 
     let mut earliest: Option<chrono::DateTime<chrono::Utc>> = None;
 
-    let entries = std::fs::read_dir(&markers_dir).ok()?;
-    for entry in entries.flatten() {
-        let file_name = entry.file_name().to_str()?.to_string();
-        if !file_name.contains(".started.") {
-            continue;
-        }
-        let content = std::fs::read_to_string(entry.path()).ok()?;
-        let marker: crate::run_state::markers::StartedMarker =
-            serde_json::from_str(&content).ok()?;
-        if earliest.map_or(true, |e| marker.started_at < e) {
-            earliest = Some(marker.started_at);
+    if let Ok(entries) = std::fs::read_dir(&markers_dir) {
+        for entry in entries.flatten() {
+            let file_name = match entry.file_name().to_str() {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            if !file_name.contains(".started.") {
+                continue;
+            }
+            let content = match std::fs::read_to_string(entry.path()) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let marker: crate::run_state::markers::StartedMarker =
+                match serde_json::from_str(&content) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+            if earliest.map_or(true, |e| marker.started_at < e) {
+                earliest = Some(marker.started_at);
+            }
         }
     }
 
     earliest.map(|dt| dt.to_rfc3339())
+}
+
+/// Get the run finish time from the latest terminal marker (completed or failed)
+/// across all phases. Falls back to the latest started marker if no terminal
+/// marker exists.
+fn compute_finished_at(run_dir: &Path) -> Option<String> {
+    let markers_dir = run_dir.join("markers");
+    if !markers_dir.is_dir() {
+        return None;
+    }
+
+    let mut latest: Option<chrono::DateTime<chrono::Utc>> = None;
+
+    if let Ok(entries) = std::fs::read_dir(&markers_dir) {
+        for entry in entries.flatten() {
+            let file_name = match entry.file_name().to_str() {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            let content = match std::fs::read_to_string(entry.path()) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            if file_name.ends_with(".completed") {
+                if let Ok(marker) =
+                    serde_json::from_str::<crate::run_state::markers::CompletedMarker>(&content)
+                {
+                    if latest.map_or(true, |e| marker.completed_at > e) {
+                        latest = Some(marker.completed_at);
+                    }
+                }
+            } else if file_name.ends_with(".failed") {
+                if let Ok(marker) =
+                    serde_json::from_str::<crate::run_state::markers::FailedMarker>(&content)
+                {
+                    if latest.map_or(true, |e| marker.failed_at > e) {
+                        latest = Some(marker.failed_at);
+                    }
+                }
+            } else if file_name.contains(".started.") {
+                // Fallback: if no terminal markers exist yet, use latest started
+                if latest.is_none() {
+                    if let Ok(marker) =
+                        serde_json::from_str::<crate::run_state::markers::StartedMarker>(&content)
+                    {
+                        if latest.map_or(true, |e| marker.started_at > e) {
+                            latest = Some(marker.started_at);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    latest.map(|dt| dt.to_rfc3339())
 }
 
 /// Compute wall-clock duration of the run from the earliest started marker

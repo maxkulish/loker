@@ -284,6 +284,12 @@ mod summary_integration_tests {
         assert_eq!(summary.backends.len(), 1);
         assert_eq!(summary.backends[0].input_tokens, 100);
         assert_eq!(summary.backends[0].output_tokens, 200);
+
+        // Run status should be Partial (not Success) since a phase failed
+        assert!(
+            matches!(summary.status, loker::RunStatus::Partial),
+            "run status should be Partial when a phase failed"
+        );
     }
 
     // ------------------------------------------------------------------
@@ -456,6 +462,18 @@ mod summary_integration_tests {
             assert!(json.get("loker.run_id").is_some());
             assert!(json.get("totals").is_some());
         }
+
+        // Verify idempotent manifest registration: after 3 write_summary calls,
+        // only 1 summary.json entry should exist
+        let summary_entry_count = manifest
+            .entries
+            .iter()
+            .filter(|e| e.name == "summary.json")
+            .count();
+        assert_eq!(
+            summary_entry_count, 1,
+            "manifest should have exactly 1 summary.json entry after 3 write_summary calls"
+        );
     }
 
     // ------------------------------------------------------------------
