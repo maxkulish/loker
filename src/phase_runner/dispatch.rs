@@ -5,6 +5,7 @@ use crate::aggregator::{
     AggregateInput, Aggregator, BallotSchema, BranchFailure, BranchOutcome, BranchSuccess,
     TieBreak, VoteConfig,
 };
+use crate::strategy::verify::HumanVerifier;
 use crate::strategy::{EscalatingRetry, ParallelFanOut, SingleModel, Strategy, VerifyHook};
 
 use super::{AggregatorName, PhaseConfig, PhaseError, VerifyHookName};
@@ -61,9 +62,11 @@ pub fn resolve_verify_hook(
     cfg: &PhaseConfig,
     verify: Option<Arc<dyn VerifyHook>>,
 ) -> Result<Option<Arc<dyn VerifyHook>>, PhaseError> {
-    match cfg.verify {
+    match &cfg.verify {
         VerifyHookName::None => Ok(None),
         VerifyHookName::RunCommand | VerifyHookName::LlmVerifier => Ok(verify),
+        VerifyHookName::HumanVerifier(cfg) => Ok(Some(std::sync::Arc::new(HumanVerifier::new(cfg.clone()))),
+        ),
     }
 }
 
@@ -205,6 +208,8 @@ mod tests {
     use super::*;
     use crate::phase_runner::{AggregatorName, PhaseConfig, StrategyName};
     use crate::strategy::TargetSpec;
+    use crate::strategy::verify::{HumanDecision, HumanVerifierConfig, HumanSeverity};
+    use std::path::PathBuf;
 
     #[test]
     fn name_dispatch_resolves_known() {
@@ -227,5 +232,21 @@ mod tests {
         assert!(resolve_strategy(&parallel, None).is_ok());
 
         assert!(resolve_verify_hook(&single, None).unwrap().is_none());
+    }
+
+    #[test]
+    fn resolve_verify_hook_returns_human_verifier() {
+        let mut single = PhaseConfig::single("p", "mock", "prompt", "out.md");
+        single.verify = VerifyHookName::HumanVerifier(HumanVerifierConfig {
+            run_dir: PathBuf::from("/tmp/run"),
+            run_id: "run-1".into(),
+            workflow: "wf".into(),
+            phase: "p".into(),
+            severity: HumanSeverity::Medium,
+            decision_options: vec![HumanDecision::Approve],
+        });
+
+        let hook = resolve_verify_hook(&single, None).unwrap().expect("hook should exist");
+        assert_eq!(hook.name(), "HumanVerifier");
     }
 }

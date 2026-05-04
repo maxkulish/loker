@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::backend::Backend;
 use crate::manifest::{Kind, ManifestEntry, ManifestError, Producer};
 use crate::run_state::markers::MarkerError;
-use crate::strategy::verify::{VerifyError, VerifyHook, VerifyResult};
+use crate::strategy::verify::{HumanVerifierConfig, VerifyError, VerifyHook, VerifyResult};
 use crate::strategy::{
     PhaseContext, Prompt, StrategyError, StrategyKind, StrategyOutput, TargetSpec, Tier,
 };
@@ -40,11 +40,12 @@ pub enum AggregatorName {
 
 /// Verify hook dispatch label. `None` is the explicit no-op.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifyHookName {
     None,
     RunCommand,
     LlmVerifier,
+    HumanVerifier(HumanVerifierConfig),
 }
 
 /// Phase-level configuration. Built by tests today and by the workflow parser later.
@@ -214,10 +215,10 @@ impl PhaseRunner {
             phase: cfg.phase.clone(),
             strategy: strategy_name(cfg.strategy).to_string(),
             aggregator: aggregator_name(cfg.aggregator).to_string(),
-            verify_hook: if matches!(cfg.verify, VerifyHookName::None) {
+            verify_hook: if matches!(&cfg.verify, VerifyHookName::None) {
                 None
             } else {
-                Some(verify_hook_name(cfg.verify).to_string())
+                Some(verify_hook_name(&cfg.verify).to_string())
             },
         };
 
@@ -324,7 +325,7 @@ impl PhaseRunner {
             );
         }
 
-        let verify_result = if matches!(cfg.verify, VerifyHookName::None) {
+        let verify_result = if matches!(&cfg.verify, VerifyHookName::None) {
             None
         } else {
             let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
@@ -362,7 +363,7 @@ impl PhaseRunner {
                     },
                     duration_ms: vdur,
                 };
-                t.verify_result(&trace_ctx, verify_hook_name(cfg.verify), &vresult);
+                t.verify_result(&trace_ctx, verify_hook_name(&cfg.verify), &vresult);
             }
             if !result.is_pass() {
                 let phase_err = PhaseError::VerifyFailed {
@@ -454,11 +455,12 @@ fn aggregator_name(name: AggregatorName) -> &'static str {
     }
 }
 
-fn verify_hook_name(name: VerifyHookName) -> &'static str {
+fn verify_hook_name(name: &VerifyHookName) -> &'static str {
     match name {
         VerifyHookName::None => "none",
         VerifyHookName::RunCommand => "run_command",
         VerifyHookName::LlmVerifier => "llm_verifier",
+        VerifyHookName::HumanVerifier(_) => "human_verifier",
     }
 }
 
