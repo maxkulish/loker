@@ -1,0 +1,135 @@
+task_id: clo-291
+task_type: development
+classification_reason: >-
+  Title describes implementing a test — development task adding code (test file, fixtures, wiremock stubs, assertions).
+  No Type: marker or [spec]/[ops] label present.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-291-m6-end-to-end-integration-test-on-calculator-spec
+  priority: '2'
+  branch_actual: feat/clo-291-e2e
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-04T12:26:46.558Z'
+  updated_at: '2026-05-04T12:37:42.927Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: PhaseRunner-level orchestrated mock backends
+    approaches_identified: 3
+    approved: true
+    baseline_score: 4
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-291.md
+    prd_created: false
+    prd_exists: false
+    prd_file: ''
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-291-m6-e2e-integration-test.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions: []
+    flagged_suggestions:
+      - id: F1
+        reason: RunDir reuse for resume test - implementation detail, not design issue
+      - id: F2
+        reason: Error path handling in test helper - to be addressed during implementation
+    review_completed: true
+    review_synthesis: docs/reviews/clo-291-review-synthesis.md
+    review_verdict: approve
+    human_review_completed: true
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-291-m6-e2e-integration-test.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-04T12:26:46.558Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-291 as development
+  - timestamp: '2026-05-04T12:28:01.819Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: title describes implementing an integration test (test file, fixtures, wiremock stubs,
+      assertions), not a specification or operational task. No Type: marker or [spec]/[ops] label present.
+  - timestamp: '2026-05-04T12:28:04.094Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-04T12:28:14.217Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-04T12:28:59.845Z'
+    action: branch_created
+    phase: discovery
+    details: Already on feat/clo-291-e2e (up to date with main). Record as branch_actual.
+  - timestamp: '2026-05-04T12:30:57.097Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: PhaseRunner-level orchestrated mock (Approach A). Baseline 4/10. 3 approaches considered. Report at
+      docs/discovery/clo-291.md
+  - timestamp: '2026-05-04T12:31:06.297Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-04T12:32:55.983Z'
+    action: design_draft_ready
+    phase: design
+    details: Draft generated manually at docs/designs/clo-291-m6-e2e-integration-test.md (264 lines, 7 sections, 8 STs)
+  - timestamp: '2026-05-04T12:34:49.788Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Manual review. Verdict: approve. 3 minor findings (RunDir reuse for resume test, make check auto-discovery, error
+      path handling in test helper) - none blocking.
+  - timestamp: '2026-05-04T12:36:02.147Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-04T12:36:10.084Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase. 7 sections, 8 test functions, approach A (PhaseRunner mocks) finalized.
+  - timestamp: '2026-05-04T12:36:10.084Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-04T12:37:04.607Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 9 sub-tasks (ST1-ST9) at docs/plans/clo-291-m6-e2e-integration-test.md
+  - timestamp: '2026-05-04T12:37:42.926Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 9 sub-tasks queued (ST1 fixtures → ST2 helper → ST3-ST9 tests).
+  - timestamp: '2026-05-04T12:37:42.927Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+task_title: M6 end-to-end integration test on calculator spec
+task_url: https://linear.app/cloud-ai/issue/CLO-291/m6-end-to-end-integration-test-on-calculator-spec
