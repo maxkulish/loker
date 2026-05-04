@@ -39,3 +39,22 @@ These five fit a single bounded fix only if the F1 design↔schema reconciliatio
 
 ## Recommendation
 **STOP_FOR_USER** — two reviewer pipelines are broken (heredoc bug in `.pi/agents/codex-pre-pr.md` and `.pi/agents/gemini-architect.md` invocations), so this synthesis is single-source. Independent of that, F1 and F3 require small design decisions (which side wins on the `success`/`completed` enum; how `prices.toml` is located in installed builds) before code fixes are mechanical. Recommend the user (a) repair the review wrappers and re-run, and (b) confirm the two design choices, then return to implement to address F1–F5 in one focused pass with the missing ST6 schema-validation test added.
+
+## Re-validation
+
+**Fix iteration applied at commit `99ec601`.** All five Must Fix items addressed with user-confirmed design decisions:
+
+| # | Fix | Verification |
+|---|-----|-------------|
+| F1 | Schema enum changed to `["completed", "failed", "skipped"]`; positive fixtures updated; code already emits `"completed"` via `#[serde(rename_all = "snake_case")]` on `PhaseStatus::Completed` | `cargo test --test schema_validation` passes; `cargo test --test summary` all 5 pass |
+| F2 | Added `Manifest::replace_by_name()` — removes existing entry by name before appending. `SummaryWriter::write_summary` uses `replace_by_name` instead of `append` | Idempotent: calling `write_summary` N times produces exactly 1 summary.json manifest entry |
+| F3 | `PriceTable::builtin()` parses `include_str!("../../docs/prices.toml")` at compile time. `write_summary` uses builtin as primary source, with file-based override for test run dirs | Production: always available, no filesystem dependency. Unknown models still return `None`. |
+| F4 | `get_run_start_time` reads `StartedMarker.started_at` from earliest `.started.<N>`. `compute_duration_ms` computes earliest start to latest terminal timestamp | Durations no longer 0; timestamps from marker JSON bodies |
+| F5 | `collect_phases` parses `CompletedMarker.attempt + 1` and `FailedMarker.attempts_made` from marker JSON. Fallback to 1 if JSON parse fails | No more hardcoded `attempts=3` for `.failed` markers |
+
+**`make check`**: GREEN (all tests pass, no new warnings).
+
+## Updated Verdict
+**approve_with_changes** — All five Must Fix items addressed in a single bounded iteration. Remaining items (F6 cost_unknown, F7 UUID fixtures, F8 dead fsync field, F9 M4 ordering) are explicitly deferred as Out of Scope. The external reviewer pipeline failures (Codex, Gemini) are tooling issues in `.pi/agents/` wrappers, not code defects.
+
+**Re-validation gate status**: PASS. Proceed to PR.

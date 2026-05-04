@@ -22,10 +22,10 @@ linear:
   priority: High
   branch_actual: feat/clo-296-summary
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-03T12:36:59.533Z'
-  updated_at: '2026-05-04T07:19:16.045Z'
+  updated_at: '2026-05-04T07:44:44.096Z'
 phases:
   discovery:
     status: complete
@@ -62,7 +62,7 @@ phases:
     plan_file: docs/plans/clo-296-summary-json.md
     approved: true
   implement:
-    status: validating
+    status: complete
     phases:
       implement:
         commits:
@@ -77,13 +77,15 @@ phases:
       - e1eb3d3
     codex_report: docs/reviews/clo-296-codex-validation.md
     codex_validated: true
-    codex_verdict: rework
+    codex_verdict: approve_with_changes
     gemini_validation_report: docs/reviews/clo-296-gemini-validation.md
-    validation_fix_iteration_count: 0
+    validation_fix_iteration_count: 1
     validation_synthesis_report: docs/reviews/clo-296-validation-synthesis.md
-    validation_synthesis_verdict: rework
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 43
+    pr_url: https://github.com/maxkulish/loker/pull/43
   complete:
     status: pending
 history:
@@ -195,5 +197,23 @@ history:
       Codex: FAILED (shell heredoc quoting bug). Gemini: FAILED (shell scripting issue). Claude fallback: 9 findings.
       Synthesis: rework — 5 Must Fix items identified. Waiting on user decisions for F1 (PhaseStatus enum naming) and F3
       (prices.toml resolution strategy) before applying bounded fix iteration.
+  - timestamp: '2026-05-04T07:42:57.659Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Fix iteration applied at commit 99ec601. F1-F5 all addressed (schema enum, manifest idempotency, built-in prices,
+      marker-based timestamps, marker-parsed attempts). Re-verdict: approve_with_changes. make check green.
+  - timestamp: '2026-05-04T07:43:10.014Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-04T07:44:04.563Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-04T07:44:44.096Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #43 opened: https://github.com/maxkulish/loker/pull/43'
 task_title: '[T-032] Implement summary.json with per-backend tokens + cost_budget_usd warning'
 task_url: https://linear.app/cloud-ai/issue/CLO-296/t-032-implement-summaryjson-with-per-backend-tokens
