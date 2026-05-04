@@ -126,8 +126,9 @@ impl TemplateContext {
 - Parsed by `parse_key_val()` which splits on the first `=`.
 - Stored as `WorkflowRunner.vars: HashMap<String, String>`.
 - Passed to `TemplateContext::new_with_extras()` which inserts a `var` namespace object.
-- The `var` namespace is always present (even when empty) so `{{ var.foo }}` resolves to
-  empty string when `foo` is not provided, rather than erroring.
+- The `var` namespace is always present (even when empty) so `{{ var.foo }}`
+  can be used with `default()` or `is defined` guards, rather than erroring
+  when `var` itself is undefined.
 
 ### 4.3 `{{ phase.<name>.output }}`
 

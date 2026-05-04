@@ -349,11 +349,12 @@ enum Commands {
 
     /// Run a workflow. Step-based today; phase-based wiring lands in T-041.
     /// Supports --spec, --var, --rerun (rerun forwarded for forward compatibility).
+    #[command(trailing_var_arg = true)]
     Run {
         /// Workflow name or path to .toml file
         name: String,
 
-        /// Path to a spec file to inject into the first phase context ({{ spec }})
+        /// Path to a spec file to inject into the template context ({{ spec }})
         #[arg(long)]
         spec: Option<PathBuf>,
 

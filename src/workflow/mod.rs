@@ -1541,7 +1541,7 @@ pub struct WorkflowRunner {
     context: CodebaseContext,
     template_engine: crate::template::TemplateEngine,
     pub explain_validation: bool,
-    /// Optional spec file content injected into the first phase context ({{ spec }}).
+    /// Optional spec file content injected into the template context ({{ spec }}).
     spec: Option<String>,
     /// Template variables from --var flags, keyed by name.
     vars: std::collections::HashMap<String, String>,

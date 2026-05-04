@@ -18,10 +18,10 @@ linear:
   priority: High
   branch_actual: feat/clo-309-run
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-04T19:34:18.852Z'
-  updated_at: '2026-05-04T20:21:40.053Z'
+  updated_at: '2026-05-04T20:36:11.511Z'
 phases:
   discovery:
     status: complete
@@ -52,11 +52,22 @@ phases:
     approved: true
     plan_file: docs/plans/clo-309-run-cli.md
   implement:
-    status: validating
+    status: complete
     commits:
       - d7d60ce
+      - 554ce25
+    codex_report: docs/reviews/clo-309-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-309-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-309-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 48
+    pr_url: https://github.com/maxkulish/loker/pull/48
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -136,5 +147,27 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 1 commit (d7d60ce).
+  - timestamp: '2026-05-04T20:29:55.830Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED. Gemini: REVIEW_FAILED. Claude fallback: approve_with_changes. Synthesis:
+      approve_with_changes. 2 Must Fix items applied: F1 (help text), F2 (rerun loop). Commit 554ce25.
+  - timestamp: '2026-05-04T20:31:43.862Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-04T20:33:04.245Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (783 lib + 18 integration tests + doc tests)'
+  - timestamp: '2026-05-04T20:33:41.527Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #48 opened: https://github.com/maxkulish/loker/pull/48'
+  - timestamp: '2026-05-04T20:36:11.511Z'
+    action: ci_passed
+    phase: pr
+    details: 'All CI checks passing: test (2m28s), clippy (31s), format (15s)'
 task_title: '[T-040] `loker run <workflow>` CLI subcommand'
 task_url: https://linear.app/cloud-ai/issue/CLO-309/t-040-loker-run-workflow-cli-subcommand
