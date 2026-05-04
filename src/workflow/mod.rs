@@ -6841,3 +6841,4 @@ prompt = "p"
 }
 
 pub mod grammar;
+pub mod template;
