@@ -1,0 +1,55 @@
+task_id: clo-301
+task_type: development
+classification_reason: >-
+  Title describes wiring ResumeRunner::execute() end-to-end - a development task adding code (struct method, integration
+  with PhaseRunner, status-marker resume protocol). No Type: marker or [spec]/[ops] label present.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_actual: feat/clo-301-resume-runner
+workflow:
+  current_phase: complete
+  status: complete
+  created_at: '2026-05-04T13:35:00.000Z'
+  updated_at: '2026-05-04T14:37:04.000Z'
+phases:
+  discovery:
+    status: complete
+  design:
+    status: complete
+  plan:
+    status: complete
+  implement:
+    status: complete
+  pr:
+    status: complete
+    pr_number: 46
+    pr_url: https://github.com/maxkulish/loker/pull/46
+    ci_passed: true
+    reviews_addressed: true
+    approved: true
+    merge_commit: 4bf4ddc
+    merged_at: '2026-05-04T14:37:04Z'
+  complete:
+    status: complete
+    merge_commit: 4bf4ddc
+    merged_at: '2026-05-04T14:37:04Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
+history:
+  - timestamp: '2026-05-04T14:37:04.000Z'
+    action: workflow_complete
+    phase: complete
+    details: 'Task CLO-301 fully completed. PR #46 merged in 4bf4ddc. ResumeRunner::execute() wired end-to-end.'
+task_title: wire ResumeRunner::execute() end-to-end
+task_url: https://linear.app/cloud-ai/issue/CLO-301/wire-resumerunner-execute-end-to-end

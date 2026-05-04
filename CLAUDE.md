@@ -1,10 +1,9 @@
 # CLAUDE.md - loker
 
-Active milestone: **M6 - Reference workflow**. M1/M2/M3/M4/M5 shipped.
+Active milestone: **M7/M8 - Slice B (deployment + CLI surface)**. M1-M6 shipped.
 
-In progress:
-- CLO-291 (Phase 7, T-037): M6 e2e on calculator spec.
-- CLO-301 (Phase 6 follow-up): wire `ResumeRunner::execute()` end-to-end.
+Next pick: CLO-309 (Phase 9, T-040) - `loker run <workflow> [--spec] [--var] [--rerun phase=]`.
+Parallel-OK: CLO-307 (T-038, docker-compose), CLO-308 (T-039, doctor TZ check), CLO-312 (T-043, `loker trace`), CLO-317 (T-048, HumanVerifier scaffold).
 
 ## Read first
 

@@ -118,18 +118,20 @@ is sequential.
 | T-031 | Resumability via status markers (FR-21). Crash-mid-write fixture triggers rerun; fully-marked run makes zero backend calls. Step-level rerun for `parallel`. | T-025, T-027, T-028 | T-042 | FR-21 |
 | T-032 | `summary.json` with per-backend tokens; warns when actual exceeds `cost_budget_usd` from `lok.toml`. Cost data source (open question §8) settled here. | T-028 | T-038 | FR-23, FR-23a |
 
-## Phase 7 - Reference workflow (M6)
+## Phase 7 - Reference workflow (M6, complete)
 
 Slice A's exit gate. End-to-end green run on the calculator spec is the
 deliverable.
 
-| ID | Task | After | Blocks | PRD |
-|----|------|-------|--------|-----|
-| T-033 | TOML workflow grammar parser. Phase block (`name`, `strategy`, `backend(s)`, `prompt_template`, `inputs`, `output`); backend name resolver (`tensorzero/`, `claude/`, `codex/`, `gemini/`, `ollama/`); `phase.contract` reserved no-op. | T-008 | T-034 | FR-29, FR-30, FR-31 |
-| T-034 | `design-doc-tdd` workflow file under `.lok/workflows/design-doc-tdd.toml`. Four phases per UC-1. | T-033 | T-037 | UC-1 |
-| ~~T-035~~ (CLO-289 done) | Prompt templates for each phase. Variable substitution from upstream artefacts. | T-029, T-030, T-034 | T-037 | UC-1 |
-| ~~T-036~~ (CLO-290 done) | Tiny example spec at `examples/specs/calculator.md`. | - | T-037 | KPI table row 1 |
-| T-037 | CLO-291 - M6 end-to-end integration test on calculator spec. Asserts artefacts, trace shape, exit code. All blockers green. | T-014, T-019, T-032, T-035, T-036 | Phase 8+ | KPI table row 1 |
+**Status (2026-05-04): all five Phase 7 tasks shipped. M6 done; Slice A complete.**
+
+| ID | Linear | Task | After | Blocks | PRD |
+|----|--------|------|-------|--------|-----|
+| ~~T-033~~ | CLO-287 done | TOML workflow grammar parser. Phase block (`name`, `strategy`, `backend(s)`, `prompt_template`, `inputs`, `output`); backend name resolver (`tensorzero/`, `claude/`, `codex/`, `gemini/`, `ollama/`); `phase.contract` reserved no-op. | T-008 | T-034 | FR-29, FR-30, FR-31 |
+| ~~T-034~~ | CLO-288 done | `design-doc-tdd` workflow file under `.lok/workflows/design-doc-tdd.toml`. Four phases per UC-1. | T-033 | T-037 | UC-1 |
+| ~~T-035~~ | CLO-289 done | Prompt templates for each phase. Variable substitution from upstream artefacts. | T-029, T-030, T-034 | T-037 | UC-1 |
+| ~~T-036~~ | CLO-290 done | Tiny example spec at `examples/specs/calculator.md`. | - | T-037 | KPI table row 1 |
+| ~~T-037~~ | CLO-291 done | M6 end-to-end integration test on calculator spec. Asserts artefacts, trace shape, exit code. All blockers green. | T-014, T-019, T-032, T-035, T-036 | Phase 8+ | KPI table row 1 |
 
 ## Phase 8 - Deployment recipe (M7)
 
