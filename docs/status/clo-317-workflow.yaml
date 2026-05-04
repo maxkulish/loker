@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-04T19:37:17.249Z'
-  updated_at: '2026-05-04T20:27:28.838Z'
+  updated_at: '2026-05-04T20:27:50.142Z'
 phases:
   discovery:
     status: complete
@@ -67,6 +67,7 @@ phases:
       - 02843fc
       - af2b141
       - 122cbf0
+      - 7b7d875
     codex_validated: true
     codex_verdict: approve_with_changes
     codex_report: docs/reviews/clo-317-codex-validation.md
@@ -188,5 +189,11 @@ history:
       Added CLO-317 docs and review artifacts (implementation metadata, design/discovery/plan docs, validation reports)
       in commit 122cbf0. Validation remains in validating due unresolved synthesis must-fix scope items from second gate
       pass.
+  - timestamp: '2026-05-04T20:27:50.142Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Appended final verdict stubs to codex/gemini validation reports for lok checker compatibility and recorded
+      workflow status update in 7b7d875.
 task_title: '[T-048] HumanVerifier hook scaffold (Phase 11 HITL kickoff)'
 task_url: https://linear.app/cloud-ai/issue/CLO-317/t-048-humanverifier-hook-scaffold-phase-11-hitl-kickoff
