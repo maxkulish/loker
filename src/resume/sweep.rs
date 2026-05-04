@@ -127,7 +127,7 @@ mod tests {
         assert!(!stale.exists(), "original file removed");
 
         // Verify it ended up in orphan dir
-        let orphaned = fs::read_dir(&swept[0].parent().unwrap()).unwrap().next();
+        let orphaned = fs::read_dir(swept[0].parent().unwrap()).unwrap().next();
         assert!(orphaned.is_some(), "orphan dir has file");
     }
 

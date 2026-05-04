@@ -19,7 +19,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use jsonschema;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
 use loker::manifest::{sha256_hex, Kind, Manifest, Producer};
 use loker::phase_runner::{
@@ -223,6 +222,7 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures, tempfil
                         run_dir: run_dir.path().to_path_buf(),
                         trace: Some(trace_writer.as_ref()),
                     },
+                    0u32,
                 )
                 .await
                 .expect("design phase should succeed");
@@ -273,6 +273,7 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures, tempfil
                         run_dir: run_dir.path().to_path_buf(),
                         trace: Some(trace_writer.as_ref()),
                     },
+                    0u32,
                 )
                 .await
                 .expect("review phase should succeed");
@@ -316,6 +317,7 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures, tempfil
                         run_dir: run_dir.path().to_path_buf(),
                         trace: Some(trace_writer.as_ref()),
                     },
+                    0u32,
                 )
                 .await
                 .expect("implement phase should succeed");
@@ -358,6 +360,7 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures, tempfil
                         run_dir: run_dir.path().to_path_buf(),
                         trace: Some(trace_writer.as_ref()),
                     },
+                    0u32,
                 )
                 .await
                 .expect("verify phase should succeed");
@@ -690,7 +693,7 @@ fn m6_summary_and_resume() {
 
     // Trace must have token usage data
     let trace_content =
-        std::fs::read_to_string(&run_dir.trace_path()).expect("trace.jsonl should exist");
+        std::fs::read_to_string(run_dir.trace_path()).expect("trace.jsonl should exist");
     let has_tokens = trace_content.lines().any(|line| {
         line.contains("gen_ai.usage.input_tokens")
             || line.contains("gen_ai.usage.output_tokens")

@@ -91,6 +91,7 @@ async fn single_phase_four_spans_parented() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(sink.as_ref()),
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
@@ -153,6 +154,7 @@ async fn parallel_three_replicas_six_spans() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(sink.as_ref()),
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
@@ -225,6 +227,7 @@ async fn escalating_retry_attempt_spans() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(sink.as_ref()),
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
@@ -276,6 +279,7 @@ async fn verify_failure_outcome() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(sink.as_ref()),
             },
+            0,
         )
         .await;
 
@@ -323,6 +327,7 @@ async fn token_counts_match_mock() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(sink.as_ref()),
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
@@ -360,6 +365,7 @@ async fn file_valid_jsonl() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(&writer),
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
@@ -397,6 +403,7 @@ async fn schema_validation() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: Some(&writer),
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
