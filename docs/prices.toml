@@ -1,0 +1,48 @@
+# Loker price table
+#
+# Static price per million tokens for known backend:model combinations.
+# Keys follow the format "<backend>:<model>" where <backend> is the
+# gen_ai.system value and <model> is the gen_ai.request.model value
+# from trace.jsonl.
+#
+# Prices are in USD per million tokens. Missing entries produce
+# cost_usd: null in the summary — the summary is still emitted.
+#
+# Source: provider published pricing as of 2026-05.
+# This file is re-reviewed periodically; operator edits are welcome.
+
+["anthropic:claude-opus-4-7"]
+input_per_mtok = 15.0
+output_per_mtok = 75.0
+
+["anthropic:claude-sonnet-4-6"]
+input_per_mtok = 3.0
+output_per_mtok = 15.0
+
+["anthropic:claude-haiku-3-5"]
+input_per_mtok = 0.80
+output_per_mtok = 4.0
+
+["openai:gpt-5"]
+input_per_mtok = 10.0
+output_per_mtok = 40.0
+
+["openai:gpt-5-mini"]
+input_per_mtok = 1.25
+output_per_mtok = 5.0
+
+["openai:gpt-4o"]
+input_per_mtok = 2.50
+output_per_mtok = 10.0
+
+["google:gemini-3.1-pro-preview"]
+input_per_mtok = 1.25
+output_per_mtok = 5.0
+
+["google:gemini-2.5-pro"]
+input_per_mtok = 1.25
+output_per_mtok = 10.0
+
+["google:gemini-2.0-flash"]
+input_per_mtok = 0.10
+output_per_mtok = 0.40

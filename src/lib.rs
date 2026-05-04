@@ -14,6 +14,7 @@ pub mod phase_runner;
 pub mod resume; // scaffolding; execution wiring deferred to CLO-301
 pub mod run_state;
 pub mod strategy;
+pub mod summary;
 pub mod template;
 pub mod trace;
 
@@ -31,6 +32,10 @@ mod workflows;
 pub use phase_runner::{
     AggregatorName, PhaseConfig, PhaseError, PhaseInputs, PhaseOutcome, PhaseRung, PhaseRunner,
     StrategyName, VerifyHookName,
+};
+pub use summary::{
+    BackendUsage, InMemorySummarySink, PhaseStatus, PriceTable, RunStatus, Summary, SummaryError,
+    SummarySink, SummaryWriter, Totals, TraceReader,
 };
 pub use trace::{
     AttemptSpanContext, BackendSpanResult, InMemorySink, PhaseSpanContext, TraceSink, TraceWriter,

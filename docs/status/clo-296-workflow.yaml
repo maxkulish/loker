@@ -1,0 +1,224 @@
+task_id: CLO-296
+task_type: development
+classification_reason: >-
+  task title has [T-032] prefix, implementing a summary.json feature — backend Rust work with schema, tests, and
+  manifest registration. Not triggered as specification because the bracket prefix means title doesn't start with
+  Add/Implement/Fix/Refactor.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by:
+    - CLO-292
+  branch_suggested: kmamemo/clo-296-t-032-implement-summaryjson-with-per-backend-tokens
+  priority: High
+  branch_actual: feat/clo-296-summary
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-05-03T12:36:59.533Z'
+  updated_at: '2026-05-04T07:48:48.836Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: Dedicated SummaryWriter module with SummarySink trait (trace-like pattern)
+    approaches_identified: 3
+    approved: true
+    baseline_score: 8
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-296.md
+    prd_created: false
+    prd_exists: true
+    prd_file: https://linear.app/cloud-ai/issue/CLO-296/t-032-implement-summaryjson-with-per-backend-tokens
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-296-summary-json.md
+    discovery_context_used: true
+    draft_ready: true
+    applied_suggestions:
+      - Add prices.toml parse error handling — non-fatal on syntax error, empty PriceTable returned
+      - Add large-trace performance note — acknowledged as post-v0 optimization concern
+      - 'Q1 (Pricing): default-with-override model for prices.toml (refinement)'
+      - 'Q2 (Budget): pass cost_budget_usd as Option<f64> to finalize() (refinement)'
+      - 'Q5 (Manifest): replace-existing logic for summary entry on re-finalize (refinement)'
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-296-design-gemini.md
+    review_synthesis: docs/reviews/clo-296-design-synthesis.md
+    review_verdict: approve
+    human_review_completed: true
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-296-summary-json.md
+    approved: true
+  implement:
+    status: complete
+    phases:
+      implement:
+        commits:
+          - 1412cce
+          - 8f59092
+          - d76507d
+    commits:
+      - 1412cce
+      - 8f59092
+      - d76507d
+      - a2f5e95
+      - e1eb3d3
+    codex_report: docs/reviews/clo-296-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-296-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-296-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+  pr:
+    status: in_progress
+    pr_number: 43
+    pr_url: https://github.com/maxkulish/loker/pull/43
+    ci_passed: true
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-03T12:36:59.533Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-296 as development
+  - timestamp: '2026-05-03T12:37:40.407Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: task title has [T-032] prefix, implementing a summary.json feature — backend Rust work
+      with schema, tests, and manifest registration. Not triggered as specification because the bracket prefix means
+      title doesn't start with Add/Implement/Fix/Refactor.
+  - timestamp: '2026-05-03T12:37:44.178Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-03T12:37:54.406Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-03T12:38:40.269Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-296-summary already exists and is checked out.
+  - timestamp: '2026-05-03T12:42:29.199Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Approach: Dedicated SummaryWriter module with SummarySink trait (trace-like pattern). Baseline 8/10. 3 approaches
+      considered.
+  - timestamp: '2026-05-03T12:42:52.993Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-03T12:43:30.873Z'
+    action: phase_resumed
+    phase: design
+    details: Resumed after discovery->design model-switch boundary. Design phase begins.
+  - timestamp: '2026-05-03T12:49:09.769Z'
+    action: design_draft_ready
+    phase: design
+    details: Draft written manually at docs/designs/clo-296-summary-json.md (309 lines, 7 sections).
+  - timestamp: '2026-05-03T12:55:52.403Z'
+    action: design_review_complete
+    phase: design
+    details: 'Review verdict: approve. 5 suggestions applied (2 additive + 3 refinement), 0 flagged.'
+  - timestamp: '2026-05-03T12:58:36.283Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session timed out with no annotations.
+  - timestamp: '2026-05-03T12:58:51.167Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. 311 lines, 7 sections, 6 open questions documented. Public API signatures:
+      SummarySink trait, SummaryWriter, Summary struct, TraceReader, PriceTable.
+  - timestamp: '2026-05-03T12:58:54.097Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-03T12:59:57.110Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-296-summary-json.md
+  - timestamp: '2026-05-03T13:00:01.153Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 6 sub-tasks queued: ST1 PriceTable, ST2 TraceReader, ST3 SummaryWriter, ST4 finalize wiring, ST5
+      test contract, ST6 schema validation + make check.
+  - timestamp: '2026-05-03T13:00:10.739Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-03T13:05:56.711Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: PriceTable — prices.toml + pricing lookup. Commit 1412cce.'
+  - timestamp: '2026-05-03T13:09:54.571Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: TraceReader — trace.jsonl token aggregation. Commit 8f59092.'
+  - timestamp: '2026-05-03T13:18:40.715Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: SummaryWriter — summary.json emission + manifest registration. Commit d76507d.'
+  - timestamp: '2026-05-04T07:14:06.612Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: SummaryWriter::finalize integration wiring — prices.toml path resolution fix. Commit a2f5e95.'
+  - timestamp: '2026-05-04T07:14:09.802Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST5 landed: 5 integration tests in tests/summary.rs — single_phase_success, multi_backend_parallel,
+      failed_phase_emitted, price_table_miss_no_panic, budget_exceeded_warning. Commit e1eb3d3.
+  - timestamp: '2026-05-04T07:14:55.757Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All sub-tasks landed. make check green. 5 commits: 1412cce (ST1), 8f59092 (ST2), d76507d (ST3), a2f5e95 (ST4),
+      e1eb3d3 (ST5).
+  - timestamp: '2026-05-04T07:19:16.045Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: FAILED (shell heredoc quoting bug). Gemini: FAILED (shell scripting issue). Claude fallback: 9 findings.
+      Synthesis: rework — 5 Must Fix items identified. Waiting on user decisions for F1 (PhaseStatus enum naming) and F3
+      (prices.toml resolution strategy) before applying bounded fix iteration.
+  - timestamp: '2026-05-04T07:42:57.659Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Fix iteration applied at commit 99ec601. F1-F5 all addressed (schema enum, manifest idempotency, built-in prices,
+      marker-based timestamps, marker-parsed attempts). Re-verdict: approve_with_changes. make check green.
+  - timestamp: '2026-05-04T07:43:10.014Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-04T07:44:04.563Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-04T07:44:44.096Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #43 opened: https://github.com/maxkulish/loker/pull/43'
+  - timestamp: '2026-05-04T07:48:48.836Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format, clippy, test all green'
+task_title: '[T-032] Implement summary.json with per-backend tokens + cost_budget_usd warning'
+task_url: https://linear.app/cloud-ai/issue/CLO-296/t-032-implement-summaryjson-with-per-backend-tokens
