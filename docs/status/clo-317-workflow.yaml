@@ -18,10 +18,10 @@ linear:
   branch_suggested: kmamemo/clo-317-t-048-humanverifier-hook-scaffold-phase-11-hitl-kickoff
   branch_actual: feat/clo-317-t-048-humanverifier-hook-scaffold
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-04T19:37:17.249Z'
-  updated_at: '2026-05-04T20:27:50.142Z'
+  updated_at: '2026-05-04T20:50:42.998Z'
 phases:
   discovery:
     status: complete
@@ -58,7 +58,7 @@ phases:
     plan_file: docs/plans/clo-317-humanverifier-hook-scaffold.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - d056f2a
       - be1efee
@@ -68,6 +68,8 @@ phases:
       - af2b141
       - 122cbf0
       - 7b7d875
+      - 32f57e3
+      - 854d840
     codex_validated: true
     codex_verdict: approve_with_changes
     codex_report: docs/reviews/clo-317-codex-validation.md
@@ -76,7 +78,7 @@ phases:
     validation_synthesis_verdict: approve_with_changes
     validation_fix_iteration_count: 1
   pr:
-    status: pending
+    status: in_progress
   complete:
     status: pending
 history:
@@ -195,5 +197,30 @@ history:
     details: >-
       Appended final verdict stubs to codex/gemini validation reports for lok checker compatibility and recorded
       workflow status update in 7b7d875.
+  - timestamp: '2026-05-04T20:28:11.700Z'
+    action: codex_validation_complete
+    phase: implement
+    details: Recorded final workflow-state sync in 32f57e3 after state persistence updates.
+  - timestamp: '2026-05-04T20:47:00.932Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Applied synthesis must-fix F1/F2/F3: removed consume_response on phase mismatch, threaded
+      artefact_name+artefact_kind through HumanVerifierConfig, reverted response.schema.json comment_only addition. make
+      check green. Commit 854d840.
+  - timestamp: '2026-05-04T20:48:05.627Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      All Must Fix items from synthesis applied (F1: no mismatch consume, F2: real artefact path, F3: schema revert).
+      make check green. 10 commits total. Gate checklist complete.
+  - timestamp: '2026-05-04T20:48:47.913Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-04T20:50:42.998Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'Local pre-flight checks passed: fmt, clippy, test all green.'
 task_title: '[T-048] HumanVerifier hook scaffold (Phase 11 HITL kickoff)'
 task_url: https://linear.app/cloud-ai/issue/CLO-317/t-048-humanverifier-hook-scaffold-phase-11-hitl-kickoff
