@@ -1,0 +1,69 @@
+task_id: clo-289
+task_type: development
+classification_reason: ''
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-05-04T09:12:11.991Z'
+  updated_at: '2026-05-04T09:35:27.977Z'
+phases:
+  discovery:
+    status: complete
+  design:
+    status: complete
+  plan:
+    status: complete
+  implement:
+    status: complete
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-04T09:12:11.991Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-289 as development
+  - timestamp: '2026-05-04T09:15:40.535Z'
+    action: started_implementation
+    phase: implement
+    details: >-
+      Implementing phase prompt templates with upstream-artefact substitution for design-doc-tdd workflow. Creating:
+      template engine (src/workflow/template.rs), 4 .tmpl files, wiring to workflow file, and TDD tests.
+  - timestamp: '2026-05-04T09:27:04.285Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All tests pass (747 total). Cargo fmt, clippy clean. Implementation includes: src/workflow/template.rs (phase
+      template engine), 4 .tmpl files in .lok/prompts/design-doc-tdd/, wiring in both canonical and fixture workflow
+      TOML files, tests/workflow_template.rs with 18 TDD tests covering all 8 acceptance criteria.
+  - timestamp: '2026-05-04T09:30:00.000Z'
+    action: implementation_done
+    phase: complete
+    details: >-
+      CLO-289 fully implemented. Substitution engine, 4 template files, wiring, and 18 TDD tests all pass. `make check`
+      is green. Ready for PR.
+  - timestamp: '2026-05-04T09:34:30.874Z'
+    action: resumed_orchestrator
+    phase: implement
+    details: >-
+      Resuming orchestrator for clo-289. Implementation is complete and tested (make check green). Resetting
+      current_phase from incorrectly-set 'complete' back to 'implement' to proceed with proper phase sequence: implement
+      → pr → complete.
+  - timestamp: '2026-05-04T09:35:27.977Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
