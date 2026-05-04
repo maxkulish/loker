@@ -1,0 +1,148 @@
+task_id: clo-301
+task_type: development
+classification_reason: >-
+  Title starts with 'Wire' (implementation fix-up), blockers are mechanical integration points, no spec/ops signals in
+  issue body.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-301-t-031-follow-up-wire-resumerunner-execution-end-to-end
+  priority: '2'
+workflow:
+  current_phase: implement
+  status: in_progress
+  created_at: '2026-05-04T12:28:46.214Z'
+  updated_at: '2026-05-04T13:24:45.327Z'
+phases:
+  discovery:
+    status: complete
+  design:
+    status: complete
+    design_doc: docs/designs/clo-301-resume-runner-wiring.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: claude-designer
+    applied_suggestions:
+      - 'F1: shell-step limitation documented in §4.2'
+      - 'F2: manifest orphan-sweep noted in §4.3'
+    flagged_suggestions:
+      - id: F3
+        reason: nit - carry forward into implementation notes; Vec<u8> handling is standard Rust practice
+    review_completed: true
+    review_gemini: docs/reviews/clo-301-design-gemini.md
+    review_synthesis: docs/reviews/clo-301-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-301-resume-runner-wiring.md
+    approved: true
+  implement:
+    status: in_progress
+    last_phase_completed: null
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-04T12:28:46.214Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-301 as development
+  - timestamp: '2026-05-04T12:30:27.845Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-301 as development - Wire ResumeRunner execution end-to-end
+  - timestamp: '2026-05-04T12:42:30.818Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: Title starts with "Wire" (implementation fix-up), blockers are mechanical integration
+      points, no spec signals in issue body.
+  - timestamp: '2026-05-04T12:42:32.812Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-04T12:42:48.796Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-04T12:50:49.617Z'
+    action: discovery_complete
+    phase: discovery
+    details: >-
+      Found two workflow grammars (grammar::Workflow vs Workflow). No Workflow→PhaseConfig adapter exists. No workflow
+      name stored on disk. Partial impl (initial_attempt) already done.
+  - timestamp: '2026-05-04T12:50:54.518Z'
+    action: discovery_approved
+    phase: discovery
+    details: >-
+      Two grammar types (grammar::Workflow vs Workflow). No adapter exists. Workflow name not persisted. Need to add
+      Workflow::to_phase_configs() method. initial_attempt parameter added to PhaseRunner::run().
+  - timestamp: '2026-05-04T12:51:00.673Z'
+    action: discovery_complete
+    phase: discovery
+    details: >-
+      Discovery complete - two grammar types, no adapter, no workflow name persisted. Need Workflow::to_phase_configs()
+      method and workflow name persistence.
+  - timestamp: '2026-05-04T12:51:34.314Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-04T13:19:53.965Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Design draft at docs/designs/clo-301-resume-runner-wiring.md (204 lines, 8 sections). initial_attempt blocker
+      already resolved.
+  - timestamp: '2026-05-04T13:21:51.562Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 2 applied (shell-step limitation note, manifest orphan-sweep note), 1
+      flagged as refinement nit (binary artefact handling).
+  - timestamp: '2026-05-04T13:23:06.242Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-04T13:23:10.001Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase. Public API signatures mentally verified. Test plan concrete. Open questions resolved.
+  - timestamp: '2026-05-04T13:23:14.018Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-04T13:24:08.087Z'
+    action: plan_created
+    phase: plan
+    details: Implementation plan created at docs/plans/clo-301-resume-runner-wiring.md — 5 sub-tasks, ordered P4→P1→P2→P3→P5.
+  - timestamp: '2026-05-04T13:24:20.406Z'
+    action: plan_checkpoint_shown
+    phase: plan
+    details: Re-dispatched to discovery but workflow is at plan phase. Showing plan checkpoint instead.
+  - timestamp: '2026-05-04T13:24:23.748Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved — 5 sub-tasks, P4→P1→P2→P3→P5. Starting implementation.
+  - timestamp: '2026-05-04T13:24:26.829Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved — starting implement phase. 5 sub-tasks, P4→P1→P2→P3→P5.
+  - timestamp: '2026-05-04T13:24:45.327Z'
+    action: implementation_started
+    phase: implement
+    details: No /plan:implement agent found. Executing sub-tasks in order P4→P1→P2→P3→P5 directly.
+task_title: '[T-031-follow-up] Wire ResumeRunner execution end-to-end'
+task_url: https://linear.app/cloud-ai/issue/CLO-301/t-031-follow-up-wire-resumerunner-execution-end-to-end

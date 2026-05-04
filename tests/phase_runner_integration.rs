@@ -133,6 +133,7 @@ async fn single_first_no_verify_emits_one_artefact_and_completed_marker() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .expect("phase run succeeds");
@@ -190,6 +191,7 @@ async fn phase_runner_parallel_concat_with_verifier_emits_completed_marker() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .expect("parallel run succeeds");
@@ -230,6 +232,7 @@ async fn phase_runner_parallel_all_pass_collects_failures() {
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .unwrap_err();
@@ -281,6 +284,7 @@ async fn phase_runner_parallel_concat_any_fail_three_replicas_completed_and_reje
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .expect("any_fail all pass succeeds");
@@ -314,6 +318,7 @@ async fn phase_runner_parallel_concat_any_fail_three_replicas_completed_and_reje
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .unwrap_err();
@@ -361,6 +366,7 @@ async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failur
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .expect("escalating recovers");
@@ -391,6 +397,7 @@ async fn phase_runner_retry_and_failure_escalating_recovers_then_terminal_failur
                 run_dir: tmp.path().to_path_buf(),
                 trace: None,
             },
+            0,
         )
         .await
         .unwrap_err();

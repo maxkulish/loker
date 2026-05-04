@@ -21,7 +21,7 @@ pub mod trace;
 mod apply_verify;
 mod cache;
 mod config;
-mod consensus;
+pub mod consensus;
 mod context;
 mod git_agent;
 mod role;

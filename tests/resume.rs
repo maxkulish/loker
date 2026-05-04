@@ -18,6 +18,7 @@ fn setup_run_dir_with_manifest(tmp: &Path, entries: Vec<ManifestEntry>) {
     let manifest = Manifest {
         run_id: "test-run-id".to_string(),
         schema_version: 1,
+        workflow_name: None,
         entries,
     };
     let manifest_json = manifest.to_json().unwrap();

@@ -42,7 +42,7 @@ mod summary_integration_tests {
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("single-phase-test");
+        let mut manifest = Manifest::new("single-phase-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(
@@ -132,7 +132,7 @@ mod summary_integration_tests {
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("multi-backend-test");
+        let mut manifest = Manifest::new("multi-backend-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(
@@ -239,7 +239,7 @@ mod summary_integration_tests {
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("failed-phase-test");
+        let mut manifest = Manifest::new("failed-phase-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(
@@ -316,7 +316,7 @@ mod summary_integration_tests {
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("price-miss-test");
+        let mut manifest = Manifest::new("price-miss-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(
@@ -396,7 +396,7 @@ mod summary_integration_tests {
 
         // Create manifest
         let manifest_path = run_dir.join("manifest.json");
-        let mut manifest = Manifest::new("budget-test");
+        let mut manifest = Manifest::new("budget-test", None);
         manifest
             .append(
                 ManifestEntry::from_payload(

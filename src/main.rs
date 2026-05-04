@@ -21,7 +21,15 @@ mod tasks;
 mod team;
 mod template;
 mod utils;
-mod workflow;
+pub mod manifest;
+pub mod phase_runner;
+pub mod family;
+pub mod aggregator;
+pub mod run_state;
+pub mod trace;
+pub mod strategy;
+pub mod resume;
+pub mod workflow;
 mod workflows;
 
 use anyhow::{Context, Result};
@@ -863,35 +871,65 @@ async fn main() -> Result<()> {
             println!("{}", result);
         }
         Commands::Resume { run_dir, ttl } => {
-            use loker::resume::lock::RunLock;
-            use loker::run_state::{read_ttl, RunState};
+            use crate::resume::lock::RunLock;
+            use crate::run_state::{read_ttl, RunState};
 
             let lock = RunLock::acquire(&run_dir)?;
             let effective_ttl = ttl.unwrap_or_else(|| read_ttl(&run_dir).unwrap_or(300));
-            let swept = loker::resume::sweep::sweep_stale_tmp(&run_dir, effective_ttl)?;
+            let swept = crate::resume::sweep::sweep_stale_tmp(&run_dir, effective_ttl)?;
             if !swept.is_empty() {
                 eprintln!("  swept {} stale tmp files", swept.len());
             }
 
             let run_state = RunState::load(&run_dir, effective_ttl)?;
 
-            if let Some(loker::run_state::HeartbeatStatus::Live(ref hb)) = run_state.heartbeat {
+            if let Some(crate::run_state::HeartbeatStatus::Live(ref hb)) = run_state.heartbeat {
                 anyhow::bail!(
                     "run is already in progress (heartbeat live at {})",
                     hb.tick_at
                 );
             }
 
-            println!("Run state loaded for {}", run_dir.display());
-            println!("  phases: {:?}", run_state.phase_status);
+            // Read workflow name from manifest.json
+            let manifest = loker::manifest::Manifest::load(&run_dir.join("manifest.json"))?;
+            let workflow_name = match manifest.workflow_name {
+                Some(name) => name,
+                None => anyhow::bail!(
+                    "Cannot resume: manifest.json has no workflow_name field. \
+                     This run was created with an older loker version."
+                ),
+            };
 
+
+            // Find and load the workflow definition
+            let source = workflow::find_workflow(&workflow_name).await.with_context(|| {
+                format!("Failed to locate workflow '{}'", workflow_name)
+            })?;
+            let wf = workflow::load_workflow_from_source(source).await?;
+            let phase_configs = wf.to_phase_configs();
+            if phase_configs.is_empty() {
+                anyhow::bail!("No phases to resume (workflow has no LLM steps)");
+            }
+
+            // Resolve backends from config
+            let backends = backend::get_backends(&config, None)?;
+
+            // Build ResumeRunner
+            let runner = crate::resume::ResumeRunner::new(backends);
+
+            // Plan what to do per phase
+            let plan = crate::resume::ResumePlanner::plan(
+                &run_dir,
+                &run_state,
+                &phase_configs[..],
+                swept,
+            )?;
+
+            // Execute the plan
+            runner.execute(&plan).await?;
+
+            println!("Resume complete.");
             drop(lock);
-
-            anyhow::bail!(
-                "resume execution is not yet implemented (CLO-295 delivers planner + scaffolding only). \
-                 Phase configs must be derived from the persisted workflow before the runner can execute. \
-                 See: https://linear.app/cloud-ai/issue/CLO-295"
-            );
         }
         Commands::Workflow(subcmd) => match subcmd {
             WorkflowCommands::Run {
