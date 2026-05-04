@@ -10,6 +10,10 @@
       "type": "string",
       "format": "uuid"
     },
+    "workflow_name": {
+      "type": "string",
+      "description": "Optional name of the workflow definition used to produce this run. Set by RunDir::create() for runs created from a workflow spec; absent in legacy runs or runs started directly from a spec path."
+    },
     "schema_version": {
       "type": "integer",
       "const": 1,
