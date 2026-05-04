@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::manifest::Kind;
 use crate::run_state::atomic_write;
 use crate::strategy::verify::{
     FailureReason, VerifyContext, VerifyError, VerifyHook, VerifyResult,
@@ -24,6 +25,8 @@ pub struct HumanVerifierConfig {
     pub run_id: String,
     pub workflow: String,
     pub phase: String,
+    pub artefact_name: String,
+    pub artefact_kind: Kind,
     pub severity: HumanSeverity,
     pub decision_options: Vec<HumanDecision>,
 }
@@ -225,8 +228,8 @@ impl VerifyHook for HumanVerifier {
             Ok(None) => None,
             Err(err) => {
                 let payload = self.ensure_pending_payload(
-                    &self.config.phase,
-                    "text/plain",
+                    &self.config.artefact_name,
+                    kind_str(&self.config.artefact_kind),
                     &summary,
                     preview_lines,
                 );
@@ -243,12 +246,11 @@ impl VerifyHook for HumanVerifier {
             Some(response) => {
                 if response.phase != self.config.phase {
                     let payload = self.ensure_pending_payload(
-                        &self.config.phase,
-                        "text/plain",
+                        &self.config.artefact_name,
+                        kind_str(&self.config.artefact_kind),
                         &summary,
                         preview_lines,
                     );
-                    self.consume_response("mismatched")?;
                     self.ensure_pending_file(&payload)?;
                     let reason = FailureReason::new(format!(
                         "response phase mismatch for {}: expected {}",
@@ -273,8 +275,8 @@ impl VerifyHook for HumanVerifier {
             }
             None => {
                 let payload = self.ensure_pending_payload(
-                    &self.config.phase,
-                    "text/plain",
+                    &self.config.artefact_name,
+                    kind_str(&self.config.artefact_kind),
                     &summary,
                     preview_lines,
                 );
@@ -298,6 +300,19 @@ fn timeout_from(now: DateTime<Utc>, severity: HumanSeverity) -> Option<String> {
     timeout.map(|t| t.to_rfc3339())
 }
 
+fn kind_str(kind: &Kind) -> &'static str {
+    match kind {
+        Kind::DesignMd | Kind::ReviewMd => "text/markdown",
+        Kind::VerifyJson
+        | Kind::PhaseResultJson
+        | Kind::PendingJson
+        | Kind::ResponseJson
+        | Kind::SummaryJson
+        | Kind::TraceJsonl => "application/json",
+        Kind::ChangesDir => "application/directory",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,6 +324,8 @@ mod tests {
             run_id: Utc::now().to_rfc3339(),
             workflow: "design-doc-tdd".into(),
             phase: "review".into(),
+            artefact_name: "review.md".into(),
+            artefact_kind: Kind::ReviewMd,
             severity,
             decision_options: vec![
                 HumanDecision::Approve,
@@ -398,6 +415,8 @@ mod tests {
             run_id: "run-1".into(),
             workflow: "wf".into(),
             phase: "review".into(),
+            artefact_name: "review.md".into(),
+            artefact_kind: Kind::ReviewMd,
             severity: HumanSeverity::Medium,
             decision_options: vec![HumanDecision::Approve],
         });
@@ -431,6 +450,8 @@ mod tests {
         let text = fs::read_to_string(tmp.path().join("pending/review.json")).unwrap();
         let request: PendingRequest = serde_json::from_str(&text).unwrap();
         assert_eq!(request.phase, "review");
+        assert_eq!(request.artefact.path, "review.md");
+        assert_eq!(request.artefact.kind, "text/markdown");
     }
 
     #[tokio::test]
@@ -479,7 +500,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn phase_mismatch_is_consumed_after_fail() {
+    async fn phase_mismatch_keeps_response_in_place() {
         let tmp = tempfile::tempdir().unwrap();
         let hook = hook(&tmp, HumanSeverity::Medium);
         let response_path = hook.response_path();
@@ -491,20 +512,8 @@ mod tests {
             .unwrap();
         assert!(mismatch.is_fail());
 
-        assert!(!response_path.exists());
-        let responses_dir = tmp.path().join("responses");
-        let consumed = responses_dir
-            .read_dir()
-            .unwrap()
-            .filter_map(|entry| entry.ok())
-            .any(|entry| {
-                entry
-                    .file_name()
-                    .to_string_lossy()
-                    .to_string()
-                    .contains("review.json.mismatched.")
-            });
-        assert!(consumed);
+        // original response file should still exist (not consumed on mismatch)
+        assert!(response_path.exists());
     }
 
     #[tokio::test]

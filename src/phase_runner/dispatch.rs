@@ -207,6 +207,7 @@ fn resolve_output_path(run_dir: &Path, path: &str) -> std::path::PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manifest::Kind;
     use crate::phase_runner::{AggregatorName, PhaseConfig, StrategyName};
     use crate::strategy::verify::{HumanDecision, HumanSeverity, HumanVerifierConfig};
     use crate::strategy::TargetSpec;
@@ -243,6 +244,8 @@ mod tests {
             run_id: "run-1".into(),
             workflow: "wf".into(),
             phase: "p".into(),
+            artefact_name: "out.md".into(),
+            artefact_kind: Kind::DesignMd,
             severity: HumanSeverity::Medium,
             decision_options: vec![HumanDecision::Approve],
         });

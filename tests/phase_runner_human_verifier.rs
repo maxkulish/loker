@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
+use loker::manifest::Kind;
 use loker::strategy::verify::{HumanDecision, HumanResponse, HumanSeverity, HumanVerifierConfig};
 use loker::strategy::{PhaseContext, Prompt};
 use loker::{PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
@@ -75,6 +76,8 @@ async fn phase_human_verifier_blocks_until_response() {
         run_id: "run-1".into(),
         workflow: "wf".into(),
         phase: "review".into(),
+        artefact_name: "review.md".into(),
+        artefact_kind: Kind::ReviewMd,
         severity: HumanSeverity::Medium,
         decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
     });
@@ -103,6 +106,11 @@ async fn phase_human_verifier_blocks_until_response() {
 
     assert_eq!(err.error_class(), "verify_failed");
     assert!(tmp.path().join("pending").join("review.json").is_file());
+
+    let pending_text = fs::read_to_string(tmp.path().join("pending/review.json")).unwrap();
+    let pending: serde_json::Value = serde_json::from_str(&pending_text).unwrap();
+    assert_eq!(pending["artefact"]["path"], "review.md");
+    assert_eq!(pending["artefact"]["kind"], "text/markdown");
 }
 
 #[tokio::test]
@@ -114,6 +122,8 @@ async fn phase_human_verifier_ignores_stale_response_after_consume() {
         run_id: "run-1".into(),
         workflow: "wf".into(),
         phase: "review".into(),
+        artefact_name: "review.md".into(),
+        artefact_kind: Kind::ReviewMd,
         severity: HumanSeverity::Medium,
         decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
     });

@@ -20,7 +20,7 @@
     "decided_at": { "type": "string", "format": "date-time" },
     "decision": {
       "type": "string",
-      "enum": ["approve", "reject", "comment_only"]
+      "enum": ["approve", "reject"]
     },
     "global_comment": {
       "type": ["string", "null"]
