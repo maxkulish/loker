@@ -109,18 +109,44 @@ impl HumanVerifier {
         })
     }
 
-    fn parse_response(&self) -> Result<Option<HumanResponse>, VerifyError> {
+    fn parse_response(&self) -> Result<Option<HumanResponse>, String> {
         let path = self.response_path();
         if !path.exists() {
             return Ok(None);
         }
-        let text = std::fs::read_to_string(&path).map_err(|err| {
-            VerifyError::new(format!("failed to read response file {}: {err}", path.display()))
-        })?;
-        let response: HumanResponse = serde_json::from_str(&text).map_err(|err| {
-            VerifyError::new(format!("failed to parse response file {}: {err}", path.display()))
-        })?;
+        let text = std::fs::read_to_string(&path)
+            .map_err(|err| format!("failed to read response file {}: {err}", path.display()))?;
+        let response: HumanResponse = serde_json::from_str(&text)
+            .map_err(|err| format!("failed to parse response file {}: {err}", path.display()))?;
         Ok(Some(response))
+    }
+
+    fn consume_response(&self) -> Result<(), VerifyError> {
+        let source = self.response_path();
+        if !source.exists() {
+            return Ok(());
+        }
+        let destination = source.with_file_name(format!(
+            "{}.json.handled.{}",
+            self.config.phase,
+            Utc::now().timestamp_millis()
+        ));
+
+        if let Some(dir) = destination.parent() {
+            std::fs::create_dir_all(dir).map_err(|err| {
+                VerifyError::new(format!(
+                    "failed to prepare response archive dir {}: {err}",
+                    dir.display()
+                ))
+            })?;
+        }
+
+        std::fs::rename(&source, &destination).map_err(|err| {
+            VerifyError::new(format!(
+                "failed to consume response for {}: {err}",
+                self.config.phase
+            ))
+        })
     }
 }
 
@@ -190,14 +216,44 @@ impl VerifyHook for HumanVerifier {
         let preview_lines = u32::try_from(ctx.stdout.lines().count()).unwrap_or(u32::MAX);
         let summary = ctx.stdout.chars().take(160).collect::<String>();
 
-        match self.parse_response()? {
+        let decision_or_pending = match self.parse_response() {
+            Ok(Some(response)) => Some(response),
+            Ok(None) => None,
+            Err(err) => {
+                let payload = self.ensure_pending_payload(
+                    &self.config.phase,
+                    "text/plain",
+                    &summary,
+                    preview_lines,
+                );
+                self.ensure_pending_file(&payload)?;
+                let reason = FailureReason::new(format!(
+                    "malformed or missing human response for {}: {}",
+                    self.config.phase,
+                    err
+                ));
+                return Ok(VerifyResult::Fail { reason });
+            }
+        };
+
+        match decision_or_pending {
             Some(response) => {
                 if response.phase != self.config.phase {
-                    return Err(VerifyError::new(format!(
+                    let payload = self.ensure_pending_payload(
+                        &self.config.phase,
+                        "text/plain",
+                        &summary,
+                        preview_lines,
+                    );
+                    self.ensure_pending_file(&payload)?;
+                    let reason = FailureReason::new(format!(
                         "response phase mismatch for {}: expected {}",
                         self.config.phase, response.phase
-                    )));
+                    ));
+                    return Ok(VerifyResult::Fail { reason });
                 }
+
+                self.consume_response()?;
 
                 match response.decision {
                     HumanDecision::Approve => Ok(VerifyResult::pass()),
@@ -243,8 +299,6 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use std::fs;
-    use std::io::Write;
-
     fn hook(tmp: &tempfile::TempDir, severity: HumanSeverity) -> HumanVerifier {
         HumanVerifier::new(HumanVerifierConfig {
             run_dir: tmp.path().to_path_buf(),
@@ -270,6 +324,23 @@ mod tests {
             structured: None,
             duration: std::time::Duration::ZERO,
         }
+    }
+
+    fn write_response(path: &PathBuf, decision: HumanDecision, comment: Option<&str>) {
+        let response = HumanResponse {
+            schema_version: SCHEMA_VERSION,
+            phase: "review".into(),
+            claimed_by: "human".into(),
+            decided_at: "2026-05-04T00:00:00Z".into(),
+            decision,
+            global_comment: comment.map(ToString::to_string),
+            inline_comments_path: None,
+        };
+
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, serde_json::to_vec_pretty(&response).unwrap()).unwrap();
     }
 
     #[test]
@@ -362,30 +433,13 @@ mod tests {
         let hook = hook(&tmp, HumanSeverity::High);
 
         let response_path = hook.response_path();
-        if let Some(parent) = response_path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
 
-        let write_response = |decision: HumanDecision, comment: Option<&str>| {
-            let response = HumanResponse {
-                schema_version: SCHEMA_VERSION,
-                phase: "review".into(),
-                claimed_by: "human".into(),
-                decided_at: "2026-05-04T00:00:00Z".into(),
-                decision,
-                global_comment: comment.map(ToString::to_string),
-                inline_comments_path: None,
-            };
-            let mut f = fs::File::create(&response_path).unwrap();
-            f.write_all(serde_json::to_string_pretty(&response).unwrap().as_bytes())
-                .unwrap();
-        };
-
-        write_response(HumanDecision::Approve, None);
+        write_response(&response_path, HumanDecision::Approve, None);
         let ok = hook.verify(&context_with_output("candidate output")).await.unwrap();
         assert!(ok.is_pass());
 
         write_response(
+            &response_path,
             HumanDecision::Reject,
             Some("Needs additional context around security section"),
         );
@@ -398,8 +452,54 @@ mod tests {
             panic!("expected fail");
         }
 
-        write_response(HumanDecision::CommentOnly, Some("Looks okay as next step"));
+        write_response(
+            &response_path,
+            HumanDecision::CommentOnly,
+            Some("Looks okay as next step"),
+        );
         let pending = hook.verify(&context_with_output("candidate output")).await.unwrap();
         assert!(pending.is_fail());
+    }
+
+    #[tokio::test]
+    async fn consumes_response_after_successful_parse() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hook = hook(&tmp, HumanSeverity::Medium);
+        let response_path = hook.response_path();
+
+        write_response(&response_path, HumanDecision::Approve, None);
+        let ok = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        assert!(ok.is_pass());
+
+        assert!(!response_path.exists());
+        let response_dir = tmp.path().join("responses");
+        let consumed = response_dir
+            .read_dir()
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .to_string()
+                    .starts_with("review.json.handled.")
+            });
+        assert!(consumed);
+    }
+
+    #[tokio::test]
+    async fn keeps_pending_on_malformed_response() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hook = hook(&tmp, HumanSeverity::Medium);
+        let response_path = hook.response_path();
+
+        if let Some(parent) = response_path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&response_path, b"{not valid json}").unwrap();
+
+        let pending = hook.verify(&context_with_output("candidate output")).await.unwrap();
+        assert!(pending.is_fail());
+        assert!(tmp.path().join("pending/review.json").is_file());
     }
 }
