@@ -1,0 +1,16 @@
+name = "test-run-rerun"
+description = "Test --rerun phase flag"
+
+[[steps]]
+name = "phase_one"
+shell = "echo 'PHASE_ONE_RAN'"
+
+[[steps]]
+name = "phase_two"
+shell = "echo 'PHASE_TWO_RAN'"
+depends_on = ["phase_one"]
+
+[[steps]]
+name = "phase_three"
+shell = "echo 'PHASE_THREE_RAN'"
+depends_on = ["phase_two"]

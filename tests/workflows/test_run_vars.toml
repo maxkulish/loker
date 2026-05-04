@@ -1,0 +1,6 @@
+name = "test-run-vars"
+description = "Test --var flag injection only"
+
+[[steps]]
+name = "show_vars"
+shell = "echo 'vars: {{ var.foo }} / {{ var.bar }}'"

@@ -1541,6 +1541,12 @@ pub struct WorkflowRunner {
     context: CodebaseContext,
     template_engine: crate::template::TemplateEngine,
     pub explain_validation: bool,
+    /// Optional spec file content injected into the first phase context ({{ spec }}).
+    spec: Option<String>,
+    /// Template variables from --var flags, keyed by name.
+    vars: std::collections::HashMap<String, String>,
+    /// Phase names to force re-execute via --rerun phase=<name>.
+    rerun_phases: Vec<String>,
 }
 
 impl WorkflowRunner {
@@ -1553,7 +1559,28 @@ impl WorkflowRunner {
             context,
             template_engine: crate::template::TemplateEngine::new(),
             explain_validation: false,
+            spec: None,
+            vars: std::collections::HashMap::new(),
+            rerun_phases: Vec::new(),
         }
+    }
+
+    /// Set the spec file content.
+    pub fn with_spec(mut self, spec: Option<String>) -> Self {
+        self.spec = spec;
+        self
+    }
+
+    /// Set template variables from --var flags.
+    pub fn with_vars(mut self, vars: std::collections::HashMap<String, String>) -> Self {
+        self.vars = vars;
+        self
+    }
+
+    /// Set phase names to force re-execute.
+    pub fn with_rerun_phases(mut self, phases: Vec<String>) -> Self {
+        self.rerun_phases = phases;
+        self
     }
 
     /// Set whether to dump raw validator responses on parse failures
@@ -2880,7 +2907,13 @@ impl WorkflowRunner {
     ) -> Result<String, WorkflowError> {
         let protected = protect_loop_vars(template);
         let backends = Self::collect_backends(results);
-        let ctx = crate::template::TemplateContext::new(results, &self.args, &backends);
+        let ctx = crate::template::TemplateContext::new_with_extras(
+            results,
+            &self.args,
+            &backends,
+            self.spec.clone(),
+            &self.vars,
+        );
         self.template_engine
             .render(&protected, &ctx)
             .map_err(|e| map_template_error(e, &protected, workflow_name, current_step))

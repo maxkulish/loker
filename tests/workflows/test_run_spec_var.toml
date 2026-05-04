@@ -1,0 +1,16 @@
+name = "test-run-spec-var"
+description = "Test --spec and --var flag injection combined"
+
+[[steps]]
+name = "show_spec"
+shell = "echo 'spec: {{ spec }}'"
+
+[[steps]]
+name = "show_vars"
+shell = "echo 'vars: {{ var.foo }} / {{ var.bar }}'"
+depends_on = ["show_spec"]
+
+[[steps]]
+name = "show_both"
+shell = "echo 'both: {{ spec }} / {{ var.foo }}'"
+depends_on = ["show_vars"]
