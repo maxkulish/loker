@@ -179,16 +179,16 @@ impl PhaseFixtures {
 /// Creates a `RunDir`, renders templates, executes each phase through
 /// `PhaseRunner`, and returns the completed run directory and phase runs
 /// for assertion inspection.
-fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures) {
+fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures, tempfile::TempDir) {
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     rt.block_on(async {
         let fixtures = PhaseFixtures::load();
         let spec_content = calculator_spec_content();
-        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let base_dir = tempfile::tempdir().expect("failed to create temp dir for test run");
 
         // Create run directory
-        let run_dir =
-            RunDir::create(manifest_dir, "design-doc-tdd").expect("failed to create run directory");
+        let run_dir = RunDir::create(base_dir.path(), "design-doc-tdd")
+            .expect("failed to create run directory");
 
         // Create trace writer
         let trace_writer: Arc<dyn TraceSink> = Arc::new(
@@ -367,7 +367,7 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures) {
             });
         }
 
-        (run_dir, phase_runs, fixtures)
+        (run_dir, phase_runs, fixtures, base_dir)
     })
 }
 
@@ -381,7 +381,7 @@ fn run_mocked_design_doc_tdd() -> (RunDir, Vec<PhaseRun>, PhaseFixtures) {
 /// flows end-to-end).
 #[test]
 fn m6_smoke_test_mocked_pipeline_exits_zero() {
-    let (run_dir, phase_runs, _fixtures) = run_mocked_design_doc_tdd();
+    let (run_dir, phase_runs, _fixtures, _tmp) = run_mocked_design_doc_tdd();
 
     assert_eq!(
         phase_runs.len(),
@@ -422,7 +422,7 @@ fn m6_smoke_test_mocked_pipeline_exits_zero() {
 
 #[test]
 fn m6_layout_assertions() {
-    let (run_dir, _phase_runs, _fixtures) = run_mocked_design_doc_tdd();
+    let (run_dir, _phase_runs, _fixtures, _tmp) = run_mocked_design_doc_tdd();
 
     let dir_name = run_dir
         .path()
@@ -482,7 +482,7 @@ fn m6_layout_assertions() {
 
 #[test]
 fn m6_manifest_sha256s_verify() {
-    let (run_dir, _phase_runs, _fixtures) = run_mocked_design_doc_tdd();
+    let (run_dir, _phase_runs, _fixtures, _tmp) = run_mocked_design_doc_tdd();
 
     let manifest =
         Manifest::load(&run_dir.manifest_path()).expect("manifest.json should load as Manifest");
@@ -538,7 +538,7 @@ fn m6_manifest_sha256s_verify() {
 
 #[test]
 fn m6_trace_schema_valid() {
-    let (run_dir, _phase_runs, _fixtures) = run_mocked_design_doc_tdd();
+    let (run_dir, _phase_runs, _fixtures, _tmp) = run_mocked_design_doc_tdd();
 
     let trace_path = run_dir.trace_path();
     let trace_content = std::fs::read_to_string(&trace_path)
@@ -618,7 +618,7 @@ fn m6_trace_schema_valid() {
 
 #[test]
 fn m6_per_phase_artefact_assertions() {
-    let (run_dir, _phase_runs, _fixtures) = run_mocked_design_doc_tdd();
+    let (run_dir, _phase_runs, _fixtures, _tmp) = run_mocked_design_doc_tdd();
 
     // design.md: exists, non-empty
     let design_path = run_dir.path().join("design.md");
@@ -670,7 +670,7 @@ fn m6_per_phase_artefact_assertions() {
 
 #[test]
 fn m6_summary_and_resume() {
-    let (run_dir, _phase_runs, _fixtures) = run_mocked_design_doc_tdd();
+    let (run_dir, _phase_runs, _fixtures, _tmp) = run_mocked_design_doc_tdd();
 
     // --- Summary ---
     let summary_path = run_dir.path().join("summary.json");
