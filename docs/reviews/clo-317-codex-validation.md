@@ -45,3 +45,6 @@ echo "$OUTPUT"
 sh: -c: line 30: unexpected EOF while looking for matching `''
 sh: -c: line 37: syntax error: unexpected end of file
 
+
+## Verdict
+rework
