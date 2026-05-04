@@ -15,10 +15,10 @@ linear:
   blocks: []
   blocked_by: []
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-04T19:35:12.231Z'
-  updated_at: '2026-05-04T20:11:04.858Z'
+  updated_at: '2026-05-04T20:25:27.364Z'
 phases:
   discovery:
     status: complete
@@ -46,12 +46,16 @@ phases:
     validation_synthesis_report: docs/reviews/clo-307-validation-synthesis.md
     validation_synthesis_verdict: approve
   pr:
-    status: in_progress
+    status: complete
     ci_passed: true
     pr_number: 47
     pr_url: https://github.com/maxkulish/loker/pull/47
+    reviews_addressed: true
+    merge_commit: 005eb8c
+    merged_at: '2026-05-04T22:20:14+02:00'
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-04T19:35:12.231Z'
     action: workflow_started
@@ -187,3 +191,28 @@ history:
     action: ci_passed
     phase: pr
     details: All required checks passing on latest commit d2d2908 (clippy, format, test all pass)
+  - timestamp: '2026-05-04T20:14:36.191Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      13 review comments addressed: 6 stale (.env path fixes in d2d2908) + 7 new fixes in 4115096 (wget→curl,
+      CLICKHOUSE_DB, health check wording, browser-neutral open, fixture jargon, handoff TL;DR). All 13 replies verified
+      with /gemini review trailer. No new unresolved threads.
+  - timestamp: '2026-05-04T20:20:37.331Z'
+    action: pr_merged
+    phase: pr
+    details: 'PR #47 merged via squash. Merge commit: 005eb8c. All checks passed, all review comments addressed.'
+  - timestamp: '2026-05-04T20:20:40.145Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-04T20:21:20.415Z'
+    action: project_sync_complete
+    phase: complete
+    details: Aggregation files (PROJECT.md, ROADMAP.md, DEPENDENCIES.md) not present in this project; skipping sync step.
+  - timestamp: '2026-05-04T20:25:27.364Z'
+    action: workflow_complete
+    phase: complete
+    details: 'CLO-307 complete. PR #47 merged (005eb8c). All validation passed, all reviews addressed, all checks green.'
+current_phase: complete
+status: complete
