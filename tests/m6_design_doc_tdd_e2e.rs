@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use jsonschema;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
 use loker::manifest::{sha256_hex, Kind, Manifest, Producer};
 use loker::phase_runner::{
@@ -544,23 +545,23 @@ fn m6_trace_schema_valid() {
     let trace_content = std::fs::read_to_string(&trace_path)
         .unwrap_or_else(|e| panic!("failed to read trace.jsonl: {e}"));
 
+    // Load schema and compile validator
+    let schema_json = std::fs::read_to_string("docs/schemas/trace_span.schema.json")
+        .expect("trace_span.schema.json must exist");
+    let schema: serde_json::Value =
+        serde_json::from_str(&schema_json).expect("trace_span.schema.json must be valid JSON");
+    let validator = jsonschema::validator_for(&schema).expect("schema compiles");
+
+    // Parse trace lines and validate each against the schema
     let spans: Vec<serde_json::Value> = trace_content
         .lines()
         .map(|line| serde_json::from_str(line).expect("trace line must be valid JSON"))
         .collect();
 
-    assert!(
-        spans.len() >= 6,
-        "expected at least 6 trace spans, got {}",
-        spans.len()
-    );
-
     for (i, span) in spans.iter().enumerate() {
-        let obj = span.as_object().expect("span must be a JSON object");
-        assert!(obj.contains_key("trace_id"), "span {i} missing trace_id");
-        assert!(obj.contains_key("span_id"), "span {i} missing span_id");
-        assert!(obj.contains_key("name"), "span {i} missing name");
-        assert!(obj.contains_key("timestamp"), "span {i} missing timestamp");
+        validator
+            .validate(span)
+            .unwrap_or_else(|e| panic!("trace line {i} fails schema validation: {e:?}"));
     }
 
     // Phase-level started spans: one per phase (PhaseRunner emits both
