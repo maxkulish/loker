@@ -70,7 +70,7 @@ Phase 3 and 4. Internal order is sequential.
 Parallel with Phase 2 and 4. T-015 is the load-bearing one - cross-family
 enforcement is the loker thesis.
 
-**Status (2026-04-29): T-015, T-016, T-017, T-018 shipped (plus CLO-274 follow-up). Only T-019 (Vote, demote candidate) remains.**
+**Status (2026-05-04): all five Phase 3 tasks shipped (plus CLO-274 follow-up). M3 done.**
 
 | ID | Linear | Task | After | Blocks | PRD |
 |----|--------|------|-------|--------|-----|
@@ -78,7 +78,7 @@ enforcement is the loker thesis.
 | ~~T-016~~ | CLO-266 done | `Aggregator::Concat`: per-source headings, snapshot test. | - | T-029 | FR-9 |
 | ~~T-017~~ | CLO-268 done | `Aggregator::LLMJudge`: judge prompt construction, family-overlap test, opt-out via `require_judge_different_family = false`. | T-015 | T-029 | FR-10 |
 | ~~T-018~~ | CLO-267 done | `Aggregator::AnyFail`: first failure wins on JSON verdict fixtures. | - | T-029 | FR-11 |
-| T-019 | CLO-269 | `Aggregator::Vote` (Should). Ballot schema + abstentions + tie-breakers (`ClosestToFamily`, `Random`, `FirstResponder`) decided in TDD doc before code. Demote to post-v0 if no concrete first use case lands by M3 start. | T-015 | - | FR-12 |
+| ~~T-019~~ | CLO-269 done | `Aggregator::Vote` (Should). Ballot schema + abstentions + tie-breakers (`ClosestToFamily`, `Random`, `FirstResponder`) decided in TDD doc before code. Demote to post-v0 if no concrete first use case lands by M3 start. | T-015 | - | FR-12 |
 
 ## Phase 4 - Verify hooks (M4)
 
@@ -127,9 +127,9 @@ deliverable.
 |----|------|-------|--------|-----|
 | T-033 | TOML workflow grammar parser. Phase block (`name`, `strategy`, `backend(s)`, `prompt_template`, `inputs`, `output`); backend name resolver (`tensorzero/`, `claude/`, `codex/`, `gemini/`, `ollama/`); `phase.contract` reserved no-op. | T-008 | T-034 | FR-29, FR-30, FR-31 |
 | T-034 | `design-doc-tdd` workflow file under `.lok/workflows/design-doc-tdd.toml`. Four phases per UC-1. | T-033 | T-037 | UC-1 |
-| T-035 | Prompt templates for each phase. Variable substitution from upstream artefacts. | T-029, T-030, T-034 | T-037 | UC-1 |
-| T-036 | Tiny example spec at `examples/specs/calculator.md`. | - | T-037 | KPI table row 1 |
-| T-037 | M6 end-to-end integration test on calculator spec. Asserts artefacts, trace shape, exit code. | T-014, T-019 (or its demotion), T-032, T-035, T-036 | Phase 8+ | KPI table row 1 |
+| ~~T-035~~ (CLO-289 done) | Prompt templates for each phase. Variable substitution from upstream artefacts. | T-029, T-030, T-034 | T-037 | UC-1 |
+| ~~T-036~~ (CLO-290 done) | Tiny example spec at `examples/specs/calculator.md`. | - | T-037 | KPI table row 1 |
+| T-037 | CLO-291 - M6 end-to-end integration test on calculator spec. Asserts artefacts, trace shape, exit code. All blockers green. | T-014, T-019, T-032, T-035, T-036 | Phase 8+ | KPI table row 1 |
 
 ## Phase 8 - Deployment recipe (M7)
 
@@ -137,8 +137,8 @@ Parallel with Phase 7 once T-009 is green.
 
 | ID | Task | After | Blocks | PRD |
 |----|------|-------|--------|-----|
-| T-038 | `deploy/tensorzero/docker-compose.yml` for Tier 2 (gateway + ClickHouse + UI). README snippet. | T-009 | T-040 | M7 |
-| T-039 | `loker doctor` extension: TensorZero reachability check (HEALTHY / UNREACHABLE). | T-008 | T-041 | FR-35 |
+| T-038 | CLO-307 - `deploy/tensorzero/docker-compose.yml` for Tier 2 (gateway + ClickHouse + UI). README snippet. | T-009 | T-040 | M7 |
+| T-039 | CLO-308 - `loker doctor` extension: TensorZero reachability check (HEALTHY / UNREACHABLE). | T-008 | T-041 | FR-35 |
 
 ## Phase 9 - CLI surface (M8)
 
@@ -146,11 +146,11 @@ Sequential within phase.
 
 | ID | Task | After | Blocks | PRD |
 |----|------|-------|--------|-----|
-| T-040 | `loker run <workflow> [--spec] [--var] [--rerun phase=]`. All flags exercised in integration. | T-037 | T-042, T-043 | FR-32 |
-| T-041 | `loker resume <run_id>`. Pause / resume round-trip test. | T-031, T-040 | T-046 | FR-33 |
-| T-042 | `loker explain <workflow>`: DAG + per-phase strategy summary. Snapshot test. | T-040 | - | FR-34 |
-| T-043 | `loker trace <run_id>` pretty-printer. Snapshot test. | T-029 | - | FR-36 |
-| T-044 | `loker ls --blocked` enumerating HITL-pending runs. (Should) | T-050 | - | FR-37 |
+| T-040 | CLO-309 - `loker run <workflow> [--spec] [--var] [--rerun phase=]`. All flags exercised in integration. | T-037 | T-042, T-043 | FR-32 |
+| T-041 | CLO-310 - `loker resume <run_id>`. Pause / resume round-trip test. | T-031, T-040 | T-046 | FR-33 |
+| T-042 | CLO-311 - `loker explain <workflow>`: DAG + per-phase strategy summary. Snapshot test. | T-040 | - | FR-34 |
+| T-043 | CLO-312 - `loker trace <run_id>` pretty-printer. Snapshot test. | T-029 | - | FR-36 |
+| T-044 | CLO-313 - `loker ls --blocked` enumerating HITL-pending runs. (Should) | T-050 | - | FR-37 |
 
 ## Phase 10 - Documentation (M9)
 
@@ -158,9 +158,9 @@ End of Slice B. Marks v0 of the docs surface.
 
 | ID | Task | After | Blocks | PRD |
 |----|------|-------|--------|-----|
-| T-045 | README rewrite: thesis, three primitives, install, one-page example. | Phase 9 except T-044 | - | M9 |
-| T-046 | One-page tutorial: clone -> first run -> read trace. | T-045 | - | M9 |
-| T-047 | `docs/migration-from-lok.md`: every lok knob mapped to its loker equivalent. Deprecation window note. | T-045 | - | M9 |
+| T-045 | CLO-314 - README rewrite: thesis, three primitives, install, one-page example. | Phase 9 except T-044 | - | M9 |
+| T-046 | CLO-315 - One-page tutorial: clone -> first run -> read trace. | T-045 | - | M9 |
+| T-047 | CLO-316 - `docs/migration-from-lok.md`: every lok knob mapped to its loker equivalent. Deprecation window note. | T-045 | - | M9 |
 
 ## Phase 11 - HITL hook (M10)
 
@@ -168,10 +168,10 @@ Slice C entry. Depends on Phase 4 trait + D4 threat model.
 
 | ID | Task | After | Blocks | PRD |
 |----|------|-------|--------|-----|
-| T-048 | `HumanVerifier` hook scaffold: writes `runs/<id>/pending/<phase>.json`, blocks on `runs/<id>/responses/<phase>.json`, maps decision + comments to `VerifyResult`. | T-002, T-020 | T-049, T-051 | FR-17 |
-| T-049 | Severity ladder: low (1h), medium (24h), high (infinite). Timeout-as-fail with fake-clock test. Interaction with `EscalatingRetry` resolved here (open question §8). | T-013, T-048 | T-053 | FR-17 |
-| T-050 | First-write-wins per-phase advisory lock (`<phase>.json.lock`) with 60s heartbeat auto-release. | T-004, T-048 | T-051, T-053 | FR-26 |
-| T-051 | Per-gate fallback axum server (one-shot, no daemon). Shared route module with M11. | T-049, T-050 | T-053 | FR-27 |
+| T-048 | CLO-317 - `HumanVerifier` hook scaffold: writes `runs/<id>/pending/<phase>.json`, blocks on `runs/<id>/responses/<phase>.json`, maps decision + comments to `VerifyResult`. | T-002, T-020 | T-049, T-051 | FR-17 |
+| T-049 | CLO-318 - Severity ladder: low (1h), medium (24h), high (infinite). Timeout-as-fail with fake-clock test. Interaction with `EscalatingRetry` resolved here (open question §8). | T-013, T-048 | T-053 | FR-17 |
+| T-050 | CLO-319 - First-write-wins per-phase advisory lock (`<phase>.json.lock`) with 60s heartbeat auto-release. | T-004, T-048 | T-051, T-053 | FR-26 |
+| T-051 | CLO-320 - Per-gate fallback axum server (one-shot, no daemon). Shared route module with M11. | T-049, T-050 | T-053 | FR-27 |
 
 ## Phase 12 - UI daemon (M11)
 
@@ -179,10 +179,10 @@ Slice C exit. Threat-model test suite is the gating artefact.
 
 | ID | Task | After | Blocks | PRD |
 |----|------|-------|--------|-----|
-| T-052 | Daemon mode `loker ui --serve`. Localhost-only bind. Shares 100% of route handlers with T-051. | T-051 | T-053, T-054, T-055 | FR-24, FR-27, FR-28 |
-| T-053 | Sessions list (left pane) + per-run trace + pending panel (right pane). Snapshot tests on active / blocked / complete fixtures. | T-052 | T-054 | FR-24 |
-| T-054 | SSE tail-f of `trace.jsonl` driven by `notify`. Integration test asserts <200ms delivery. | T-053 | T-055 | FR-25 |
-| T-055 | Threat-model test suite per T-004: traversal, symlink, CSRF, stale lock takeover. M11 close gate. | T-004, T-054 | - | §5 Security, §8 Risks |
+| T-052 | CLO-321 - Daemon mode `loker ui --serve`. Localhost-only bind. Shares 100% of route handlers with T-051. | T-051 | T-053, T-054, T-055 | FR-24, FR-27, FR-28 |
+| T-053 | CLO-322 - Sessions list (left pane) + per-run trace + pending panel (right pane). Snapshot tests on active / blocked / complete fixtures. | T-052 | T-054 | FR-24 |
+| T-054 | CLO-323 - SSE tail-f of `trace.jsonl` driven by `notify`. Integration test asserts <200ms delivery. | T-053 | T-055 | FR-25 |
+| T-055 | CLO-324 - Threat-model test suite per T-004: traversal, symlink, CSRF, stale lock takeover. M11 close gate. | T-004, T-054 | - | §5 Security, §8 Risks |
 
 ## Critical-path summary
 

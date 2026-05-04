@@ -2,7 +2,9 @@
 
 Active milestone: **M6 - Reference workflow**. M1/M2/M3/M4/M5 shipped.
 
-Open in Phase 7: CLO-289 (prompt templates), CLO-291 (e2e on calculator spec, blocked by 289).
+In progress:
+- CLO-291 (Phase 7, T-037): M6 e2e on calculator spec.
+- CLO-301 (Phase 6 follow-up): wire `ResumeRunner::execute()` end-to-end.
 
 ## Read first
 
