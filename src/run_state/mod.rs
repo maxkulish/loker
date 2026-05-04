@@ -10,7 +10,7 @@ pub mod load;
 
 pub(crate) use atomic::atomic_write;
 pub use attempt_dir::AttemptDir;
-pub use heartbeat::{is_stale, HeartbeatBody, HeartbeatConfig, HeartbeatWriter};
+pub use heartbeat::{is_stale, read_ttl, HeartbeatBody, HeartbeatConfig, HeartbeatWriter};
 pub use latest::LatestPointer;
 pub use load::{Heartbeat, HeartbeatStatus, LoadError, PhaseStatus, RunState};
 pub use markers::{

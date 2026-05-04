@@ -293,6 +293,11 @@ async fn heartbeat_file_gets_created_and_contains_valid_json() {
     let body: HeartbeatBody = serde_json::from_str(&content).unwrap();
     assert!(body.writer_pid > 0);
     assert!(!body.writer_host.is_empty());
+    assert_eq!(
+        body.ttl_seconds,
+        Some(300),
+        "ttl_seconds should default to 300"
+    );
 }
 
 #[tokio::test]
@@ -320,6 +325,11 @@ async fn heartbeat_file_updated_on_subsequent_ticks() {
         "heartbeat tick should be recent, but age is {}s",
         age.num_seconds()
     );
+    assert_eq!(
+        body.ttl_seconds,
+        Some(300),
+        "ttl_seconds should be persisted"
+    );
 }
 
 #[test]
@@ -333,6 +343,7 @@ fn is_stale_returns_true_when_expired() {
         writer_pid: 12345,
         writer_host: "host-a".to_string(),
         tick_at: recent,
+        ttl_seconds: Some(300),
     };
     assert!(!is_stale(&body, &now, ttl_seconds), "not stale at T-1s");
 
@@ -342,6 +353,7 @@ fn is_stale_returns_true_when_expired() {
         writer_pid: 12345,
         writer_host: "host-a".to_string(),
         tick_at: old,
+        ttl_seconds: Some(300),
     };
     assert!(is_stale(&body, &now, ttl_seconds), "stale at T+1s");
 }
@@ -357,6 +369,7 @@ fn is_stale_boundary_exact_ttl() {
         writer_pid: 12345,
         writer_host: "host-a".to_string(),
         tick_at: exactly_ttl_ago,
+        ttl_seconds: Some(300),
     };
     assert!(
         !is_stale(&body, &now, ttl_seconds),
@@ -369,6 +382,51 @@ fn is_stale_boundary_exact_ttl() {
         writer_pid: 12345,
         writer_host: "host-a".to_string(),
         tick_at: one_second_over,
+        ttl_seconds: Some(300),
     };
     assert!(is_stale(&body, &now, ttl_seconds), "stale at TTL+1s");
+}
+
+// ---------------------------------------------------------------------------
+// Heartbeat TTL read tests
+// ---------------------------------------------------------------------------
+
+use loker::run_state::read_ttl;
+
+#[test]
+fn read_ttl_parses_ttl_from_heartbeat_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let body = HeartbeatBody {
+        writer_pid: 42,
+        writer_host: "test-host".to_string(),
+        tick_at: chrono::Utc::now(),
+        ttl_seconds: Some(600),
+    };
+    let json = serde_json::to_string_pretty(&body).unwrap();
+    std::fs::write(tmp.path().join("heartbeat.json"), json).unwrap();
+
+    assert_eq!(read_ttl(tmp.path()), Some(600));
+}
+
+#[test]
+fn read_ttl_returns_none_when_file_missing() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert_eq!(read_ttl(tmp.path()), None);
+}
+
+#[test]
+fn read_ttl_returns_none_when_field_absent() {
+    let tmp = tempfile::tempdir().unwrap();
+    let body = serde_json::json!({
+        "writer_pid": 42,
+        "writer_host": "test-host",
+        "tick_at": chrono::Utc::now().to_rfc3339(),
+    });
+    std::fs::write(
+        tmp.path().join("heartbeat.json"),
+        serde_json::to_string_pretty(&body).unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(read_ttl(tmp.path()), None);
 }

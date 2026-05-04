@@ -1,0 +1,229 @@
+task_id: CLO-295
+task_type: development
+classification_reason: >-
+  Complex implementation task with TDD contract, multiple subsystem integrations (markers, heartbeat, manifest,
+  PhaseRunner), and non-mechanical acceptance criteria. Title starts with 'Implement' but scope is too broad for
+  specification type.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks:
+    - CLO-284
+    - CLO-286
+    - CLO-292
+  blocked_by: []
+  branch_suggested: kmamemo/clo-295-t-031-implement-run-resumability-via-status-markers
+  priority: High
+  branch_actual: feat/clo-295-run-resumability
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-05-03T12:35:56.289Z'
+  updated_at: '2026-05-03T17:03:19.371Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: Resume-as-separate ResumeRunner
+    approaches_identified: 3
+    approved: true
+    baseline_score: 7
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-295.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-295-run-resumability.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-295-run-resumability.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - Remove redundant ArtefactCorrupt/ArtefactMissing from ResumeError (use LoadError path)
+      - Add heartbeat TTL recovery to execution flow and CLI (--ttl flag + heartbeat.json schema)
+      - Define archive_current_attempt() semantics in architecture
+      - Document trace.jsonl append behaviour
+      - Document disk-full sweep as hard error
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-295-review-gemini.md
+    review_synthesis: docs/reviews/clo-295-review-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-295-run-resumability.md
+    approved: true
+  implement:
+    status: complete
+    commits:
+      - 0cc2c8f
+      - ac403d2
+      - c7e6555
+      - d83cce0
+      - 5820eb3
+      - 1d1c7fd
+      - 633ef43
+      - f94c6be
+      - fb53825
+    codex_report: docs/reviews/clo-295-claude-fallback-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-295-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-295-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+  pr:
+    status: in_progress
+    pr_number: 42
+    pr_url: https://github.com/maxkulish/loker/pull/42
+    ci_passed: true
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-03T12:35:56.289Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-295 as development
+  - timestamp: '2026-05-03T12:36:49.435Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: Complex implementation task with TDD contract, multiple subsystem integrations
+      (markers, heartbeat, manifest, PhaseRunner), and non-mechanical acceptance criteria. Title starts with 'Implement'
+      but scope is too broad for specification type.
+  - timestamp: '2026-05-03T12:36:54.045Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-03T12:36:56.516Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-03T12:37:08.305Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-295-run-resumability checked out from main
+  - timestamp: '2026-05-03T12:38:54.617Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Resume-as-separate ResumeRunner. Baseline 7/10. 3 approaches considered.'
+  - timestamp: '2026-05-03T12:39:05.139Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-03T12:54:33.546Z'
+    action: design_draft_ready
+    phase: design
+    details: Draft generated manually at docs/designs/clo-295-run-resumability.md (255 lines, 7 sections verified)
+  - timestamp: '2026-05-03T13:02:42.219Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_suggestions. 5 applied (ResumeError cleanup, heartbeat TTL, archive op, trace.jsonl,
+      disk-full), 0 flagged. Gemini/Ollama reviewers failed; Claude fallback review used.
+  - timestamp: '2026-05-03T13:03:27.365Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-03T13:03:46.652Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design ready for plan phase. 292 lines, 7 sections, 5 review suggestions applied, 0 flagged, no plannotator
+      annotations.
+  - timestamp: '2026-05-03T13:03:49.780Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-03T13:09:20.115Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 9 sub-tasks at docs/plans/clo-295-run-resumability.md
+  - timestamp: '2026-05-03T13:09:23.787Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 9 sub-tasks queued (XS→S→S→S→S→M→M→M→S).
+  - timestamp: '2026-05-03T13:09:33.699Z'
+    action: plan_approved
+    phase: plan
+    details: >-
+      Plan approved. 9 sub-tasks queued. All have concrete acceptance commands, reference real files, pre-merge gate is
+      make check.
+  - timestamp: '2026-05-03T13:09:36.165Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-03T13:14:09.615Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: extended heartbeat schema with ttl_seconds, added read_ttl helper, updated tests. Commit 0cc2c8f.'
+  - timestamp: '2026-05-03T13:14:37.637Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: added fs2 0.4 dependency. Commit ac403d2.'
+  - timestamp: '2026-05-03T13:14:42.892Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: added fs2 dependency. Commit ac403d2.'
+  - timestamp: '2026-05-03T13:18:01.608Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: advisory lock RunLock with fcntl lock, Drop release, 2 unit tests. Commit c7e6555.'
+  - timestamp: '2026-05-03T13:19:01.612Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: stale tmp sweep with recursive walk, mtime check, orphan dir creation, 3 unit tests. Commit d83cce0.'
+  - timestamp: '2026-05-03T13:19:56.686Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 landed: archive_current_attempt with rename+fsync, 3 unit tests. Commit 5820eb3.'
+  - timestamp: '2026-05-03T13:24:58.945Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST6 landed: ResumePlanner, PhaseAction, ResumePlan, 5 unit tests. Commit 1d1c7fd.'
+  - timestamp: '2026-05-03T13:29:27.913Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST7 landed: ResumeRunner, CLI subcommand with lock+sweep+load+plan+status. Commit 633ef43.'
+  - timestamp: '2026-05-03T13:31:25.600Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST8 landed: 5 integration tests covering kill mid-phase, already complete, corrupt manifest, live writer, stale
+      writer. Commit f94c6be.
+  - timestamp: '2026-05-03T13:33:02.916Z'
+    action: implementation_complete
+    phase: implement
+    details: All 9 sub-tasks landed. make check green. 9 commits.
+  - timestamp: '2026-05-03T16:42:26.146Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Validation gate: Codex/Gemini wrappers failed (syntax error). Claude fallback verdict: rework. Synthesis verdict:
+      pivot. Option B accepted — descope to planner+scaffolding. Must-fix items F3/F6/F7/F8 applied. Follow-up CLO-301
+      created for runner execution. make check green.
+  - timestamp: '2026-05-03T16:42:38.244Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-03T16:46:03.741Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #42 opened: https://github.com/maxkulish/loker/pull/42'
+  - timestamp: '2026-05-03T17:03:19.371Z'
+    action: ci_passed
+    phase: pr
+    details: 'All CI checks passing: format (14s), clippy (1m11s), test (2m31s)'
+task_title: '[T-031] Implement run resumability via status markers'
+task_url: https://linear.app/cloud-ai/issue/CLO-295/t-031-implement-run-resumability-via-status-markers
