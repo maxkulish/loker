@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T19:47:47.918Z'
-  updated_at: '2026-05-06T20:15:56.174Z'
+  updated_at: '2026-05-06T20:16:11.840Z'
 phases:
   discovery:
     status: complete
@@ -67,6 +67,7 @@ phases:
     status: pending
     commits:
       - bf90e3f
+      - f7bb4b5
   pr:
     status: pending
   complete:
@@ -172,3 +173,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST1 landed: implemented blocked-run scanner model and module export. Commit bf90e3f'
+  - timestamp: '2026-05-06T20:16:11.840Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: rendering helpers and compact age formatting verified. Commit f7bb4b5'
