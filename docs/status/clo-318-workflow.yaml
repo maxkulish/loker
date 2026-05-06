@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:35:14.827Z'
+  updated_at: '2026-05-06T12:43:25.288Z'
 phases:
   discovery:
     status: complete
@@ -70,6 +70,7 @@ phases:
       - 556444d
       - ee1a17c
       - 4b0532f
+      - 0d18fd3
   pr:
     status: pending
   complete:
@@ -173,3 +174,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST4 landed: HITL context in completed/failed markers. Commit 4b0532f'
+  - timestamp: '2026-05-06T12:43:25.288Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 landed: pending/trace schemas and workflow-spec docs. Commit 0d18fd3'
