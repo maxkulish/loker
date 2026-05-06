@@ -13,11 +13,7 @@ fn snapshot_default_render_against_fixture() {
     let out = String::from_utf8(buf).unwrap();
     // Ensure output fits within 80 cols
     for line in out.lines() {
-        assert!(
-            line.len() <= 80,
-            "line exceeds 80 columns: '{}'",
-            line
-        );
+        assert!(line.len() <= 80, "line exceeds 80 columns: '{}'", line);
     }
     insta::assert_snapshot!(&out);
 }
