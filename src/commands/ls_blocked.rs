@@ -70,7 +70,7 @@ pub fn scan_blocked(root: &Path) -> Result<Vec<BlockedEntry>> {
                 continue;
             }
 
-            match parse_pending(root, &run_id, &phase, &pending_path, response_path) {
+            match parse_pending(&run_id, &phase, &pending_path, response_path) {
                 Ok(entry) => entries.push(entry),
                 Err(err) => eprintln!(
                     "warning: skipping malformed pending request for run {run_id} phase {phase}: {err:#}"
@@ -89,9 +89,8 @@ pub fn scan_blocked(root: &Path) -> Result<Vec<BlockedEntry>> {
 }
 
 fn parse_pending(
-    root: &Path,
-    fallback_run_id: &str,
-    fallback_phase: &str,
+    run_id: &str,
+    phase: &str,
     pending_path: &Path,
     response_path: PathBuf,
 ) -> Result<BlockedEntry> {
@@ -114,33 +113,23 @@ fn parse_pending(
         .map(|value| parse_rfc3339_utc(value, "timeout_at"))
         .transpose()?;
 
-    let run_id = if pending.run_id.is_empty() {
-        fallback_run_id.to_string()
-    } else {
-        pending.run_id
-    };
-    let phase = if pending.phase.is_empty() {
-        fallback_phase.to_string()
-    } else {
-        pending.phase
-    };
+    // The pending file's location is the source of truth for the entry key.
+    // HumanVerifier writes matching JSON fields today, but using disk stems for
+    // the response path prevents drifted JSON from telling operators to write a
+    // response file the scanner will never check.
     let response_display_path = PathBuf::from("runs")
-        .join(&run_id)
+        .join(run_id)
         .join("responses")
         .join(format!("{phase}.json"));
 
     Ok(BlockedEntry {
-        run_id,
-        phase,
+        run_id: run_id.to_string(),
+        phase: phase.to_string(),
         severity: pending.severity,
         opened_at,
         timeout_at,
         pending_path: pending_path.to_path_buf(),
-        response_path: if response_path.is_absolute() {
-            response_path
-        } else {
-            root.join(response_path)
-        },
+        response_path,
         response_display_path,
     })
 }
@@ -210,17 +199,28 @@ mod tests {
     use serde_json::json;
 
     fn write_pending(root: &Path, run_id: &str, phase: &str, opened_at: &str) -> PathBuf {
+        write_pending_with_payload_ids(root, run_id, phase, run_id, phase, opened_at)
+    }
+
+    fn write_pending_with_payload_ids(
+        root: &Path,
+        disk_run_id: &str,
+        disk_phase: &str,
+        payload_run_id: &str,
+        payload_phase: &str,
+        opened_at: &str,
+    ) -> PathBuf {
         let path = root
             .join("runs")
-            .join(run_id)
+            .join(disk_run_id)
             .join("pending")
-            .join(format!("{phase}.json"));
+            .join(format!("{disk_phase}.json"));
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let payload = json!({
             "schema_version": 1,
-            "run_id": run_id,
+            "run_id": payload_run_id,
             "workflow": "wf",
-            "phase": phase,
+            "phase": payload_phase,
             "severity": "high",
             "opened_at": opened_at,
             "timeout_at": null,
@@ -281,8 +281,33 @@ mod tests {
         assert_eq!(entries[0].phase, "review");
         assert_eq!(entries[0].severity, HumanSeverity::High);
         assert_eq!(
+            entries[0].response_path,
+            tmp.path().join("runs/run-1/responses/review.json")
+        );
+        assert_eq!(
             entries[0].response_display_path,
             PathBuf::from("runs/run-1/responses/review.json")
+        );
+    }
+
+    #[test]
+    fn scan_blocked_uses_disk_stems_when_payload_ids_drift() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_pending_with_payload_ids(
+            tmp.path(),
+            "disk-run",
+            "review",
+            "payload-run",
+            "payload-phase",
+            "2026-05-06T10:00:00Z",
+        );
+        let entries = scan_blocked(tmp.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].run_id, "disk-run");
+        assert_eq!(entries[0].phase, "review");
+        assert_eq!(
+            entries[0].response_display_path,
+            PathBuf::from("runs/disk-run/responses/review.json")
         );
     }
 
