@@ -122,6 +122,21 @@ fn test_explain_forward_reference_errors() {
 }
 
 #[test]
+fn test_explain_unknown_workflow_name_reports_lookup_error() {
+    let (success, output) = run_loker_explain(&["definitely-not-a-workflow"]);
+
+    assert!(!success, "unknown workflow unexpectedly succeeded");
+    assert!(
+        output.contains("Workflow 'definitely-not-a-workflow' not found"),
+        "missing workflow lookup error:\n{output}"
+    );
+    assert!(
+        !output.contains("Lok Explain"),
+        "unknown workflow name fell through to codebase mode:\n{output}"
+    );
+}
+
+#[test]
 fn test_explain_falls_back_to_codebase_mode_for_directory() {
     let (success, output) =
         run_loker_explain(&[".", "--focus", "workflow", "--backend", "does-not-exist"]);

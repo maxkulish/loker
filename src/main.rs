@@ -1999,8 +1999,13 @@ async fn run_explain_unified(
                 print!("{}", workflow::explain::render_text(&explanation));
                 return Ok(());
             }
-            Err(_) => {
-                // Not a workflow; preserve existing codebase explanation behavior.
+            Err(err) => {
+                let target_path = Path::new(target);
+                let dir_relative_target = dir.join(target_path);
+                if !target_path.is_dir() && !dir_relative_target.is_dir() {
+                    return Err(err);
+                }
+                // Not a workflow; preserve existing codebase explanation behavior for directories.
             }
         }
     }

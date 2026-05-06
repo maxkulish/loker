@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-05T15:20:52.408Z'
-  updated_at: '2026-05-06T07:15:08.526Z'
+  updated_at: '2026-05-06T07:16:28.249Z'
 phases:
   discovery:
     status: complete
@@ -63,12 +63,13 @@ phases:
     plan_file: docs/plans/clo-311-loker-explain-workflow.md
     approved: true
   implement:
-    status: in_progress
+    status: validating
     commits:
       - df9311f
       - e1add76
       - cbf9d18
       - f2bca93
+      - f350e1d
   pr:
     status: pending
   complete:
@@ -196,3 +197,11 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST4 landed: add invalid fixtures and CLI integration coverage. Commit f2bca93'
+  - timestamp: '2026-05-06T07:16:18.406Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 landed: formatting, targeted tests, and make check green. Commit f350e1d'
+  - timestamp: '2026-05-06T07:16:28.249Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 5 commits.
