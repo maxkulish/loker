@@ -535,6 +535,13 @@ enum Commands {
         #[arg(long, value_enum)]
         color: Option<loker::commands::trace::ColorChoice>,
     },
+
+    /// List runs with state matching a filter.
+    Ls {
+        /// Show runs paused on an unmatched HITL pending request.
+        #[arg(long)]
+        blocked: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1150,6 +1157,15 @@ async fn main() -> Result<()> {
             let trace_path = run_dir.join("trace.jsonl");
             let color = color.unwrap_or_default();
             loker::commands::trace::run(&trace_path, json, color)?;
+        }
+        Commands::Ls { blocked } => {
+            if !blocked {
+                anyhow::bail!("`loker ls` requires --blocked (no other modes in v1)");
+            }
+            let root = find_project_root()
+                .or_else(|| std::env::current_dir().ok())
+                .ok_or_else(|| anyhow::anyhow!("could not determine project root"))?;
+            loker::commands::ls_blocked::run(&root)?;
         }
     }
 
