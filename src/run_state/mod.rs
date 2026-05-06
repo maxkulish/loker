@@ -18,7 +18,5 @@ pub use markers::{
     next_attempt, CompletedMarker, FailedMarker, MarkerError, MarkerWriter, StartedMarker,
 };
 pub use order::{PhaseOrderGuard, PhaseState};
-pub use phase_lock::{
-    PhaseLock, PhaseLockBody, PhaseLockError, DEFAULT_PHASE_LOCK_TTL_SECONDS,
-};
+pub use phase_lock::{PhaseLock, PhaseLockBody, PhaseLockError, DEFAULT_PHASE_LOCK_TTL_SECONDS};
 pub use run_dir::{RunDir, RunDirError};

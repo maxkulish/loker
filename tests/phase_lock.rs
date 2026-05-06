@@ -82,11 +82,7 @@ fn stale_lock_recovery_after_crash() {
         ttl_seconds: 60,
     };
     let lock_path = tmp.path().join("locks").join("review.lock");
-    std::fs::write(
-        &lock_path,
-        serde_json::to_string_pretty(&body).unwrap(),
-    )
-    .unwrap();
+    std::fs::write(&lock_path, serde_json::to_string_pretty(&body).unwrap()).unwrap();
 
     // Acquire should succeed because the PID is dead.
     let lock = PhaseLock::acquire(tmp.path(), "review", "new-run", None)

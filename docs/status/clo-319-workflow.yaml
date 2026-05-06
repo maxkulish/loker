@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:35:32.163Z'
-  updated_at: '2026-05-06T12:48:33.373Z'
+  updated_at: '2026-05-06T12:55:22.455Z'
 phases:
   discovery:
     status: complete
@@ -65,10 +65,11 @@ phases:
     plan_file: docs/plans/clo-319-advisory-lock.md
     approved: true
   implement:
-    status: pending
+    status: validating
     commits:
       - bbfb25f
       - fe1dac9
+      - c374fde
   pr:
     status: pending
   complete:
@@ -144,5 +145,13 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: wire PhaseLock into ResumeRunner::run_phase. Commit fe1dac9. All 13 existing resume tests pass.'
+  - timestamp: '2026-05-06T12:52:32.065Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: integration tests for phase locking. Commit c374fde. All 4 integration tests pass.'
+  - timestamp: '2026-05-06T12:55:22.455Z'
+    action: implementation_complete
+    phase: implement
+    details: All 4 sub-tasks landed. make check green. 3 commits on feat/clo-319-advisory.
 task_title: '[T-050] First-write-wins per-phase advisory lock'
 task_url: https://linear.app/cloud-ai/issue/CLO-319/t-050-first-write-wins-per-phase-advisory-lock

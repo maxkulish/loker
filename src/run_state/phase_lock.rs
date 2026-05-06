@@ -35,15 +35,10 @@ pub enum PhaseLockError {
     },
 
     #[error("stale lock detected for phase '{phase}' but could not reclaim: {reason}")]
-    StaleReclaimFailed {
-        phase: String,
-        reason: String,
-    },
+    StaleReclaimFailed { phase: String, reason: String },
 
     #[error("invalid phase name '{phase}': contains path separator or is empty")]
-    InvalidPhaseName {
-        phase: String,
-    },
+    InvalidPhaseName { phase: String },
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
@@ -59,10 +54,10 @@ pub const DEFAULT_PHASE_LOCK_TTL_SECONDS: u64 = 60;
 
 /// Advisory exclusive lock scoped to one phase within a run.
 ///
-/// Drop releases the OS advisory lock by closing the fd. The lock body stays
-/// on disk until the next acquire overwrites it; callers should always verify
-/// staleness via TTL and (on Unix) PID liveness before treating a body as
-/// "held". Use [`PhaseLock::release`] to release explicitly without relying on
+/// Drop releases the OS advisory lock by closing the fd and truncates the
+/// lock file to 0 bytes so that non-holders can distinguish "not held"
+/// (empty file or missing file) from "held" (valid JSON body).
+/// Use [`PhaseLock::release`] to release explicitly without relying on
 /// drop order.
 #[derive(Debug)]
 pub struct PhaseLock {
@@ -88,7 +83,11 @@ impl PhaseLock {
         let ttl = ttl_seconds.unwrap_or(DEFAULT_PHASE_LOCK_TTL_SECONDS);
 
         // Validate phase name
-        if phase.is_empty() || phase.contains('/') || phase.contains('\0') || phase.trim() == "." || phase.trim() == ".."
+        if phase.is_empty()
+            || phase.contains('/')
+            || phase.contains('\0')
+            || phase.trim() == "."
+            || phase.trim() == ".."
         {
             return Err(PhaseLockError::InvalidPhaseName {
                 phase: phase.to_owned(),
@@ -184,14 +183,11 @@ impl PhaseLock {
         })
     }
 
-    /// Release the lock by removing the lock file and closing the fd.
-    /// The OS advisory lock is released when the fd closes.
+    /// Release the lock by truncating the lock file and closing the fd.
+    /// The body is cleared from the lock file so that `inspect` returns
+    /// `Ok(None)`. The OS advisory lock is released when the fd closes.
     pub fn release(self) {
-        // Remove the lock file so subsequent acquire/inspect see no lock.
-        // On Unix, removing an open file is safe (the fd stays valid and the
-        // advisory lock is released when the fd is ultimately dropped).
-        let _ = std::fs::remove_file(&self.path);
-        // Drop closes the fd, releasing the OS advisory lock.
+        // Drop handles truncation + fd close.
     }
 
     /// Path to the lock file under `run_dir/locks/`.
@@ -214,10 +210,11 @@ impl PhaseLock {
 
 impl Drop for PhaseLock {
     fn drop(&mut self) {
-        // Remove the lock file so the body does not confuse later callers
-        // with a stale-but-self-referential PID.
-        // Close the fd, releasing the OS advisory lock.
-        let _ = std::fs::remove_file(&self.path);
+        // Truncate the lock file to 0 bytes so that `inspect` can distinguish
+        // "not held" (empty) from "held" (valid JSON).
+        let _ = self.file.set_len(0);
+        let _ = self.file.sync_all();
+        // fd close releases the OS advisory lock.
     }
 }
 
@@ -387,7 +384,10 @@ mod tests {
             let contents = std::fs::read_to_string(&lock_path).unwrap();
             serde_json::from_str(&contents).unwrap()
         };
-        assert_eq!(fresh_body.run_id, run_id, "body should be overwritten with new run_id");
+        assert_eq!(
+            fresh_body.run_id, run_id,
+            "body should be overwritten with new run_id"
+        );
         assert_eq!(fresh_body.ttl_seconds, ttl);
 
         drop(lock);
@@ -400,9 +400,7 @@ mod tests {
 
         // No lock yet — inspect returns None
         assert!(
-            PhaseLock::inspect(tmp.path(), "design")
-                .unwrap()
-                .is_none(),
+            PhaseLock::inspect(tmp.path(), "design").unwrap().is_none(),
             "no lock file yet"
         );
 
@@ -417,9 +415,11 @@ mod tests {
         drop(lock);
 
         // After release, the file is removed, so inspect returns None.
-        let body_after = PhaseLock::inspect(tmp.path(), "design")
-            .unwrap();
-        assert!(body_after.is_none(), "lock file should be removed after release");
+        let body_after = PhaseLock::inspect(tmp.path(), "design").unwrap();
+        assert!(
+            body_after.is_none(),
+            "lock file should be removed after release"
+        );
     }
 
     #[test]
@@ -449,15 +449,24 @@ mod tests {
 
         // Empty phase name
         let result = PhaseLock::acquire(tmp.path(), "", run_id, Some(60));
-        assert!(matches!(result, Err(PhaseLockError::InvalidPhaseName { .. })));
+        assert!(matches!(
+            result,
+            Err(PhaseLockError::InvalidPhaseName { .. })
+        ));
 
         // Phase with path separator
         let result = PhaseLock::acquire(tmp.path(), "design/../evil", run_id, Some(60));
-        assert!(matches!(result, Err(PhaseLockError::InvalidPhaseName { .. })));
+        assert!(matches!(
+            result,
+            Err(PhaseLockError::InvalidPhaseName { .. })
+        ));
 
         // Phase that is just ".."
         let result = PhaseLock::acquire(tmp.path(), "..", run_id, Some(60));
-        assert!(matches!(result, Err(PhaseLockError::InvalidPhaseName { .. })));
+        assert!(matches!(
+            result,
+            Err(PhaseLockError::InvalidPhaseName { .. })
+        ));
     }
 
     #[test]
@@ -474,7 +483,7 @@ mod tests {
         // return a structured error — never panic.
         let result = PhaseLock::acquire(tmp.path(), phase, run_id, Some(60));
         match result {
-            Ok(_) => {} // reclaimed, treating corrupt body as stale — fine
+            Ok(_) => {}                        // reclaimed, treating corrupt body as stale — fine
             Err(PhaseLockError::Json(_)) => {} // structured JSON error — fine
             Err(e) => panic!("unexpected error: {:?}", e),
         }
@@ -522,10 +531,22 @@ mod tests {
 
         assert!(body.get("phase").is_some(), "missing 'phase' field");
         assert!(body.get("run_id").is_some(), "missing 'run_id' field");
-        assert!(body.get("writer_pid").is_some(), "missing 'writer_pid' field");
-        assert!(body.get("writer_host").is_some(), "missing 'writer_host' field");
-        assert!(body.get("acquired_at").is_some(), "missing 'acquired_at' field");
-        assert!(body.get("ttl_seconds").is_some(), "missing 'ttl_seconds' field");
+        assert!(
+            body.get("writer_pid").is_some(),
+            "missing 'writer_pid' field"
+        );
+        assert!(
+            body.get("writer_host").is_some(),
+            "missing 'writer_host' field"
+        );
+        assert!(
+            body.get("acquired_at").is_some(),
+            "missing 'acquired_at' field"
+        );
+        assert!(
+            body.get("ttl_seconds").is_some(),
+            "missing 'ttl_seconds' field"
+        );
 
         assert_eq!(body["run_id"], run_id);
         assert_eq!(body["writer_pid"], std::process::id());
