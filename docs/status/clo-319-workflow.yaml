@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:35:32.163Z'
-  updated_at: '2026-05-06T12:26:53.676Z'
+  updated_at: '2026-05-06T12:46:49.204Z'
 phases:
   discovery:
     status: complete
@@ -66,6 +66,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - bbfb25f
   pr:
     status: pending
   complete:
@@ -133,5 +135,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-06T12:46:49.204Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: create PhaseLock primitive with 11 unit tests. Commit bbfb25f'
 task_title: '[T-050] First-write-wins per-phase advisory lock'
 task_url: https://linear.app/cloud-ai/issue/CLO-319/t-050-first-write-wins-per-phase-advisory-lock
