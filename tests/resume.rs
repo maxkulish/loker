@@ -238,3 +238,93 @@ fn resume_stale_writer() {
     assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 2 });
     assert_eq!(plan.actions[2].1, PhaseAction::RunFresh);
 }
+
+// ---------------------------------------------------------------------------
+// CLO-310 integration tests: binary-level guard clause tests
+// ---------------------------------------------------------------------------
+
+/// Path to the compiled `loker` binary.
+fn loker_binary() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("debug")
+        .join("loker")
+}
+
+#[test]
+fn test_resume_run_not_found() {
+    let output = std::process::Command::new(loker_binary())
+        .args(["resume", "nonexistent-run-xyz"])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for nonexistent run"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.to_lowercase().contains("not found"),
+        "expected 'not found' in stderr, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_resume_fully_complete_exit_zero() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Create a minimal run dir with all phases completed
+    setup_run_dir(tmp.path());
+    let sha = "00".repeat(32);
+    write_completed_marker(tmp.path(), "design", 1, &sha);
+    write_completed_marker(tmp.path(), "review", 1, &sha);
+    write_completed_marker(tmp.path(), "verify", 1, &sha);
+
+    // Stale heartbeat (writer is dead)
+    let old_tick = Utc::now() - Duration::seconds(600);
+    write_heartbeat(tmp.path(), old_tick, 300);
+
+    let output = std::process::Command::new(loker_binary())
+        .args(["resume", tmp.path().to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "expected exit 0 for already-complete run, got: {}",
+        output.status
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("All phases already complete"),
+        "expected 'All phases already complete' in stdout, got: {stdout}"
+    );
+}
+
+#[test]
+fn test_resume_no_resumable_state() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Create a run dir with no markers (all phases default to None)
+    setup_run_dir(tmp.path());
+
+    // Stale heartbeat (writer is dead)
+    let old_tick = Utc::now() - Duration::seconds(600);
+    write_heartbeat(tmp.path(), old_tick, 300);
+
+    let output = std::process::Command::new(loker_binary())
+        .args(["resume", tmp.path().to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for no-resumable-state, got: {}",
+        output.status
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("No resumable state found"),
+        "expected 'No resumable state found' in stderr, got: {stderr}"
+    );
+}
