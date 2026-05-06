@@ -66,6 +66,7 @@ libc = "0.2"
 wiremock = "0.6"
 jsonschema = "0.46"
 insta = "1.47.2"
+nix = { version = "0.29", features = ["signal", "process"] }
 
 [package.metadata.docs.rs]
 all-features = true
