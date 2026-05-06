@@ -89,10 +89,17 @@ fn test_explain_workflow_path_snapshot() {
 
 #[test]
 fn test_explain_missing_reference_errors() {
-    let (success, output) = run_loker_explain(&["tests/fixtures/workflows/explain-missing-ref.toml"]);
+    let (success, output) =
+        run_loker_explain(&["tests/fixtures/workflows/explain-missing-ref.toml"]);
 
-    assert!(!success, "invalid workflow unexpectedly succeeded:\n{output}");
-    assert!(output.contains("Invalid workflow:"), "missing invalid-workflow header:\n{output}");
+    assert!(
+        !success,
+        "invalid workflow unexpectedly succeeded:\n{output}"
+    );
+    assert!(
+        output.contains("Invalid workflow:"),
+        "missing invalid-workflow header:\n{output}"
+    );
     assert!(
         output.contains("references unknown phase 'missing'"),
         "missing unknown phase error:\n{output}"
@@ -101,9 +108,13 @@ fn test_explain_missing_reference_errors() {
 
 #[test]
 fn test_explain_forward_reference_errors() {
-    let (success, output) = run_loker_explain(&["tests/fixtures/workflows/explain-forward-ref.toml"]);
+    let (success, output) =
+        run_loker_explain(&["tests/fixtures/workflows/explain-forward-ref.toml"]);
 
-    assert!(!success, "invalid workflow unexpectedly succeeded:\n{output}");
+    assert!(
+        !success,
+        "invalid workflow unexpectedly succeeded:\n{output}"
+    );
     assert!(
         output.contains("references phase 'design' which is declared later"),
         "missing forward reference error:\n{output}"
@@ -112,10 +123,23 @@ fn test_explain_forward_reference_errors() {
 
 #[test]
 fn test_explain_falls_back_to_codebase_mode_for_directory() {
-    let (success, output) = run_loker_explain(&[".", "--focus", "workflow", "--backend", "does-not-exist"]);
+    let (success, output) =
+        run_loker_explain(&[".", "--focus", "workflow", "--backend", "does-not-exist"]);
 
-    assert!(!success, "unknown backend should fail after codebase fallback");
-    assert!(output.contains("Lok Explain"), "did not enter codebase explain mode:\n{output}");
-    assert!(!output.contains("Workflow:"), "directory was treated as a workflow:\n{output}");
-    assert!(!output.contains("Invalid workflow:"), "directory was parsed as a workflow:\n{output}");
+    assert!(
+        !success,
+        "unknown backend should fail after codebase fallback"
+    );
+    assert!(
+        output.contains("Lok Explain"),
+        "did not enter codebase explain mode:\n{output}"
+    );
+    assert!(
+        !output.contains("Workflow:"),
+        "directory was treated as a workflow:\n{output}"
+    );
+    assert!(
+        !output.contains("Invalid workflow:"),
+        "directory was parsed as a workflow:\n{output}"
+    );
 }

@@ -2005,15 +2005,10 @@ async fn run_explain_unified(
         }
     }
 
-    let codebase_dir = target.map(PathBuf::from).unwrap_or_else(|| dir.to_path_buf());
-    run_explain(
-        &codebase_dir,
-        backend_filter,
-        focus,
-        config,
-        verbose,
-    )
-    .await
+    let codebase_dir = target
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dir.to_path_buf());
+    run_explain(&codebase_dir, backend_filter, focus, config, verbose).await
 }
 
 async fn run_explain(

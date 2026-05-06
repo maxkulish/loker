@@ -48,9 +48,11 @@ pub async fn explain_workflow_source(source: WorkflowSource) -> Result<WorkflowE
         );
     }
 
-    let workflow: grammar::Workflow = text
-        .parse()
-        .map_err(|errors: Vec<grammar::WorkflowError>| invalid_workflow_error(&display_name, errors))?;
+    let workflow: grammar::Workflow =
+        text.parse()
+            .map_err(|errors: Vec<grammar::WorkflowError>| {
+                invalid_workflow_error(&display_name, errors)
+            })?;
 
     explain_workflow(&workflow, display_name)
 }
@@ -63,7 +65,9 @@ async fn read_source_text(source: &WorkflowSource) -> Result<(String, String)> {
                 .with_context(|| format!("failed to read workflow {}", path.display()))?;
             Ok((path.display().to_string(), text))
         }
-        WorkflowSource::Embedded { name, content } => Ok((format!("embedded:{}", name), content.to_string())),
+        WorkflowSource::Embedded { name, content } => {
+            Ok((format!("embedded:{}", name), content.to_string()))
+        }
     }
 }
 
@@ -175,7 +179,10 @@ pub fn render_text(explanation: &WorkflowExplanation) -> String {
             output.push('\n');
         }
         output.push_str(&format!("  {}\n", phase.name));
-        output.push_str(&format!("    strategy: {}\n", render_strategy(&phase.strategy)));
+        output.push_str(&format!(
+            "    strategy: {}\n",
+            render_strategy(&phase.strategy)
+        ));
         output.push_str(&format!("    backends: {}\n", render_list(&phase.backends)));
         output.push_str(&format!("    inputs: {}\n", render_list(&phase.inputs)));
         if !phase.dependencies.is_empty() {
@@ -302,8 +309,11 @@ output = "design.md"
 
     #[test]
     fn render_text_is_stable_for_design_doc_tdd_shape() {
-        let workflow = parse_workflow(include_str!("../../tests/fixtures/workflows/design-doc-tdd.toml"));
-        let explanation = explain_workflow(&workflow, "tests/fixtures/workflows/design-doc-tdd.toml").unwrap();
+        let workflow = parse_workflow(include_str!(
+            "../../tests/fixtures/workflows/design-doc-tdd.toml"
+        ));
+        let explanation =
+            explain_workflow(&workflow, "tests/fixtures/workflows/design-doc-tdd.toml").unwrap();
         let rendered = render_text(&explanation);
 
         assert!(rendered.contains("Workflow: design-doc-tdd"));
