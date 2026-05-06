@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:32:06.048Z'
+  updated_at: '2026-05-06T12:35:14.827Z'
 phases:
   discovery:
     status: complete
@@ -69,6 +69,7 @@ phases:
       - c5bdc8c
       - 556444d
       - ee1a17c
+      - 4b0532f
   pr:
     status: pending
   complete:
@@ -168,3 +169,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: HITL metadata on verify trace spans. Commit ee1a17c'
+  - timestamp: '2026-05-06T12:35:14.827Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: HITL context in completed/failed markers. Commit 4b0532f'

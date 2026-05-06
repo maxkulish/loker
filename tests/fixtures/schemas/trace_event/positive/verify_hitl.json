@@ -1,0 +1,11 @@
+{
+  "loker.run_id": "00000000-0000-0000-0000-000000000001",
+  "loker.event": "verify_result",
+  "loker.phase": "review",
+  "timestamp": "2026-05-06T12:00:00Z",
+  "verify.status": "fail",
+  "loker.hitl.severity": "medium",
+  "loker.hitl.timeout_at": "2026-05-07T12:00:00Z",
+  "loker.hitl.timeout_action": "auto_fail",
+  "loker.hitl.timeout_outcome": "not_timed_out"
+}

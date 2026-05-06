@@ -16,5 +16,5 @@
     "next_phase": "implement",
     "prompt_summary": "low-severity sanity check that should set a deadline."
   },
-  "decision_options": ["approve", "comment_only"]
+  "decision_options": []
 }

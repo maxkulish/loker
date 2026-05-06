@@ -8,7 +8,7 @@ use crate::backend::Backend;
 use crate::manifest::{Kind, ManifestEntry, ManifestError, Producer};
 use crate::run_state::markers::{HitlMarkerContext, MarkerError};
 use crate::strategy::verify::{
-    HumanVerifier, HumanVerifyReport, HumanVerifierConfig, VerifyError, VerifyHook, VerifyResult,
+    HumanVerifier, HumanVerifierConfig, HumanVerifyReport, VerifyError, VerifyHook, VerifyResult,
 };
 use crate::strategy::{
     PhaseContext, Prompt, StrategyError, StrategyKind, StrategyOutput, TargetSpec, Tier,
@@ -42,6 +42,7 @@ pub enum AggregatorName {
 }
 
 /// Verify hook dispatch label. `None` is the explicit no-op.
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifyHookName {

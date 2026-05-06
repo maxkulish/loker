@@ -204,12 +204,17 @@ impl HumanVerifier {
     ) -> Result<(VerifyResult, HumanVerifyReport), VerifyError> {
         let preview_lines = u32::try_from(ctx.stdout.lines().count()).unwrap_or(u32::MAX);
         let summary = ctx.stdout.chars().take(160).collect::<String>();
-        let default_report = || HumanVerifyReport::from_policy(
-            self.config.severity,
-            None,
-            self.config.timeout_policy.rule_for(self.config.severity).on_timeout,
-            HumanTimeoutOutcome::NotTimedOut,
-        );
+        let default_report = || {
+            HumanVerifyReport::from_policy(
+                self.config.severity,
+                None,
+                self.config
+                    .timeout_policy
+                    .rule_for(self.config.severity)
+                    .on_timeout,
+                HumanTimeoutOutcome::NotTimedOut,
+            )
+        };
 
         let decision_or_pending = match self.parse_response() {
             Ok(Some(response)) => Some(response),
@@ -256,9 +261,9 @@ impl HumanVerifier {
                         self.config.phase,
                         response.global_comment.unwrap_or_default()
                     )),
-                    HumanDecision::CommentOnly => VerifyResult::fail(
-                        "human comment_only is not treated as approval",
-                    ),
+                    HumanDecision::CommentOnly => {
+                        VerifyResult::fail("human comment_only is not treated as approval")
+                    }
                 };
                 Ok((result, default_report()))
             }
@@ -741,12 +746,7 @@ mod tests {
     async fn missing_low_response_after_timeout_auto_approves() {
         let tmp = tempfile::tempdir().unwrap();
         let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
-        let hook = hook_at(
-            &tmp,
-            HumanSeverity::Low,
-            t0,
-            HumanTimeoutPolicy::default(),
-        );
+        let hook = hook_at(&tmp, HumanSeverity::Low, t0, HumanTimeoutPolicy::default());
         let first = hook
             .verify_with_report(&context_with_output("candidate output"))
             .await
@@ -804,12 +804,7 @@ mod tests {
     async fn high_response_missing_blocks_indefinitely() {
         let tmp = tempfile::tempdir().unwrap();
         let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
-        let hook = hook_at(
-            &tmp,
-            HumanSeverity::High,
-            t0,
-            HumanTimeoutPolicy::default(),
-        );
+        let hook = hook_at(&tmp, HumanSeverity::High, t0, HumanTimeoutPolicy::default());
         let (result, report) = hook
             .verify_with_report(&context_with_output("candidate output"))
             .await
@@ -835,12 +830,7 @@ mod tests {
     async fn existing_pending_deadline_is_stable() {
         let tmp = tempfile::tempdir().unwrap();
         let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
-        let hook = hook_at(
-            &tmp,
-            HumanSeverity::Low,
-            t0,
-            HumanTimeoutPolicy::default(),
-        );
+        let hook = hook_at(&tmp, HumanSeverity::Low, t0, HumanTimeoutPolicy::default());
         hook.verify_with_report(&context_with_output("candidate output"))
             .await
             .unwrap();
