@@ -50,6 +50,7 @@ fn write_completed_marker(tmp: &Path, phase: &str, attempt: u32, sha: &str) {
         completed_at: Utc::now(),
         manifest_entry_sha256: sha.to_string(),
         artefact_paths: vec![format!("{phase}/out.md")],
+        hitl: None,
     };
     fs::write(
         tmp.join("markers").join(format!("{phase}.completed")),

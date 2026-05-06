@@ -179,6 +179,26 @@ impl TraceSink for InMemorySink {
         if let Some(ref msg) = result.message {
             map.insert("error.message".to_string(), Value::String(msg.clone()));
         }
+        if let Some(ref hitl) = result.hitl {
+            map.insert(
+                "loker.hitl.severity".to_string(),
+                Value::String(hitl.severity.clone()),
+            );
+            if let Some(ref timeout_at) = hitl.timeout_at {
+                map.insert(
+                    "loker.hitl.timeout_at".to_string(),
+                    Value::String(timeout_at.clone()),
+                );
+            }
+            map.insert(
+                "loker.hitl.timeout_action".to_string(),
+                Value::String(hitl.timeout_action.clone()),
+            );
+            map.insert(
+                "loker.hitl.timeout_outcome".to_string(),
+                Value::String(hitl.timeout_outcome.clone()),
+            );
+        }
         self.push(Value::Object(map));
     }
 
@@ -311,6 +331,7 @@ mod tests {
                 passed: true,
                 message: None,
                 duration_ms: 0,
+                hitl: None,
             },
         );
         sink.phase_finished(&ctx, "success", 42);

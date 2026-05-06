@@ -1,0 +1,250 @@
+task_id: CLO-318
+task_title: '[T-049] Severity ladder (low/medium/high) for HITL gates'
+task_url: https://linear.app/cloud-ai/issue/CLO-318/t-049-severity-ladder-lowmediumhigh-for-hitl-gates
+task_type: development
+classification_reason: >-
+  no specification/operational markers; feature adds HumanVerifier severity handling, runtime behavior, trace/status
+  surfacing, docs, and tests.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-318-t-049-severity-ladder-lowmediumhigh-for-hitl-gates
+  priority: Medium
+  branch_actual: feat/clo-318-severity
+workflow:
+  current_phase: complete
+  status: active
+  created_at: '2026-05-06T10:37:20.857Z'
+  updated_at: '2026-05-06T13:26:16.341Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: 'Approach A: Extend HumanVerifierConfig with policy + clock seam'
+    approaches_identified: 3
+    approved: true
+    baseline_score: 7
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-318.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-318-severity-ladder.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-318-severity-ladder.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - F1 - replace internal timeout outcome mutex/state with verify_with_report returning HumanVerifyReport
+    flagged_suggestions:
+      - id: F2
+        reason: >-
+          MarkerWriter builder pattern is stylistic; additive write_completed_with_hitl/write_failed_with_hitl helpers
+          preserve existing API and minimize churn.
+    review_completed: true
+    review_gemini: docs/reviews/clo-318-design-gemini.md
+    review_synthesis: docs/reviews/clo-318-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-318-severity-ladder.md
+    approved: true
+  implement:
+    status: complete
+    commits:
+      - c5bdc8c
+      - 556444d
+      - ee1a17c
+      - 4b0532f
+      - 0d18fd3
+      - e6dbc90
+      - 7b5d29f
+    codex_validated: true
+    codex_verdict: rework
+    codex_report: docs/reviews/clo-318-codex-validation.md
+    gemini_validation_report: docs/reviews/clo-318-gemini-validation.md
+    validation_synthesis_report: docs/reviews/clo-318-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+    validation_fix_iteration_count: 1
+  pr:
+    status: complete
+    pr_url: https://github.com/maxkulish/loker/pull/53
+    pr_number: 53
+    ci_passed: true
+    reviews_addressed: true
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-06T10:37:20.857Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-318 as development
+  - timestamp: '2026-05-06T10:37:56.516Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: no specification/operational markers; feature adds HumanVerifier severity handling,
+      runtime behavior, trace/status surfacing, docs, and tests.
+  - timestamp: '2026-05-06T10:38:00.395Z'
+    action: linear_status_updated
+    phase: init
+    details: Linear issue CLO-318 was in Backlog; updated status to Todo.
+  - timestamp: '2026-05-06T10:38:02.846Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-06T10:38:21.214Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-06T10:38:34.064Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-318-severity already checked out for discovery from main.
+  - timestamp: '2026-05-06T10:39:33.999Z'
+    action: prd_created
+    phase: discovery
+    details: Created PRD at docs/prds/clo-318-severity-ladder.md from Linear issue goal, scope, and acceptance criteria.
+  - timestamp: '2026-05-06T10:40:05.058Z'
+    action: discovery_report_written
+    phase: discovery
+    details: >-
+      Wrote discovery report at docs/discovery/clo-318.md with problem framing, existing-code findings, baseline score
+      7, and 3 approaches.
+  - timestamp: '2026-05-06T10:40:14.701Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Approach A: Extend HumanVerifierConfig with policy + clock seam. Baseline 7/10. 3 approaches considered.'
+  - timestamp: '2026-05-06T10:40:26.106Z'
+    action: linear_discovery_updated
+    phase: discovery
+    details: Moved Linear issue to In Progress and posted discovery completion comment.
+  - timestamp: '2026-05-06T10:40:28.237Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-06T12:01:47.852Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Draft generated manually at docs/designs/clo-318-severity-ladder.md after lok design-draft timed out; discovery
+      context used.
+  - timestamp: '2026-05-06T12:04:00.199Z'
+    action: design_review_complete
+    phase: design
+    details: 'Review verdict: approve_with_changes. 1 applied, 1 flagged.'
+  - timestamp: '2026-05-06T12:04:49.503Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-06T12:04:58.298Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase.
+  - timestamp: '2026-05-06T12:05:04.250Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-06T12:23:30.801Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-318-severity-ladder.md
+  - timestamp: '2026-05-06T12:24:14.729Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 6 sub-tasks queued.
+  - timestamp: '2026-05-06T12:24:17.571Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-06T12:29:12.239Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: timeout policy types and fake-clock seam. Commit c5bdc8c'
+  - timestamp: '2026-05-06T12:30:15.381Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: HumanVerifier timeout decisions and deterministic tests. Commit 556444d'
+  - timestamp: '2026-05-06T12:32:06.048Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: HITL metadata on verify trace spans. Commit ee1a17c'
+  - timestamp: '2026-05-06T12:35:14.827Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: HITL context in completed/failed markers. Commit 4b0532f'
+  - timestamp: '2026-05-06T12:43:25.288Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST5 landed: pending/trace schemas and workflow-spec docs. Commit 0d18fd3'
+  - timestamp: '2026-05-06T12:45:17.719Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST6 landed: focused tests and make check green. Commit e6dbc90'
+  - timestamp: '2026-05-06T12:45:47.178Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 6 commits.
+  - timestamp: '2026-05-06T12:53:29.817Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (tool wrapper failure). Gemini: rework (tool wrapper failure). Synthesis: approve_with_changes. 1
+      fix applied.
+  - timestamp: '2026-05-06T12:55:28.043Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T12:57:13.027Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-06T12:58:20.504Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #53 opened: https://github.com/maxkulish/loker/pull/53'
+  - timestamp: '2026-05-06T13:02:44.222Z'
+    action: ci_passed
+    phase: pr
+    details: All required checks passing
+  - timestamp: '2026-05-06T13:08:31.903Z'
+    action: ci_iteration
+    phase: pr
+    details: >-
+      Addressed Gemini review comment: preserve timeout_at context on malformed response path; make check green locally;
+      pushed c724a80.
+  - timestamp: '2026-05-06T13:16:15.484Z'
+    action: ci_iteration
+    phase: pr
+    details: >-
+      Addressed Copilot review feedback: pending schema version validation, invalid timeout_at fail-fast,
+      explicit-response timeout metadata, and single HumanVerifier construction path; make check green locally; pushed
+      01f5203.
+  - timestamp: '2026-05-06T13:21:32.881Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      7 threads resolved; replies posted 7/7; /gemini review trailer verified on every reply (Gemini, Copilot, human
+      alike).
+  - timestamp: '2026-05-06T13:25:56.016Z'
+    action: pr_ready_to_merge
+    phase: pr
+    details: 'PR #53 has green CI, no unresolved review threads, and all review replies included /gemini review trailers.'
+  - timestamp: '2026-05-06T13:26:16.341Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete

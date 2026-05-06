@@ -54,11 +54,29 @@
     },
     "verify.hook": { "type": ["string", "null"] },
     "verify.status": { "type": "string", "enum": ["pass", "fail", "skipped"] },
+    "loker.hitl.severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "HumanVerifier gate severity when the trace event is associated with HITL verification."
+    },
+    "loker.hitl.timeout_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Effective HITL deadline for the gate when one exists."
+    },
+    "loker.hitl.timeout_action": {
+      "type": "string",
+      "enum": ["auto_approve", "auto_fail", "block"]
+    },
+    "loker.hitl.timeout_outcome": {
+      "type": "string",
+      "enum": ["not_timed_out", "auto_approved", "auto_failed", "blocking"]
+    },
     "error.kind": { "type": "string" },
     "error.message": { "type": "string" }
   },
   "patternProperties": {
-    "^loker\\.[a-z][a-z0-9_]*$": {}
+    "^loker\\.[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$": {}
   },
   "additionalProperties": false,
   "oneOf": [

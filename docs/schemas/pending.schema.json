@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://loker.dev/schemas/pending.schema.json",
   "title": "Loker HITL Pending Request",
-  "description": "Engine-written request for human input at runs/<id>/pending/<phase>.json (HITL design §3.3). Severity drives the timeout ladder (low/medium/high), with high never auto-failing - timeout_at is null in that case. The artefact + context blocks give the UI everything it needs to render the decision page; decision_options narrows the legal verdicts the responder may pick.",
+  "description": "Engine-written request for human input at runs/<id>/pending/<phase>.json (HITL design §3.3). Severity drives the default timeout ladder (low/medium/high), but workflow policy may configure any severity to have a concrete deadline or to block indefinitely. The artefact + context blocks give the UI everything it needs to render the decision page; decision_options narrows the legal verdicts the responder may pick.",
   "type": "object",
   "required": [
     "schema_version",
@@ -33,7 +33,7 @@
     "timeout_at": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Null when severity=high (no auto-fail). Otherwise an absolute deadline. The relationship is enforced by an if/then/else clause at the schema root."
+      "description": "Absolute deadline for this gate, or null when the effective workflow policy blocks indefinitely. Default policy writes low=1h, medium=24h, high=null; configured policies may write any severity as date-time or null."
     },
     "artefact": {
       "type": "object",
@@ -68,15 +68,5 @@
       }
     }
   },
-  "additionalProperties": false,
-  "if": {
-    "properties": { "severity": { "const": "high" } },
-    "required": ["severity"]
-  },
-  "then": {
-    "properties": { "timeout_at": { "type": "null" } }
-  },
-  "else": {
-    "properties": { "timeout_at": { "type": "string", "format": "date-time" } }
-  }
+  "additionalProperties": false
 }

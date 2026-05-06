@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::manifest::{Manifest, ManifestEntry};
 use crate::run_state::atomic_write;
-use crate::run_state::markers::{MarkerError, MarkerWriter};
+use crate::run_state::markers::{HitlMarkerContext, MarkerError, MarkerWriter};
 
 use super::{PhaseConfig, PhaseError};
 
@@ -67,6 +67,17 @@ pub fn record_terminal_failure(
     attempts_made: u32,
     error_class: &str,
 ) -> Result<(), PhaseError> {
+    record_terminal_failure_with_hitl(markers, run_dir, cfg, attempts_made, error_class, None)
+}
+
+pub fn record_terminal_failure_with_hitl(
+    markers: &MarkerWriter,
+    run_dir: &Path,
+    cfg: &PhaseConfig,
+    attempts_made: u32,
+    error_class: &str,
+    hitl: Option<HitlMarkerContext>,
+) -> Result<(), PhaseError> {
     let last_attempt = attempts_made.saturating_sub(1);
     let archive = archive_failed_attempt(run_dir, &cfg.phase, last_attempt)?;
     let summary = serde_json::json!({
@@ -78,11 +89,12 @@ pub fn record_terminal_failure(
         &archive.join("failure-summary.json"),
         serde_json::to_string_pretty(&summary)?.as_bytes(),
     )?;
-    markers.write_failed(
+    markers.write_failed_with_hitl(
         &cfg.phase,
         attempts_made,
         error_class,
         &archive.to_string_lossy(),
+        hitl,
     )?;
     Ok(())
 }
