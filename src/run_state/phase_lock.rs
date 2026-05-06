@@ -82,18 +82,8 @@ impl PhaseLock {
     ) -> Result<Self, PhaseLockError> {
         let ttl = ttl_seconds.unwrap_or(DEFAULT_PHASE_LOCK_TTL_SECONDS);
 
-        // Validate phase name
-        if phase.is_empty()
-            || phase.contains('/')
-            || phase.contains('\\')
-            || phase.contains('\0')
-            || phase.trim() == "."
-            || phase.trim() == ".."
-        {
-            return Err(PhaseLockError::InvalidPhaseName {
-                phase: phase.to_owned(),
-            });
-        }
+        // Validate phase name (shared helper also used by `inspect`)
+        validate_phase_name(phase)?;
 
         // Symlink hardening: ensure run_dir is a real directory (not a symlink)
         if !std::fs::symlink_metadata(run_dir)
@@ -209,7 +199,9 @@ impl PhaseLock {
     ///
     /// Returns `Ok(None)` when no lock file exists or the file is empty.
     /// Returns `Err` if the file contains unparseable JSON (never panics).
+    /// Validates the phase name to prevent path traversal.
     pub fn inspect(run_dir: &Path, phase: &str) -> Result<Option<PhaseLockBody>, PhaseLockError> {
+        validate_phase_name(phase)?;
         let lock_path = run_dir.join("locks").join(format!("{}.lock", phase));
         if !lock_path.exists() {
             return Ok(None);
@@ -231,6 +223,23 @@ impl Drop for PhaseLock {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/// Validate a phase name for use as a lock file path segment.
+/// Rejects empty names, path separators, null bytes, and directory traps.
+fn validate_phase_name(phase: &str) -> Result<(), PhaseLockError> {
+    if phase.is_empty()
+        || phase.contains('/')
+        || phase.contains('\\')
+        || phase.contains('\0')
+        || phase.trim() == "."
+        || phase.trim() == ".."
+    {
+        return Err(PhaseLockError::InvalidPhaseName {
+            phase: phase.to_owned(),
+        });
+    }
+    Ok(())
+}
 
 /// Read and deserialize a lock body from the given path.
 /// Returns `Ok(None)` if the file exists but is empty.
@@ -257,8 +266,10 @@ fn read_lock_body(path: &Path) -> Result<Option<PhaseLockBody>, PhaseLockError> 
 /// not expired.  If either check says "dead", the lock is stale.
 fn is_lock_body_live(body: &PhaseLockBody) -> bool {
     let now = Utc::now();
-    let age = (now - body.acquired_at).num_seconds() as u64;
-    if age >= body.ttl_seconds {
+    let age_secs = (now - body.acquired_at).num_seconds();
+    // Use signed comparison: if acquired_at is in the future (clock skew or
+    // corrupt body) age_secs is negative, which should not count as expired.
+    if age_secs >= body.ttl_seconds as i64 {
         // TTL has expired — definitely stale regardless of PID.
         return false;
     }
