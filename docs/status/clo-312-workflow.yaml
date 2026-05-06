@@ -20,10 +20,10 @@ linear:
   priority: Medium
   branch_actual: feat/clo-312-trace
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-06T10:04:32.470Z'
-  updated_at: '2026-05-06T12:47:52.981Z'
+  updated_at: '2026-05-06T13:20:01.917Z'
 phases:
   discovery:
     status: complete
@@ -64,12 +64,23 @@ phases:
     plan_file: docs/plans/clo-312-trace-pretty-printer.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - 3be3c91
       - 194601b
+      - c3f4564
+    codex_report: docs/reviews/CLO-312-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/CLO-312-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/CLO-312-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 54
+    pr_url: https://github.com/maxkulish/loker/pull/54
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -146,5 +157,28 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 2 commits.
+  - timestamp: '2026-05-06T13:13:49.011Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (shell quoting artifact). Gemini: REVIEW_FAILED (shell quoting artifact). Claude fallback:
+      rework with F1-F7. Synthesis: approve_with_changes. 1 fix iteration applied covering all 6 Must Fix Before PR
+      items (F1-F6).
+  - timestamp: '2026-05-06T13:14:41.975Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T13:16:05.134Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-06T13:17:48.719Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #54 opened: https://github.com/maxkulish/loker/pull/54'
+  - timestamp: '2026-05-06T13:20:01.917Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format, clippy, test'
 task_title: '[T-043] `loker trace <run_id>` pretty-printer'
 task_url: https://linear.app/cloud-ai/issue/CLO-312/t-043-loker-trace-run-id-pretty-printer

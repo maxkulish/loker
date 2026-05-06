@@ -1148,7 +1148,7 @@ async fn main() -> Result<()> {
         } => {
             let run_dir = resolve_run_dir(&run_id)?;
             let trace_path = run_dir.join("trace.jsonl");
-            let color = color.unwrap_or(loker::commands::trace::ColorChoice::Auto);
+            let color = color.unwrap_or_default();
             loker::commands::trace::run(&trace_path, json, color)?;
         }
     }

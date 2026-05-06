@@ -14,7 +14,7 @@ fn snapshot_default_render_against_fixture() {
     // Ensure output fits within 80 cols
     for line in out.lines() {
         assert!(
-            line.chars().count() <= 80,
+            line.len() <= 80,
             "line exceeds 80 columns: '{}'",
             line
         );
