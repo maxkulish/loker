@@ -994,6 +994,29 @@ async fn main() -> Result<()> {
                 );
             }
 
+            // All phases done - no-op, exit 0.
+            // NOTE: RunState::load() (called above) already verifies manifest entry SHA256
+            // integrity for every completed marker. If an artefact is corrupt, the error
+            // surfaces before this guard runs. Do NOT move this check before the load.
+            if !run_state.phase_status.is_empty()
+                && run_state
+                    .phase_status
+                    .values()
+                    .all(|s| *s == crate::run_state::PhaseStatus::Completed)
+            {
+                println!("All phases already complete. Nothing to resume.");
+                return Ok(());
+            }
+
+            // No phase has any state - nothing to resume.
+            if run_state
+                .phase_status
+                .values()
+                .all(|s| *s == crate::run_state::PhaseStatus::None)
+            {
+                anyhow::bail!("No resumable state found in {}.", run_dir.display());
+            }
+
             // Read workflow name from manifest.json
             let manifest = loker::manifest::Manifest::load(&run_dir.join("manifest.json"))?;
             let workflow_name = match manifest.workflow_name {
