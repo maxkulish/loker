@@ -25,7 +25,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-06T19:47:47.918Z'
-  updated_at: '2026-05-06T20:29:57.487Z'
+  updated_at: '2026-05-06T20:30:18.712Z'
 phases:
   discovery:
     status: complete
@@ -81,6 +81,8 @@ phases:
     validation_fix_iteration_count: 1
   pr:
     status: in_progress
+    pr_url: https://github.com/maxkulish/loker/pull/57
+    pr_number: 57
   complete:
     status: pending
 history:
@@ -218,3 +220,7 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-06T20:30:18.712Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #57 opened: https://github.com/maxkulish/loker/pull/57'
