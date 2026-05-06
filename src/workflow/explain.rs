@@ -41,17 +41,17 @@ pub enum VerifyExplanation {
 pub async fn explain_workflow_source(source: WorkflowSource) -> Result<WorkflowExplanation> {
     let (display_name, text) = read_source_text(&source).await?;
 
-    if !text.contains("[[phases]]") {
-        anyhow::bail!(
-            "workflow explanation supports phase-based workflows only: {}",
-            display_name
-        );
-    }
-
     let workflow: grammar::Workflow =
         text.parse()
             .map_err(|errors: Vec<grammar::WorkflowError>| {
-                invalid_workflow_error(&display_name, errors)
+                if text.contains("[[steps]]") || !text.contains("[[phases]]") {
+                    anyhow!(
+                        "workflow explanation supports phase-based workflows only: {}",
+                        display_name
+                    )
+                } else {
+                    invalid_workflow_error(&display_name, errors)
+                }
             })?;
 
     explain_workflow(&workflow, display_name)
@@ -63,12 +63,18 @@ async fn read_source_text(source: &WorkflowSource) -> Result<(String, String)> {
             let text = tokio::fs::read_to_string(path)
                 .await
                 .with_context(|| format!("failed to read workflow {}", path.display()))?;
-            Ok((path.display().to_string(), text))
+            Ok((stable_path_display(path), text))
         }
         WorkflowSource::Embedded { name, content } => {
             Ok((format!("embedded:{}", name), content.to_string()))
         }
     }
+}
+
+fn stable_path_display(path: &std::path::Path) -> String {
+    path.display()
+        .to_string()
+        .replace(std::path::MAIN_SEPARATOR, "/")
 }
 
 fn invalid_workflow_error(source: &str, errors: Vec<grammar::WorkflowError>) -> anyhow::Error {

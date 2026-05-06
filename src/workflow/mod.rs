@@ -3450,7 +3450,7 @@ pub(crate) fn extract_json_from_text(text: &str) -> Option<String> {
 }
 
 /// Result of finding a workflow - either a file path or embedded content
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum WorkflowSource {
     /// Workflow loaded from a file
     File(PathBuf),
