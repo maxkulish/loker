@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-05T15:15:35.835Z'
-  updated_at: '2026-05-06T07:23:16.944Z'
+  updated_at: '2026-05-06T07:28:58.662Z'
 phases:
   discovery:
     status: complete
@@ -65,7 +65,10 @@ phases:
     validation_synthesis_report: docs/reviews/clo-308-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 51
+    pr_url: https://github.com/maxkulish/loker/pull/51
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -182,5 +185,19 @@ history:
     action: fix_iteration_committed
     phase: implement
     details: Added fix commit 5966ab3 to implement phase commits list.
+  - timestamp: '2026-05-06T07:25:11.561Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: >-
+      cargo fmt --check clean, cargo clippy --all-targets --all-features -- -D warnings clean, cargo clippy --tests
+      clean, cargo test all pass (0 failures).
+  - timestamp: '2026-05-06T07:26:05.237Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #51 opened: https://github.com/maxkulish/loker/pull/51'
+  - timestamp: '2026-05-06T07:28:58.662Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: clippy 32s, format 14s, test 2m33s.'
 task_title: '[T-039] Extend `loker doctor` with TensorZero reachability check'
 task_url: https://linear.app/cloud-ai/issue/CLO-308/t-039-extend-loker-doctor-with-tensorzero-reachability-check

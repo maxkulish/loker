@@ -190,9 +190,6 @@ fn classify_transport_error(e: &reqwest::Error) -> &'static str {
         if chain.contains("dns") || chain.contains("resolve") || chain.contains("lookup") {
             return "DNS";
         }
-        if chain.contains("refused") {
-            return "connection refused";
-        }
         return "connection refused";
     }
     "network"
@@ -238,14 +235,14 @@ pub fn print_rows(rows: &[CheckRow]) {
                     "  {} {} - set ({})",
                     "✓".green(),
                     row.name,
-                    row.detail.as_ref().unwrap()
+                    row.detail.as_deref().unwrap_or_default()
                 );
             } else {
                 println!(
                     "  {} {} - not set ({})",
                     "○".yellow(),
                     row.name,
-                    row.detail.as_ref().unwrap()
+                    row.detail.as_deref().unwrap_or_default()
                 );
             }
         }
