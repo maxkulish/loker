@@ -22,10 +22,10 @@ linear:
   blocks: []
   blocked_by: []
 workflow:
-  current_phase: pr
+  current_phase: complete
   status: active
   created_at: '2026-05-05T15:20:52.408Z'
-  updated_at: '2026-05-06T07:42:16.485Z'
+  updated_at: '2026-05-06T07:45:40.706Z'
 phases:
   discovery:
     status: complete
@@ -253,3 +253,11 @@ history:
     details: >-
       Post-final-push review check clean: 0 unresolved review threads, no new inline comments after 08cd179, checks
       green.
+  - timestamp: '2026-05-06T07:45:20.296Z'
+    action: ci_passed
+    phase: pr
+    details: All required checks passing after PR-ready state commit ac36188 (format, clippy, test green).
+  - timestamp: '2026-05-06T07:45:40.706Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
