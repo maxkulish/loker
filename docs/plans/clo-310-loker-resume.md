@@ -63,33 +63,34 @@
 
 **Estimate:** M
 
-### ST5 Round-trip pause/resume integration test (opt-in)
+### ST5 Binary-level all-complete guard test (opt-in)
 
-**Files:** `Cargo.toml`, `tests/resume.rs`
-**Acceptance:** `LOKER_RESUME_INTEGRATION=1 cargo test --test resume test_resume_round_trip_kill_mid_phase` passes (~30 s). `make check` green (test is skipped by default).
+**Files:** `tests/resume.rs`
+**Acceptance:** `LOKER_RESUME_INTEGRATION=1 cargo test --test resume test_resume_via_binary_all_complete_guard` passes.
 
 **Changes:**
-1. `Cargo.toml`: add `nix = "0.29"` to `[dev-dependencies]` for `SIGTERM` delivery.
-2. Add `test_resume_round_trip_kill_mid_phase()` to `tests/resume.rs`:
-   - Write a two-phase workflow TOML to a tempdir (phase 1: writes sentinel file + sleeps 30 s; phase 2: writes sentinel file).
-   - Spawn `cargo run -- run <workflow>` as a child.
-   - Poll for sentinel file (run is mid-phase-1 sleep).
-   - Send `SIGTERM` via `nix::sys::signal::kill`.
-   - Assert markers/phase-1/started exists, markers/phase-2/ does not.
-   - Invoke `cargo run -- resume <run_dir>`.
-   - Assert exit 0, stdout contains "Resume complete."
-   - Assert both completed markers exist; phase-1 sentinel mtime unchanged.
-3. Gate behind `LOKER_RESUME_INTEGRATION=1` matching the existing `LOKER_TZ_INTEGRATION=1` convention in `tests/tensorzero_integration.rs`.
+1. Add `test_resume_via_binary_all_complete_guard()` to `tests/resume.rs`.
+   - Create a tempdir with run directory: all-completed phase markers, manifest with workflow_name, stale heartbeat.
+   - Write a workflow TOML file that the resume handler can look up by name.
+   - Spawn `loker resume <run_dir>` via `std::process::Command`.
+   - Assert exit 0 and stdout contains "All phases already complete."
+   - Assert sentinel file mtime unchanged (phase not re-executed).
+2. Gate behind `LOKER_RESUME_INTEGRATION=1` matching `LOKER_TZ_INTEGRATION=1`.
 
-**Estimate:** M
+> **Note:** The original design specified a SIGTERM-based round-trip test
+> (spawn `loker run`, kill mid-phase, resume). This was descoped because
+> `loker run` uses the step-based runner, which does not write phase markers.
+> Follow-up [CLO-325](https://linear.app/cloud-ai/issue/CLO-325) tracks the
+> runner-level round-trip test once the phase runner is wired into `loker run`.
+
+**Estimate:** S
 
 ## Pre-merge gate
 
 - `make check` (fmt + clippy + test)
-- `make check` runs all non-gated tests; round-trip test is opt-in via env var
+- `make check` runs all non-gated tests; binary-level guard test is opt-in via env var
 
 ## Risks
 
-- **`nix` dev-dependency** (ST5): Adds a crate for SIGTERM delivery. `libc` is already a unix-only dep; `nix` builds on it but adds compile time. Could alternatively use `libc::kill()` directly to avoid the dep. Tradeoff documented in design Q1 — defer decision to implementation.
-- **Test `cargo run --` overhead** (ST4): Each integration test compiles + spawns the binary. At ~30 s compile time this makes tests slow. Mitigation: these tests are gated (ST4 tests compile once per `cargo test` run; ST5 is opt-in).
+- **Test binary overhead** (ST4/ST5): Integration tests compile + spawn the `loker` binary. At ~30 s compile time this makes tests slow. Mitigation: tests are gated behind `LOKER_RESUME_INTEGRATION=1`.
 - **`resolve_run_dir` not accessible from integration tests**: The helper is private in `main.rs`. ST2 includes inline unit tests for the function directly; ST4 tests the binary end-to-end for guard clause scenarios.

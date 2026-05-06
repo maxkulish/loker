@@ -104,6 +104,9 @@ fn resolve_run_dir(run_id: &str) -> anyhow::Result<std::path::PathBuf> {
     let p = std::path::Path::new(run_id);
     if p.is_absolute() || p.components().count() > 1 {
         if p.exists() {
+            if !p.is_dir() {
+                anyhow::bail!("'{}' exists but is not a directory.", run_id);
+            }
             Ok(p.to_path_buf())
         } else {
             anyhow::bail!("Run '{}' not found.", run_id)
@@ -117,6 +120,12 @@ fn resolve_run_dir(run_id: &str) -> anyhow::Result<std::path::PathBuf> {
             .unwrap_or_default();
         let candidate = project_root.join("runs").join(run_id);
         if candidate.exists() {
+            if !candidate.is_dir() {
+                anyhow::bail!(
+                    "'{}' in runs/ is not a directory.",
+                    run_id
+                );
+            }
             Ok(candidate)
         } else {
             anyhow::bail!(
@@ -2527,6 +2536,21 @@ mod tests {
         let result = resolve_run_dir(path.to_str().unwrap());
         assert!(result.is_ok(), "Expected Ok, got: {:?}", result);
         assert_eq!(result.unwrap(), path);
+    }
+
+    #[test]
+    fn test_resolve_run_dir_rejects_file_not_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("run-dir");
+        std::fs::write(&file_path, "not a dir").unwrap();
+        let result = resolve_run_dir(file_path.to_str().unwrap());
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("not a directory"),
+            "Expected 'not a directory' error, got: {}",
+            err
+        );
     }
 
     #[test]

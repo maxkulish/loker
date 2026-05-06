@@ -40,3 +40,21 @@ Roadmap row: T-041 (Phase 9). PRD: FR-33.
 * PRD FR-33
 * `docs/plans/001-implementation-roadmap.md` Phase 9 row T-041
 * `docs/discovery/clo-310.md`
+
+## Post-implementation note (CLO-310)
+
+The round-trip integration test (kill mid-phase via signal, resume, assert completion)
+was **descoped** from CLO-310. The original test design required spawning `loker run` and
+sending SIGTERM, but `loker run` uses the step-based runner which does not write phase
+markers. The phase-based runner that produces resume-able state is a separate execution
+path (CLO-301).
+
+**Shipped instead:**
+- Binary-level guard clause test (`test_resume_via_binary_all_complete_guard`), opt-in
+  behind `LOKER_RESUME_INTEGRATION=1`, validates the full data path through the binary
+  (resolve_run_dir -> RunLock -> RunState::load -> guard clause).
+- Guard clause tests cover all error paths (not found, all complete, no resumable state).
+
+**Follow-up:**
+- [CLO-325](https://linear.app/cloud-ai/issue/CLO-325) tracks the runner-level round-trip
+  integration test once the phase runner is wired into `loker run`.
