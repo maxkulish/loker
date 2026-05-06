@@ -320,7 +320,7 @@ mod tests {
 
         let config = Config {
             tensorzero: Some(TensorZeroConfig {
-                endpoint: format!("{}", server.uri()),
+                endpoint: server.uri(),
                 default_model: "test".to_string(),
                 api_key_env: None,
                 timeout_secs: 60,
@@ -346,7 +346,7 @@ mod tests {
 
         let config = Config {
             tensorzero: Some(TensorZeroConfig {
-                endpoint: format!("{}", server.uri()),
+                endpoint: server.uri(),
                 default_model: "test".to_string(),
                 api_key_env: None,
                 timeout_secs: 60,
@@ -372,7 +372,7 @@ mod tests {
 
         let config = Config {
             tensorzero: Some(TensorZeroConfig {
-                endpoint: format!("{}", server.uri()),
+                endpoint: server.uri(),
                 default_model: "test".to_string(),
                 api_key_env: None,
                 timeout_secs: 60,
@@ -398,7 +398,7 @@ mod tests {
 
         let config = Config {
             tensorzero: Some(TensorZeroConfig {
-                endpoint: format!("{}", server.uri()),
+                endpoint: server.uri(),
                 default_model: "test".to_string(),
                 api_key_env: None,
                 timeout_secs: 60,
@@ -476,7 +476,7 @@ mod tests {
         std::env::set_var("LOK_DOCTOR_TZ_TEST_KEY", "test-secret");
         let config = Config {
             tensorzero: Some(TensorZeroConfig {
-                endpoint: format!("{}", server.uri()),
+                endpoint: server.uri(),
                 default_model: "test".to_string(),
                 api_key_env: Some("LOK_DOCTOR_TZ_TEST_KEY".to_string()),
                 timeout_secs: 60,
@@ -508,7 +508,7 @@ mod tests {
 
         let config = Config {
             tensorzero: Some(TensorZeroConfig {
-                endpoint: format!("{}", server.uri()),
+                endpoint: server.uri(),
                 default_model: "test".to_string(),
                 api_key_env: None,
                 timeout_secs: 60,
