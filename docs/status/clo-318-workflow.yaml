@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:45:47.178Z'
+  updated_at: '2026-05-06T12:53:29.817Z'
 phases:
   discovery:
     status: complete
@@ -64,7 +64,7 @@ phases:
     plan_file: docs/plans/clo-318-severity-ladder.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - c5bdc8c
       - 556444d
@@ -72,6 +72,14 @@ phases:
       - 4b0532f
       - 0d18fd3
       - e6dbc90
+      - 7b5d29f
+    codex_validated: true
+    codex_verdict: rework
+    codex_report: docs/reviews/clo-318-codex-validation.md
+    gemini_validation_report: docs/reviews/clo-318-gemini-validation.md
+    validation_synthesis_report: docs/reviews/clo-318-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+    validation_fix_iteration_count: 1
   pr:
     status: pending
   complete:
@@ -187,3 +195,9 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 6 commits.
+  - timestamp: '2026-05-06T12:53:29.817Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (tool wrapper failure). Gemini: rework (tool wrapper failure). Synthesis: approve_with_changes. 1
+      fix applied.
