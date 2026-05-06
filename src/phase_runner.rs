@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::backend::Backend;
 use crate::manifest::{Kind, ManifestEntry, ManifestError, Producer};
-use crate::run_state::markers::MarkerError;
+use crate::run_state::markers::{HitlMarkerContext, MarkerError};
 use crate::strategy::verify::{
     HumanVerifier, HumanVerifyReport, HumanVerifierConfig, VerifyError, VerifyHook, VerifyResult,
 };
@@ -328,8 +328,8 @@ impl PhaseRunner {
             );
         }
 
-        let verify_result = if matches!(&cfg.verify, VerifyHookName::None) {
-            None
+        let (verify_result, verify_hitl_report) = if matches!(&cfg.verify, VerifyHookName::None) {
+            (None, None)
         } else {
             let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
             let hook = hook.ok_or_else(|| {
@@ -390,28 +390,30 @@ impl PhaseRunner {
                         phase_start.elapsed().as_millis() as u64,
                     );
                 }
-                if let Err(persist_err) = persist::record_terminal_failure(
+                if let Err(persist_err) = persist::record_terminal_failure_with_hitl(
                     &markers,
                     &inputs.run_dir,
                     cfg,
                     initial_attempt + strategy_output.attempts.len().max(1) as u32,
                     phase_err.error_class(),
+                    hitl_report.as_ref().map(hitl_marker_context),
                 ) {
                     eprintln!("failed to persist terminal failure marker: {persist_err}");
                 }
                 return Err(phase_err);
             }
-            Some(result)
+            (Some(result), hitl_report)
         };
 
         let attempt = selected_attempt;
         let (artefact_path, manifest_entry) =
             persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, run_id)?;
-        markers.write_completed(
+        markers.write_completed_with_hitl(
             &cfg.phase,
             attempt,
             &manifest_entry.sha256,
             std::slice::from_ref(&cfg.artefact_name),
+            verify_hitl_report.as_ref().map(hitl_marker_context),
         )?;
 
         if let Some(t) = trace_sink {
@@ -435,6 +437,15 @@ impl PhaseRunner {
 
 fn hitl_trace_metadata(report: &HumanVerifyReport) -> HitlTraceMetadata {
     HitlTraceMetadata {
+        severity: report.severity.as_str().to_string(),
+        timeout_at: report.timeout_at.clone(),
+        timeout_action: report.timeout_action.as_str().to_string(),
+        timeout_outcome: report.timeout_outcome.as_str().to_string(),
+    }
+}
+
+fn hitl_marker_context(report: &HumanVerifyReport) -> HitlMarkerContext {
+    HitlMarkerContext {
         severity: report.severity.as_str().to_string(),
         timeout_at: report.timeout_at.clone(),
         timeout_action: report.timeout_action.as_str().to_string(),

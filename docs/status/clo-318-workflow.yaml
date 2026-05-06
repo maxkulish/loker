@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:30:15.381Z'
+  updated_at: '2026-05-06T12:32:06.048Z'
 phases:
   discovery:
     status: complete
@@ -68,6 +68,7 @@ phases:
     commits:
       - c5bdc8c
       - 556444d
+      - ee1a17c
   pr:
     status: pending
   complete:
@@ -163,3 +164,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: HumanVerifier timeout decisions and deterministic tests. Commit 556444d'
+  - timestamp: '2026-05-06T12:32:06.048Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: HITL metadata on verify trace spans. Commit ee1a17c'
