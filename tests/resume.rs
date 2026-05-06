@@ -341,13 +341,13 @@ fn test_resume_no_resumable_state() {
 // requiring a live backend for execution.
 
 #[test]
-fn test_resume_round_trip_kill_mid_phase() {
+fn test_resume_via_binary_all_complete_guard() {
     if std::env::var("LOKER_RESUME_INTEGRATION")
         .ok()
         .filter(|v| !v.is_empty())
         .is_none()
     {
-        eprintln!("skipping round-trip test (set LOKER_RESUME_INTEGRATION=1 to enable)");
+        eprintln!("skipping binary-level guard test (set LOKER_RESUME_INTEGRATION=1 to enable)");
         return;
     }
 
@@ -402,11 +402,7 @@ depends_on = ["design"]
         workflow_name: Some("test-pause-resume".to_string()),
         entries: vec![entry],
     };
-    fs::write(
-        tmp_path.join("manifest.json"),
-        manifest.to_json().unwrap(),
-    )
-    .unwrap();
+    fs::write(tmp_path.join("manifest.json"), manifest.to_json().unwrap()).unwrap();
 
     // All phases completed — triggers the exit-0 guard clause
     write_completed_marker(tmp_path.as_path(), "design", 1, &sha);
@@ -441,7 +437,7 @@ depends_on = ["design"]
         "expected 'All phases already complete' in stdout, got: {stdout}"
     );
 
-    // Sentiment unchanged — phase 1 was not re-executed
+    // Sentinel unchanged -- phase 1 was not re-executed
     let sentinel_mtime_after = sentinel.metadata().unwrap().modified().unwrap();
     assert_eq!(
         sentinel_mtime_before, sentinel_mtime_after,

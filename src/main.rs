@@ -77,9 +77,9 @@ fn parse_rerun_phase(s: &str) -> Result<String, String> {
     Ok(phase_name.to_string())
 }
 
-/// Walk ancestors from CWD looking for `lok.toml` to find the project root.
-fn find_project_root() -> Option<std::path::PathBuf> {
-    let mut cwd = std::env::current_dir().ok()?;
+/// Walk ancestors from the given starting path looking for `lok.toml`.
+fn find_project_root_from(start: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut cwd = start.to_path_buf();
     loop {
         if cwd.join("lok.toml").exists() {
             return Some(cwd);
@@ -88,6 +88,11 @@ fn find_project_root() -> Option<std::path::PathBuf> {
             return None;
         }
     }
+}
+
+/// Walk ancestors from CWD looking for `lok.toml` to find the project root.
+fn find_project_root() -> Option<std::path::PathBuf> {
+    find_project_root_from(&std::env::current_dir().ok()?)
 }
 
 /// Resolve a `<run_id>` argument to an absolute run directory path.
@@ -107,8 +112,8 @@ fn resolve_run_dir(run_id: &str) -> anyhow::Result<std::path::PathBuf> {
         // Walk ancestors looking for a project root (lok.toml), matching
         // the convention used by `loker run`. This ensures bare run_id
         // names work regardless of the user's CWD.
-        let project_root = find_project_root()
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let project_root =
+            find_project_root().unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
         let candidate = project_root.join("runs").join(run_id);
         if candidate.exists() {
             Ok(candidate)
@@ -2525,12 +2530,9 @@ mod tests {
 
     #[test]
     fn test_find_project_root_no_lok_toml() {
-        // In a temp directory with no lok.toml, find_project_root returns None.
+        // In a temp directory with no lok.toml, find_project_root_from returns None.
         let dir = tempfile::tempdir().unwrap();
-        let original = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-        let result = find_project_root();
-        std::env::set_current_dir(original).unwrap();
+        let result = find_project_root_from(dir.path());
         assert!(result.is_none());
     }
 }
