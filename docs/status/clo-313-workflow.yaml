@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T19:47:47.918Z'
-  updated_at: '2026-05-06T20:16:11.840Z'
+  updated_at: '2026-05-06T20:16:52.455Z'
 phases:
   discovery:
     status: complete
@@ -68,6 +68,7 @@ phases:
     commits:
       - bf90e3f
       - f7bb4b5
+      - 5663d53
   pr:
     status: pending
   complete:
@@ -177,3 +178,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: rendering helpers and compact age formatting verified. Commit f7bb4b5'
+  - timestamp: '2026-05-06T20:16:52.455Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: wired `loker ls --blocked` CLI and bare `loker ls` error path. Commit 5663d53'
