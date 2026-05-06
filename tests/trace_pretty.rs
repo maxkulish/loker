@@ -1,7 +1,6 @@
 #![cfg(test)]
 
 use loker::commands::trace::{passthrough, ColorChoice, TracePrinter};
-use std::io::Write;
 use std::path::Path;
 
 #[test]
