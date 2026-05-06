@@ -1,6 +1,6 @@
-use crate::config::{Config, TensorZeroConfig};
-use anyhow::Context;
+use crate::config::Config;
 use colored::Colorize;
+use std::error::Error;
 use std::time::Duration;
 
 /// A single diagnostic check result.
@@ -102,8 +102,8 @@ async fn probe_tensorzero(config: &Config) -> CheckRow {
         Some(ref cfg) => cfg,
     };
 
-    let (endpoint, api_key) = match resolve_tensorzero_opts(tz) {
-        Ok((ep, key)) => (ep, key),
+    let (endpoint, api_key) = match tz.to_backend_opts() {
+        Ok(opts) => (opts.endpoint, opts.api_key),
         Err(e) => {
             return CheckRow {
                 name: "tensorzero",
@@ -163,7 +163,7 @@ async fn probe_tensorzero(config: &Config) -> CheckRow {
         },
         status => CheckRow {
             name: "tensorzero",
-            status: "UNREACHABLE (network)".to_string(),
+            status: format!("UNHEALTHY (HTTP {})", status),
             detail: Some(format!("HTTP {}", status)),
             is_ok: false,
             is_critical: true,
@@ -171,29 +171,26 @@ async fn probe_tensorzero(config: &Config) -> CheckRow {
     }
 }
 
-fn resolve_tensorzero_opts(tz: &TensorZeroConfig) -> anyhow::Result<(String, Option<String>)> {
-    // Try to resolve via to_backend_opts(); if api_key_env is unset or empty, that's okay.
-    let api_key = match tz.api_key_env.as_deref() {
-        Some(var) if !var.is_empty() => {
-            let val = std::env::var(var)
-                .with_context(|| format!("Missing environment variable: {}", var))?;
-            Some(val)
-        }
-        _ => None,
-    };
-    Ok((tz.endpoint.clone(), api_key))
-}
-
 fn classify_transport_error(e: &reqwest::Error) -> &'static str {
     if e.is_timeout() {
         return "timeout";
     }
     if e.is_connect() {
-        let msg = e.to_string().to_lowercase();
-        if msg.contains("dns") || msg.contains("resolve") {
+        // Walk the error source chain to find more specific clues.
+        // The top-level message is generic ("error sending request for url ..."),
+        // but deeper sources contain the actual cause ("dns error", "connection refused").
+        let top = e.to_string().to_lowercase();
+        let mut chain = top.clone();
+        let mut source: Option<&dyn std::error::Error> = e.source();
+        while let Some(s) = source {
+            chain.push(' ');
+            chain.push_str(&s.to_string().to_lowercase());
+            source = s.source();
+        }
+        if chain.contains("dns") || chain.contains("resolve") || chain.contains("lookup") {
             return "DNS";
         }
-        if msg.contains("refused") {
+        if chain.contains("refused") {
             return "connection refused";
         }
         return "connection refused";
@@ -297,6 +294,7 @@ pub fn print_rows(rows: &[CheckRow]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::TensorZeroConfig;
     use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -431,8 +429,8 @@ mod tests {
 
         let row = probe_tensorzero(&config).await;
         assert!(
-            row.status.contains("UNREACHABLE"),
-            "expected UNREACHABLE, got {:?}",
+            row.status.contains("connection refused"),
+            "expected connection refused, got {:?}",
             row.status
         );
         assert!(!row.is_ok);
@@ -455,8 +453,8 @@ mod tests {
 
         let row = probe_tensorzero(&config).await;
         assert!(
-            row.status.contains("UNREACHABLE"),
-            "expected UNREACHABLE, got {:?}",
+            row.status.contains("DNS"),
+            "expected DNS, got {:?}",
             row.status
         );
         assert!(!row.is_ok);
