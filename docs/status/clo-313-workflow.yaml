@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T19:47:47.918Z'
-  updated_at: '2026-05-06T20:18:59.001Z'
+  updated_at: '2026-05-06T20:28:23.000Z'
 phases:
   discovery:
     status: complete
@@ -64,13 +64,21 @@ phases:
     plan_file: docs/plans/clo-313-ls-blocked.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - bf90e3f
       - f7bb4b5
       - 5663d53
       - 64ff0e1
       - 7016a3e
+      - dafb5ba
+    codex_validated: true
+    codex_verdict: rework
+    codex_report: docs/reviews/clo-313-codex-validation.md
+    gemini_validation_report: docs/reviews/clo-313-gemini-validation.md
+    validation_synthesis_report: docs/reviews/clo-313-validation-synthesis.md
+    validation_synthesis_verdict: approve
+    validation_fix_iteration_count: 1
   pr:
     status: pending
   complete:
@@ -196,3 +204,9 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 5 commits.
+  - timestamp: '2026-05-06T20:28:23.000Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: rework (sandbox build-gate artifact). Gemini: rework (trusted-directory tooling failure). Synthesis:
+      approve. 1 validation fix iteration applied.
