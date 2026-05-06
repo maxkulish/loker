@@ -62,11 +62,20 @@ pub struct BackendSpanResult {
     pub error: Option<String>,
 }
 
+/// Optional HITL metadata attached to human verify spans.
+pub struct HitlTraceMetadata {
+    pub severity: String,
+    pub timeout_at: Option<String>,
+    pub timeout_action: String,
+    pub timeout_outcome: String,
+}
+
 /// Result of a verify hook invocation.
 pub struct VerifySpanResult {
     pub passed: bool,
     pub message: Option<String>,
     pub duration_ms: u64,
+    pub hitl: Option<HitlTraceMetadata>,
 }
 
 /// Generates a random 16-byte span ID as a 32-character hex string.

@@ -6,13 +6,16 @@ use std::sync::Arc;
 
 use crate::backend::Backend;
 use crate::manifest::{Kind, ManifestEntry, ManifestError, Producer};
-use crate::run_state::markers::MarkerError;
-use crate::strategy::verify::{HumanVerifierConfig, VerifyError, VerifyHook, VerifyResult};
+use crate::run_state::markers::{HitlMarkerContext, MarkerError};
+use crate::strategy::verify::{
+    HumanVerifier, HumanVerifierConfig, HumanVerifyReport, VerifyError, VerifyHook, VerifyResult,
+};
 use crate::strategy::{
     PhaseContext, Prompt, StrategyError, StrategyKind, StrategyOutput, TargetSpec, Tier,
 };
 use crate::trace::{
-    AttemptSpanContext, BackendSpanResult, PhaseSpanContext, TraceSink, VerifySpanResult,
+    AttemptSpanContext, BackendSpanResult, HitlTraceMetadata, PhaseSpanContext, TraceSink,
+    VerifySpanResult,
 };
 
 pub mod dispatch;
@@ -39,6 +42,7 @@ pub enum AggregatorName {
 }
 
 /// Verify hook dispatch label. `None` is the explicit no-op.
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifyHookName {
@@ -325,16 +329,9 @@ impl PhaseRunner {
             );
         }
 
-        let verify_result = if matches!(&cfg.verify, VerifyHookName::None) {
-            None
+        let (verify_result, verify_hitl_report) = if matches!(&cfg.verify, VerifyHookName::None) {
+            (None, None)
         } else {
-            let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
-            let hook = hook.ok_or_else(|| {
-                PhaseError::InvalidConfig(format!(
-                    "verify hook {:?} requires PhaseInputs::verify",
-                    cfg.verify
-                ))
-            })?;
             let selected = strategy_output.attempts.get(selected_attempt as usize);
             let vctx = crate::strategy::VerifyContext {
                 stdout: String::from_utf8_lossy(&bytes).into_owned(),
@@ -348,7 +345,23 @@ impl PhaseRunner {
                 duration: std::time::Duration::ZERO,
             };
             let vstart = std::time::Instant::now();
-            let result = hook.verify(&vctx).await?;
+            let (result, hitl_report) = match &cfg.verify {
+                VerifyHookName::HumanVerifier(human_cfg) => {
+                    let verifier = HumanVerifier::new(human_cfg.clone());
+                    let (result, report) = verifier.verify_with_report(&vctx).await?;
+                    (result, Some(report))
+                }
+                _ => {
+                    let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
+                    let hook = hook.ok_or_else(|| {
+                        PhaseError::InvalidConfig(format!(
+                            "verify hook {:?} requires PhaseInputs::verify",
+                            cfg.verify
+                        ))
+                    })?;
+                    (hook.verify(&vctx).await?, None)
+                }
+            };
             let vdur = vstart.elapsed().as_millis() as u64;
             if let Some(t) = trace_sink {
                 let vresult = VerifySpanResult {
@@ -362,6 +375,7 @@ impl PhaseRunner {
                         }
                     },
                     duration_ms: vdur,
+                    hitl: hitl_report.as_ref().map(hitl_trace_metadata),
                 };
                 t.verify_result(&trace_ctx, verify_hook_name(&cfg.verify), &vresult);
             }
@@ -379,28 +393,30 @@ impl PhaseRunner {
                         phase_start.elapsed().as_millis() as u64,
                     );
                 }
-                if let Err(persist_err) = persist::record_terminal_failure(
+                if let Err(persist_err) = persist::record_terminal_failure_with_hitl(
                     &markers,
                     &inputs.run_dir,
                     cfg,
                     initial_attempt + strategy_output.attempts.len().max(1) as u32,
                     phase_err.error_class(),
+                    hitl_report.as_ref().map(hitl_marker_context),
                 ) {
                     eprintln!("failed to persist terminal failure marker: {persist_err}");
                 }
                 return Err(phase_err);
             }
-            Some(result)
+            (Some(result), hitl_report)
         };
 
         let attempt = selected_attempt;
         let (artefact_path, manifest_entry) =
             persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, run_id)?;
-        markers.write_completed(
+        markers.write_completed_with_hitl(
             &cfg.phase,
             attempt,
             &manifest_entry.sha256,
             std::slice::from_ref(&cfg.artefact_name),
+            verify_hitl_report.as_ref().map(hitl_marker_context),
         )?;
 
         if let Some(t) = trace_sink {
@@ -419,6 +435,24 @@ impl PhaseRunner {
             strategy_kind,
             verify: verify_result,
         })
+    }
+}
+
+fn hitl_trace_metadata(report: &HumanVerifyReport) -> HitlTraceMetadata {
+    HitlTraceMetadata {
+        severity: report.severity.as_str().to_string(),
+        timeout_at: report.timeout_at.clone(),
+        timeout_action: report.timeout_action.as_str().to_string(),
+        timeout_outcome: report.timeout_outcome.as_str().to_string(),
+    }
+}
+
+fn hitl_marker_context(report: &HumanVerifyReport) -> HitlMarkerContext {
+    HitlMarkerContext {
+        severity: report.severity.as_str().to_string(),
+        timeout_at: report.timeout_at.clone(),
+        timeout_action: report.timeout_action.as_str().to_string(),
+        timeout_outcome: report.timeout_outcome.as_str().to_string(),
     }
 }
 

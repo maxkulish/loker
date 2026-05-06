@@ -31,6 +31,8 @@ pub struct CompletedMarker {
     pub completed_at: DateTime<Utc>,
     pub manifest_entry_sha256: String,
     pub artefact_paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hitl: Option<HitlMarkerContext>,
 }
 
 /// Marker written when a phase fails.
@@ -42,6 +44,18 @@ pub struct FailedMarker {
     pub failed_at: DateTime<Utc>,
     pub error_class: String,
     pub last_attempt_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hitl: Option<HitlMarkerContext>,
+}
+
+/// Optional HITL context attached to terminal markers for human gates.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct HitlMarkerContext {
+    pub severity: String,
+    pub timeout_at: Option<String>,
+    pub timeout_action: String,
+    pub timeout_outcome: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -115,12 +129,25 @@ impl MarkerWriter {
         manifest_entry_sha256: &str,
         artefact_paths: &[String],
     ) -> Result<CompletedMarker, MarkerError> {
+        self.write_completed_with_hitl(phase, attempt, manifest_entry_sha256, artefact_paths, None)
+    }
+
+    /// Write a "completed" marker with optional HITL context.
+    pub fn write_completed_with_hitl(
+        &self,
+        phase: &str,
+        attempt: u32,
+        manifest_entry_sha256: &str,
+        artefact_paths: &[String],
+        hitl: Option<HitlMarkerContext>,
+    ) -> Result<CompletedMarker, MarkerError> {
         let marker = CompletedMarker {
             phase: phase.to_owned(),
             attempt,
             completed_at: Utc::now(),
             manifest_entry_sha256: manifest_entry_sha256.to_owned(),
             artefact_paths: artefact_paths.to_owned(),
+            hitl,
         };
         self.write_marker(phase, "completed", &marker)?;
         Ok(marker)
@@ -139,12 +166,25 @@ impl MarkerWriter {
         error_class: &str,
         last_attempt_path: &str,
     ) -> Result<FailedMarker, MarkerError> {
+        self.write_failed_with_hitl(phase, attempts_made, error_class, last_attempt_path, None)
+    }
+
+    /// Write a "failed" marker with optional HITL context.
+    pub fn write_failed_with_hitl(
+        &self,
+        phase: &str,
+        attempts_made: u32,
+        error_class: &str,
+        last_attempt_path: &str,
+        hitl: Option<HitlMarkerContext>,
+    ) -> Result<FailedMarker, MarkerError> {
         let marker = FailedMarker {
             phase: phase.to_owned(),
             attempts_made,
             failed_at: Utc::now(),
             error_class: error_class.to_owned(),
             last_attempt_path: last_attempt_path.to_owned(),
+            hitl,
         };
         self.write_marker(phase, "failed", &marker)?;
         Ok(marker)

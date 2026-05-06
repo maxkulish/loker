@@ -210,6 +210,26 @@ impl TraceSink for TraceWriter {
         if let Some(ref msg) = result.message {
             extras.insert("error.message".to_string(), Value::String(msg.clone()));
         }
+        if let Some(ref hitl) = result.hitl {
+            extras.insert(
+                "loker.hitl.severity".to_string(),
+                Value::String(hitl.severity.clone()),
+            );
+            if let Some(ref timeout_at) = hitl.timeout_at {
+                extras.insert(
+                    "loker.hitl.timeout_at".to_string(),
+                    Value::String(timeout_at.clone()),
+                );
+            }
+            extras.insert(
+                "loker.hitl.timeout_action".to_string(),
+                Value::String(hitl.timeout_action.clone()),
+            );
+            extras.insert(
+                "loker.hitl.timeout_outcome".to_string(),
+                Value::String(hitl.timeout_outcome.clone()),
+            );
+        }
         let span_id = super::new_span_id();
         self.write_line(
             ctx.trace_id,

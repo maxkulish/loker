@@ -6,9 +6,11 @@ use std::time::Duration;
 use async_trait::async_trait;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
 use loker::manifest::Kind;
-use loker::strategy::verify::{HumanDecision, HumanResponse, HumanSeverity, HumanVerifierConfig};
+use loker::strategy::verify::{
+    HumanDecision, HumanResponse, HumanSeverity, HumanTimeoutPolicy, HumanVerifierConfig,
+};
 use loker::strategy::{PhaseContext, Prompt};
-use loker::{PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
+use loker::{InMemorySink, PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
 
 #[derive(Debug)]
 struct MockBackend {
@@ -50,6 +52,20 @@ fn context(tmp: &tempfile::TempDir, phase: &str) -> PhaseContext {
     ctx
 }
 
+fn human_cfg(tmp: &tempfile::TempDir, severity: HumanSeverity) -> HumanVerifierConfig {
+    HumanVerifierConfig {
+        run_dir: tmp.path().to_path_buf(),
+        run_id: "run-1".into(),
+        workflow: "wf".into(),
+        phase: "review".into(),
+        artefact_name: "review.md".into(),
+        artefact_kind: Kind::ReviewMd,
+        severity,
+        decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
+        timeout_policy: HumanTimeoutPolicy::default(),
+    }
+}
+
 fn write_response(path: &PathBuf, decision: HumanDecision) {
     let response = HumanResponse {
         schema_version: 1,
@@ -71,16 +87,7 @@ fn write_response(path: &PathBuf, decision: HumanDecision) {
 async fn phase_human_verifier_blocks_until_response() {
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
-    cfg.verify = VerifyHookName::HumanVerifier(HumanVerifierConfig {
-        run_dir: tmp.path().to_path_buf(),
-        run_id: "run-1".into(),
-        workflow: "wf".into(),
-        phase: "review".into(),
-        artefact_name: "review.md".into(),
-        artefact_kind: Kind::ReviewMd,
-        severity: HumanSeverity::Medium,
-        decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
-    });
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Medium));
 
     let backend: Arc<dyn Backend> = Arc::new(MockBackend {
         name: "mock",
@@ -117,16 +124,7 @@ async fn phase_human_verifier_blocks_until_response() {
 async fn phase_human_verifier_ignores_stale_response_after_consume() {
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
-    cfg.verify = VerifyHookName::HumanVerifier(HumanVerifierConfig {
-        run_dir: tmp.path().to_path_buf(),
-        run_id: "run-1".into(),
-        workflow: "wf".into(),
-        phase: "review".into(),
-        artefact_name: "review.md".into(),
-        artefact_kind: Kind::ReviewMd,
-        severity: HumanSeverity::Medium,
-        decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
-    });
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Medium));
 
     let response_path = tmp.path().join("responses").join("review.json");
     write_response(&response_path, HumanDecision::Approve);
@@ -188,4 +186,146 @@ async fn phase_human_verifier_ignores_stale_response_after_consume() {
 
     assert_eq!(err.error_class(), "verify_failed");
     assert!(tmp.path().join("pending").join("review.json").is_file());
+}
+
+#[tokio::test]
+async fn phase_human_verifier_trace_includes_severity() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Low));
+
+    let backend: Arc<dyn Backend> = Arc::new(MockBackend {
+        name: "mock",
+        output: "candidate output",
+    });
+    let backends = vec![backend];
+    let trace = InMemorySink::new();
+
+    let err = PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "review"),
+                verify: None,
+                run_dir: tmp.path().to_path_buf(),
+                trace: Some(&trace),
+            },
+            0,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.error_class(), "verify_failed");
+    let spans = trace.spans();
+    let verify_span = spans
+        .iter()
+        .find(|span| span["name"] == "verify.human_verifier")
+        .expect("verify span captured");
+    assert_eq!(verify_span["loker.hitl.severity"], "low");
+    assert_eq!(verify_span["loker.hitl.timeout_action"], "auto_approve");
+    assert_eq!(verify_span["loker.hitl.timeout_outcome"], "not_timed_out");
+    assert!(verify_span.get("loker.hitl.timeout_at").is_some());
+}
+
+fn write_pending(tmp: &tempfile::TempDir, severity: &str, timeout_at: Option<&str>) {
+    let pending = serde_json::json!({
+        "schema_version": 1,
+        "run_id": "run-1",
+        "workflow": "wf",
+        "phase": "review",
+        "severity": severity,
+        "opened_at": "2000-01-01T00:00:00Z",
+        "timeout_at": timeout_at,
+        "artefact": {
+            "path": "review.md",
+            "kind": "text/markdown",
+            "preview_lines": 1
+        },
+        "context": {
+            "preceded_by": [],
+            "next_phase": null,
+            "prompt_summary": "candidate output"
+        },
+        "decision_options": ["approve", "reject"]
+    });
+    let path = tmp.path().join("pending").join("review.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, serde_json::to_vec_pretty(&pending).unwrap()).unwrap();
+}
+
+#[tokio::test]
+async fn phase_human_verifier_low_timeout_completes_with_hitl_marker() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_pending(&tmp, "low", Some("2000-01-01T01:00:00Z"));
+    let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Low));
+
+    let backend: Arc<dyn Backend> = Arc::new(MockBackend {
+        name: "mock",
+        output: "candidate output",
+    });
+    let backends = vec![backend];
+
+    PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "review"),
+                verify: None,
+                run_dir: tmp.path().to_path_buf(),
+                trace: None,
+            },
+            0,
+        )
+        .await
+        .expect("low timeout auto-approves");
+
+    let marker: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(tmp.path().join("markers/review.completed")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(marker["hitl"]["severity"], "low");
+    assert_eq!(marker["hitl"]["timeout_outcome"], "auto_approved");
+}
+
+#[tokio::test]
+async fn phase_human_verifier_medium_timeout_fails_with_hitl_marker() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_pending(&tmp, "medium", Some("2000-01-02T00:00:00Z"));
+    let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Medium));
+
+    let backend: Arc<dyn Backend> = Arc::new(MockBackend {
+        name: "mock",
+        output: "candidate output",
+    });
+    let backends = vec![backend];
+
+    let err = PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "review"),
+                verify: None,
+                run_dir: tmp.path().to_path_buf(),
+                trace: None,
+            },
+            0,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.error_class(), "verify_failed");
+
+    let marker: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(tmp.path().join("markers/review.failed")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(marker["hitl"]["severity"], "medium");
+    assert_eq!(marker["hitl"]["timeout_outcome"], "auto_failed");
 }

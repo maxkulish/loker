@@ -14,7 +14,7 @@
   "context": {
     "preceded_by": ["design"],
     "next_phase": "implement",
-    "prompt_summary": "low-severity sanity check that should set a deadline."
+    "prompt_summary": "negative fixture: decision_options is empty and violates minItems."
   },
-  "decision_options": ["approve", "comment_only"]
+  "decision_options": []
 }

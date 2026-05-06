@@ -17,7 +17,9 @@ pub mod verify;
 
 // Re-export the core types so `strategy::verify::FailureReason` etc. work.
 pub use human_verifier::{
-    HumanDecision, HumanResponse, HumanSeverity, HumanVerifier, HumanVerifierConfig,
+    HumanClock, HumanDecision, HumanResponse, HumanSeverity, HumanTimeoutAction,
+    HumanTimeoutOutcome, HumanTimeoutPolicy, HumanTimeoutRule, HumanVerifier, HumanVerifierConfig,
+    HumanVerifyReport, SystemHumanClock,
 };
 pub use verify::{
     FailureReason, SandboxViolation, VerifyContext, VerifyError, VerifyHook, VerifyResult,
