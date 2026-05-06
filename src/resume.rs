@@ -3,6 +3,8 @@ pub mod sweep;
 
 use chrono::{DateTime, Utc};
 
+use crate::run_state::{PhaseLock, PhaseLockError};
+
 /// Errors specific to the resume orchestration flow.
 #[derive(Debug, thiserror::Error)]
 pub enum ResumeError {
@@ -31,6 +33,19 @@ pub enum ResumeError {
     /// Another loker process holds the lock; non-loker processes may ignore it.
     #[error("run directory is locked by another loker process")]
     LockInUse,
+
+    /// A per-phase advisory lock is held by another resume process.
+    #[error("phase '{phase}' is already being resumed by pid {pid} on {host} (since {since})")]
+    PhaseLocked {
+        phase: String,
+        pid: u32,
+        host: String,
+        since: DateTime<Utc>,
+    },
+
+    /// Wrapper for errors from the per-phase locking subsystem.
+    #[error("phase lock error: {0}")]
+    PhaseLock(#[from] PhaseLockError),
 }
 
 impl From<crate::run_state::LoadError> for ResumeError {
@@ -213,6 +228,25 @@ impl ResumeRunner {
         attempt: u32,
         run_id: uuid::Uuid,
     ) -> Result<(), ResumeError> {
+        // Acquire the per-phase advisory lock before running the phase.
+        // This prevents concurrent resume processes from executing the same
+        // phase simultaneously (first-write-wins).
+        let _phase_lock = PhaseLock::acquire(run_dir, &cfg.phase, &run_id.to_string(), None)
+            .map_err(|e| match e {
+                PhaseLockError::LockInUse {
+                    phase,
+                    pid,
+                    host,
+                    since,
+                } => ResumeError::PhaseLocked {
+                    phase,
+                    pid,
+                    host,
+                    since,
+                },
+                other => ResumeError::PhaseLock(other),
+            })?;
+
         let ctx = crate::strategy::PhaseContext::new(&cfg.phase, run_id);
         let prompt = crate::strategy::Prompt::new();
         let inputs = crate::phase_runner::PhaseInputs {
