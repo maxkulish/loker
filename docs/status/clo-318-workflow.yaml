@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:29:12.239Z'
+  updated_at: '2026-05-06T12:30:15.381Z'
 phases:
   discovery:
     status: complete
@@ -67,6 +67,7 @@ phases:
     status: in_progress
     commits:
       - c5bdc8c
+      - 556444d
   pr:
     status: pending
   complete:
@@ -158,3 +159,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST1 landed: timeout policy types and fake-clock seam. Commit c5bdc8c'
+  - timestamp: '2026-05-06T12:30:15.381Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: HumanVerifier timeout decisions and deterministic tests. Commit 556444d'

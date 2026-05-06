@@ -10,7 +10,7 @@ use loker::strategy::verify::{
     HumanDecision, HumanResponse, HumanSeverity, HumanTimeoutPolicy, HumanVerifierConfig,
 };
 use loker::strategy::{PhaseContext, Prompt};
-use loker::{PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
+use loker::{InMemorySink, PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
 
 #[derive(Debug)]
 struct MockBackend {
@@ -52,6 +52,20 @@ fn context(tmp: &tempfile::TempDir, phase: &str) -> PhaseContext {
     ctx
 }
 
+fn human_cfg(tmp: &tempfile::TempDir, severity: HumanSeverity) -> HumanVerifierConfig {
+    HumanVerifierConfig {
+        run_dir: tmp.path().to_path_buf(),
+        run_id: "run-1".into(),
+        workflow: "wf".into(),
+        phase: "review".into(),
+        artefact_name: "review.md".into(),
+        artefact_kind: Kind::ReviewMd,
+        severity,
+        decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
+        timeout_policy: HumanTimeoutPolicy::default(),
+    }
+}
+
 fn write_response(path: &PathBuf, decision: HumanDecision) {
     let response = HumanResponse {
         schema_version: 1,
@@ -73,17 +87,7 @@ fn write_response(path: &PathBuf, decision: HumanDecision) {
 async fn phase_human_verifier_blocks_until_response() {
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
-    cfg.verify = VerifyHookName::HumanVerifier(HumanVerifierConfig {
-        run_dir: tmp.path().to_path_buf(),
-        run_id: "run-1".into(),
-        workflow: "wf".into(),
-        phase: "review".into(),
-        artefact_name: "review.md".into(),
-        artefact_kind: Kind::ReviewMd,
-        severity: HumanSeverity::Medium,
-        decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
-        timeout_policy: HumanTimeoutPolicy::default(),
-    });
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Medium));
 
     let backend: Arc<dyn Backend> = Arc::new(MockBackend {
         name: "mock",
@@ -120,17 +124,7 @@ async fn phase_human_verifier_blocks_until_response() {
 async fn phase_human_verifier_ignores_stale_response_after_consume() {
     let tmp = tempfile::tempdir().unwrap();
     let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
-    cfg.verify = VerifyHookName::HumanVerifier(HumanVerifierConfig {
-        run_dir: tmp.path().to_path_buf(),
-        run_id: "run-1".into(),
-        workflow: "wf".into(),
-        phase: "review".into(),
-        artefact_name: "review.md".into(),
-        artefact_kind: Kind::ReviewMd,
-        severity: HumanSeverity::Medium,
-        decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
-        timeout_policy: HumanTimeoutPolicy::default(),
-    });
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Medium));
 
     let response_path = tmp.path().join("responses").join("review.json");
     write_response(&response_path, HumanDecision::Approve);
@@ -192,4 +186,45 @@ async fn phase_human_verifier_ignores_stale_response_after_consume() {
 
     assert_eq!(err.error_class(), "verify_failed");
     assert!(tmp.path().join("pending").join("review.json").is_file());
+}
+
+#[tokio::test]
+async fn phase_human_verifier_trace_includes_severity() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = PhaseConfig::single("review", "mock", "prompt", "review.md");
+    cfg.verify = VerifyHookName::HumanVerifier(human_cfg(&tmp, HumanSeverity::Low));
+
+    let backend: Arc<dyn Backend> = Arc::new(MockBackend {
+        name: "mock",
+        output: "candidate output",
+    });
+    let backends = vec![backend];
+    let trace = InMemorySink::new();
+
+    let err = PhaseRunner::new()
+        .run(
+            &cfg,
+            PhaseInputs {
+                backends: &backends,
+                prompt: Prompt::new(),
+                ctx: context(&tmp, "review"),
+                verify: None,
+                run_dir: tmp.path().to_path_buf(),
+                trace: Some(&trace),
+            },
+            0,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.error_class(), "verify_failed");
+    let spans = trace.spans();
+    let verify_span = spans
+        .iter()
+        .find(|span| span["name"] == "verify.human_verifier")
+        .expect("verify span captured");
+    assert_eq!(verify_span["loker.hitl.severity"], "low");
+    assert_eq!(verify_span["loker.hitl.timeout_action"], "auto_approve");
+    assert_eq!(verify_span["loker.hitl.timeout_outcome"], "not_timed_out");
+    assert!(verify_span.get("loker.hitl.timeout_at").is_some());
 }

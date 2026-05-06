@@ -7,12 +7,15 @@ use std::sync::Arc;
 use crate::backend::Backend;
 use crate::manifest::{Kind, ManifestEntry, ManifestError, Producer};
 use crate::run_state::markers::MarkerError;
-use crate::strategy::verify::{HumanVerifierConfig, VerifyError, VerifyHook, VerifyResult};
+use crate::strategy::verify::{
+    HumanVerifier, HumanVerifyReport, HumanVerifierConfig, VerifyError, VerifyHook, VerifyResult,
+};
 use crate::strategy::{
     PhaseContext, Prompt, StrategyError, StrategyKind, StrategyOutput, TargetSpec, Tier,
 };
 use crate::trace::{
-    AttemptSpanContext, BackendSpanResult, PhaseSpanContext, TraceSink, VerifySpanResult,
+    AttemptSpanContext, BackendSpanResult, HitlTraceMetadata, PhaseSpanContext, TraceSink,
+    VerifySpanResult,
 };
 
 pub mod dispatch;
@@ -348,7 +351,14 @@ impl PhaseRunner {
                 duration: std::time::Duration::ZERO,
             };
             let vstart = std::time::Instant::now();
-            let result = hook.verify(&vctx).await?;
+            let (result, hitl_report) = match &cfg.verify {
+                VerifyHookName::HumanVerifier(human_cfg) => {
+                    let verifier = HumanVerifier::new(human_cfg.clone());
+                    let (result, report) = verifier.verify_with_report(&vctx).await?;
+                    (result, Some(report))
+                }
+                _ => (hook.verify(&vctx).await?, None),
+            };
             let vdur = vstart.elapsed().as_millis() as u64;
             if let Some(t) = trace_sink {
                 let vresult = VerifySpanResult {
@@ -362,6 +372,7 @@ impl PhaseRunner {
                         }
                     },
                     duration_ms: vdur,
+                    hitl: hitl_report.as_ref().map(hitl_trace_metadata),
                 };
                 t.verify_result(&trace_ctx, verify_hook_name(&cfg.verify), &vresult);
             }
@@ -419,6 +430,15 @@ impl PhaseRunner {
             strategy_kind,
             verify: verify_result,
         })
+    }
+}
+
+fn hitl_trace_metadata(report: &HumanVerifyReport) -> HitlTraceMetadata {
+    HitlTraceMetadata {
+        severity: report.severity.as_str().to_string(),
+        timeout_at: report.timeout_at.clone(),
+        timeout_action: report.timeout_action.as_str().to_string(),
+        timeout_outcome: report.timeout_outcome.as_str().to_string(),
     }
 }
 
