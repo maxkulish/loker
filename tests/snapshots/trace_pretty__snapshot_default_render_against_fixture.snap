@@ -1,0 +1,13 @@
+---
+source: tests/trace_pretty.rs
+assertion_line: 23
+expression: "&out"
+---
+[20:45:00] design phase 12.4s
+[20:45:01] design backend anthropic 9.9s 1.8k+712
+[20:45:02] design verify make_check 320ms [verify_passed]
+[20:45:03] design done 12.4s
+[20:45:04] implement phase 5.6s [strategy_failed]
+[20:45:05] implement backend openai 1.5s 512+256
+[20:45:06] implement backend anthropic 3.8s 1.0k+512
+[20:45:07] implement error 5.6s [strategy_failed] all attem…
