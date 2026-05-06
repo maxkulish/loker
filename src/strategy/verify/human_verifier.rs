@@ -537,7 +537,7 @@ fn kind_str(kind: &Kind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
     use std::fs;
 
     struct FixedClock(DateTime<Utc>);
@@ -735,6 +735,132 @@ mod tests {
         assert_eq!(request.phase, "review");
         assert_eq!(request.artefact.path, "review.md");
         assert_eq!(request.artefact.kind, "text/markdown");
+    }
+
+    #[tokio::test]
+    async fn missing_low_response_after_timeout_auto_approves() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(
+            &tmp,
+            HumanSeverity::Low,
+            t0,
+            HumanTimeoutPolicy::default(),
+        );
+        let first = hook
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(first.0.is_fail());
+        assert_eq!(first.1.timeout_outcome, HumanTimeoutOutcome::NotTimedOut);
+
+        let later = hook_at(
+            &tmp,
+            HumanSeverity::Low,
+            t0 + Duration::minutes(61),
+            HumanTimeoutPolicy::default(),
+        );
+        let (result, report) = later
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(result.is_pass());
+        assert_eq!(report.timeout_outcome, HumanTimeoutOutcome::AutoApproved);
+        assert_eq!(report.timeout_action, HumanTimeoutAction::AutoApprove);
+    }
+
+    #[tokio::test]
+    async fn missing_medium_response_after_timeout_auto_fails() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(
+            &tmp,
+            HumanSeverity::Medium,
+            t0,
+            HumanTimeoutPolicy::default(),
+        );
+        hook.verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+
+        let later = hook_at(
+            &tmp,
+            HumanSeverity::Medium,
+            t0 + Duration::hours(25),
+            HumanTimeoutPolicy::default(),
+        );
+        let (result, report) = later
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(result.is_fail());
+        assert_eq!(report.timeout_outcome, HumanTimeoutOutcome::AutoFailed);
+        if let VerifyResult::Fail { reason } = result {
+            assert!(reason.summary.contains("timed out"));
+        }
+    }
+
+    #[tokio::test]
+    async fn high_response_missing_blocks_indefinitely() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(
+            &tmp,
+            HumanSeverity::High,
+            t0,
+            HumanTimeoutPolicy::default(),
+        );
+        let (result, report) = hook
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(result.is_fail());
+        assert_eq!(report.timeout_at, None);
+
+        let later = hook_at(
+            &tmp,
+            HumanSeverity::High,
+            t0 + Duration::days(365),
+            HumanTimeoutPolicy::default(),
+        );
+        let (result, report) = later
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(result.is_fail());
+        assert_eq!(report.timeout_outcome, HumanTimeoutOutcome::NotTimedOut);
+    }
+
+    #[tokio::test]
+    async fn existing_pending_deadline_is_stable() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(
+            &tmp,
+            HumanSeverity::Low,
+            t0,
+            HumanTimeoutPolicy::default(),
+        );
+        hook.verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        let original = fs::read_to_string(tmp.path().join("pending/review.json")).unwrap();
+        let original: PendingRequest = serde_json::from_str(&original).unwrap();
+
+        let later = hook_at(
+            &tmp,
+            HumanSeverity::Low,
+            t0 + Duration::minutes(30),
+            HumanTimeoutPolicy::default(),
+        );
+        later
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        let rewritten = fs::read_to_string(tmp.path().join("pending/review.json")).unwrap();
+        let rewritten: PendingRequest = serde_json::from_str(&rewritten).unwrap();
+        assert_eq!(rewritten.opened_at, original.opened_at);
+        assert_eq!(rewritten.timeout_at, original.timeout_at);
     }
 
     #[tokio::test]

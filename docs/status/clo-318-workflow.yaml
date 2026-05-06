@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:24:17.571Z'
+  updated_at: '2026-05-06T12:29:12.239Z'
 phases:
   discovery:
     status: complete
@@ -65,7 +65,8 @@ phases:
     approved: true
   implement:
     status: in_progress
-    commits: []
+    commits:
+      - c5bdc8c
   pr:
     status: pending
   complete:
@@ -153,3 +154,7 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-06T12:29:12.239Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: timeout policy types and fake-clock seam. Commit c5bdc8c'
