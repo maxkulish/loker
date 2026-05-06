@@ -31,3 +31,19 @@ approve_with_changes
 
 ## Recommendation
 PROCEED_WITH_FIXES. The branch is mergeable shape-wise (`make check` green, scope matches plan, no API/schema regressions) but the lock-file lifecycle contract (F1) needs to land in this PR so that T-044 builds against the schema the design committed to. Bounded one-iteration fix: align `Drop`/`release` to truncate-on-release, update the struct rustdoc, optionally fold F2's lenient-read into the same touch since both are "honor the resolved design open questions." Defer F3-F7 as low-priority follow-ups. Separately, flag the `.pi/agents/codex-pre-pr.md` / `.pi/agents/gemini-architect.md` runner scripts to the user for a quoting fix - the synthesis step ran on a single reviewer this cycle.
+
+## Re-validation
+
+**Fix iteration 1 applied.** Commit `b89cb63`.
+
+| # | Finding | Status | Details |
+|---|---------|--------|---------|
+| F1 | Lock-file lifecycle contract | ✅ FIXED | `Drop`/`release` now truncates to 0 bytes via `set_len(0)` on the held fd. Struct rustdoc aligned. Design doc open question updated. |
+| F2 | Corrupt JSON propagation | 🔲 DEFERRED | Low risk — OS lock is still authoritative. Follow-up if downstream T-044 consumption encounters it. |
+| F3 | `is_dir()` follows symlinks | 🔲 DEFERRED | Not a blocker. |
+| F4 | Unused `lock_dir` field | 🔲 DEFERRED | Trivial cleanup. |
+| F5 | Unused `StaleReclaimFailed` variant | 🔲 DEFERRED | Reserved for future use; add comment when touched. |
+| F6 | Phase-name validation omits `\` | 🔲 DEFERRED | Add when validator is next touched. |
+| F7 | `release` + `Drop` both call `remove_file` | ✅ RESOLVED | Both now share truncation path via `Drop`; `release` delegates to `Drop`. |
+
+`make check` green on HEAD (`b89cb63`). Scope matches plan — additive `locks/` directory only, no schema changes. Ready for PR.
