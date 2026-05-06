@@ -22,10 +22,10 @@ linear:
   priority: Medium
   branch_actual: feat/clo-318-severity
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-06T10:37:20.857Z'
-  updated_at: '2026-05-06T12:53:29.817Z'
+  updated_at: '2026-05-06T12:57:13.027Z'
 phases:
   discovery:
     status: complete
@@ -81,7 +81,7 @@ phases:
     validation_synthesis_verdict: approve_with_changes
     validation_fix_iteration_count: 1
   pr:
-    status: pending
+    status: in_progress
   complete:
     status: pending
 history:
@@ -201,3 +201,11 @@ history:
     details: >-
       Codex: rework (tool wrapper failure). Gemini: rework (tool wrapper failure). Synthesis: approve_with_changes. 1
       fix applied.
+  - timestamp: '2026-05-06T12:55:28.043Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T12:57:13.027Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
