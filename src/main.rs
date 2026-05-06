@@ -14,6 +14,7 @@ mod consensus;
 mod context;
 mod debate;
 mod delegation;
+mod doctor;
 // Module declarations mirror lib.rs for the binary crate tree.
 // `pub` is used to satisfy `pub use` re-exports within submodules;
 // binary crates cannot be imported by external consumers.
@@ -780,71 +781,10 @@ async fn main() -> Result<()> {
             println!("{}", result);
         }
         Commands::Doctor => {
-            println!("{}", "Lok Doctor".cyan().bold());
-            println!("{}", "=".repeat(50).dimmed());
-            println!();
-            println!(
-                "Lok is an orchestration layer for LLM backends. It's the brain\n\
-                that coordinates the arms you already have installed.\n"
-            );
-            println!("{}", "Checking backends...".yellow());
-            println!();
-
-            let checks = vec![
-                ("codex", "codex", "npm install -g @openai/codex"),
-                ("gemini", "npx", "Install Node.js (npx comes with npm)"),
-                (
-                    "claude",
-                    "claude",
-                    "Install Claude Code: https://claude.ai/claude-code",
-                ),
-            ];
-
-            let mut available = 0;
-            for (name, binary, install_hint) in &checks {
-                let found = which::which(binary).is_ok();
-
-                if found {
-                    println!("  {} {} - ready", "✓".green(), name);
-                    available += 1;
-                } else {
-                    println!("  {} {} - not found", "✗".red(), name);
-                    println!("    {}", install_hint.dimmed());
-                }
-            }
-
-            // Check API keys
-            println!();
-            println!("{}", "Checking API keys...".yellow());
-            println!();
-
-            let keys = vec![
-                ("ANTHROPIC_API_KEY", "claude backend"),
-                ("GOOGLE_API_KEY", "gemini backend"),
-                ("AWS_PROFILE", "bedrock backend (or AWS_ACCESS_KEY_ID)"),
-            ];
-
-            for (key, desc) in &keys {
-                if std::env::var(key).is_ok() {
-                    println!("  {} {} - set ({})", "✓".green(), key, desc);
-                } else {
-                    println!("  {} {} - not set ({})", "○".yellow(), key, desc);
-                }
-            }
-
-            println!();
-            if available > 0 {
-                println!(
-                    "{} {} backend(s) ready. Run {} to see them.",
-                    "✓".green(),
-                    available,
-                    "loker backends".cyan()
-                );
-            } else {
-                println!(
-                    "{} No backends found. Install at least one LLM CLI to get started.",
-                    "!".red()
-                );
+            let (rows, failed) = doctor::run(&config).await;
+            doctor::print_rows(&rows);
+            if failed {
+                std::process::exit(1);
             }
         }
         Commands::Spawn {

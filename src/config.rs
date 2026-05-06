@@ -177,7 +177,6 @@ fn default_tz_timeout_secs() -> u64 {
 }
 
 impl TensorZeroConfig {
-    #[allow(dead_code)]
     pub fn to_backend_opts(&self) -> Result<crate::backend::TensorZeroBackendOpts> {
         let api_key = match self.api_key_env.as_deref() {
             Some(var) if !var.is_empty() => Some(

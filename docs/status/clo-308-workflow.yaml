@@ -1,0 +1,203 @@
+task_id: clo-308
+task_type: development
+classification_reason: Title starts with 'Extend' indicating implementation work; has mechanical acceptance criteria.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-308-t-039-extend-loker-doctor-with-tensorzero-reachability-check
+  priority: Medium
+  branch_actual: feat/clo-308-doctor
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-05-05T15:15:35.835Z'
+  updated_at: '2026-05-06T07:28:58.662Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: Extract doctor module
+    approaches_identified: 3
+    approved: true
+    baseline_score: 9
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-308.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-308-extend-loker-doctor-with-tensorzero-reachability-check.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/design-docs/clo-308-extend-loker-doctor-with-tensorzero-reachability-check.md
+    draft_ready: true
+    review_applied: false
+    review_completed: false
+    review_gemini: null
+    review_ollama: null
+    review_verdict: null
+    applied_suggestions: []
+    finalized: true
+    flagged_suggestions: []
+    human_review_completed: true
+  plan:
+    status: complete
+    approved: true
+    plan_file: docs/plans/clo-308-extend-loker-doctor-with-tensorzero-reachability-check.md
+  implement:
+    status: complete
+    commits:
+      - 866d333
+      - 5966ab3
+    codex_report: docs/reviews/clo-308-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-308-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-308-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+  pr:
+    status: in_progress
+    pr_number: 51
+    pr_url: https://github.com/maxkulish/loker/pull/51
+    ci_passed: true
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-05T15:15:35.835Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-308 as development
+  - timestamp: '2026-05-05T15:17:10.242Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: Title starts with '[T-039] Extend' indicating implementation work; has mechanical
+      acceptance criteria (reachability check, unit tests, exit codes).
+  - timestamp: '2026-05-05T15:17:34.169Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-05T15:17:53.867Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-05T15:18:42.386Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-308-doctor already exists and checked out.
+  - timestamp: '2026-05-05T15:24:51.569Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Extract src/doctor.rs module. Baseline 9/10. 3 approaches considered.'
+  - timestamp: '2026-05-05T15:25:16.875Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-05T15:29:07.479Z'
+    action: design_draft_ready
+    phase: design
+    details: Design doc created at docs/design-docs/clo-308-extend-loker-doctor-with-tensorzero-reachability-check.md
+  - timestamp: '2026-05-05T15:29:45.995Z'
+    action: design_finalized
+    phase: design
+    details: User approved design. Proceeding to plan phase. AI review was unavailable in pi build.
+  - timestamp: '2026-05-05T15:30:22.205Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      AI review unavailable in pi build (no Gemini/Ollama review tooling). Design doc unchanged from draft. Verdict:
+      null.
+  - timestamp: '2026-05-05T15:31:06.388Z'
+    action: design_human_review_complete
+    phase: design
+    details: Human approved design document. AI reviews were unavailable. Design doc accepted as-is.
+  - timestamp: '2026-05-05T15:32:09.614Z'
+    action: design_human_review_complete
+    phase: design
+    details: Setting human_review_completed field for validator.
+  - timestamp: '2026-05-05T15:33:05.700Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-05T15:35:33.078Z'
+    action: plan_created
+    phase: plan
+    details: >-
+      Implementation plan created at docs/plans/clo-308-extend-loker-doctor-with-tensorzero-reachability-check.md. 4
+      sub-tasks across 2 phases. Estimated effort: S.
+  - timestamp: '2026-05-05T15:35:59.044Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved by user. 4 sub-tasks (ST1-ST4), estimated S effort.
+  - timestamp: '2026-05-05T15:36:03.458Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-05T15:36:19.786Z'
+    action: implementation_started
+    phase: implement
+    details: 'Beginning ST1: Extract Doctor module from main.rs.'
+  - timestamp: '2026-05-06T07:08:50.730Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All 4 sub-tasks complete: ST1 (Doctor module extracted), ST2 (TensorZero probe with 7 error branches), ST3 (10
+      unit tests passing), ST4 (cargo test all green — 815 pass, 0 fail).
+  - timestamp: '2026-05-06T07:09:10.041Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T07:10:08.129Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to implement
+  - timestamp: '2026-05-06T07:10:53.369Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1-ST4 landed: Doctor module extracted, TensorZero probe, 10 unit tests. Commit 866d333.'
+  - timestamp: '2026-05-06T07:11:30.687Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      All sub-tasks landed (commit 866d333). make check green (815 pass, 0 fail, 0 clippy, 0 fmt). Proceeding to
+      validation gate.
+  - timestamp: '2026-05-06T07:23:05.109Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Synthesis verdict: approve_with_changes. Applied 1 fix iteration: F1 (UNHEALTHY catch-all), F2 (error chain
+      walking + test assertions), F3 (to_backend_opts reuse + remove dead_code). make check green. Review files: codex
+      (failed-shell-escape, 1328b), gemini (failed-shell-escape, 1723b), synthesis (approve_with_changes, 4254b).
+  - timestamp: '2026-05-06T07:23:06.689Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T07:23:16.944Z'
+    action: fix_iteration_committed
+    phase: implement
+    details: Added fix commit 5966ab3 to implement phase commits list.
+  - timestamp: '2026-05-06T07:25:11.561Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: >-
+      cargo fmt --check clean, cargo clippy --all-targets --all-features -- -D warnings clean, cargo clippy --tests
+      clean, cargo test all pass (0 failures).
+  - timestamp: '2026-05-06T07:26:05.237Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #51 opened: https://github.com/maxkulish/loker/pull/51'
+  - timestamp: '2026-05-06T07:28:58.662Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: clippy 32s, format 14s, test 2m33s.'
+task_title: '[T-039] Extend `loker doctor` with TensorZero reachability check'
+task_url: https://linear.app/cloud-ai/issue/CLO-308/t-039-extend-loker-doctor-with-tensorzero-reachability-check
