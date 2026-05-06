@@ -20,6 +20,8 @@ pub mod trace;
 
 mod apply_verify;
 mod cache;
+pub mod commands;
+
 mod config;
 pub mod consensus;
 mod context;

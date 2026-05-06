@@ -18,6 +18,7 @@ mod doctor;
 // Module declarations mirror lib.rs for the binary crate tree.
 // `pub` is used to satisfy `pub use` re-exports within submodules;
 // binary crates cannot be imported by external consumers.
+pub mod commands;
 pub mod family;
 mod git_agent;
 pub mod manifest;
@@ -519,6 +520,20 @@ enum Commands {
         /// Focus on a specific aspect (e.g., "auth", "database", "api")
         #[arg(short, long)]
         focus: Option<String>,
+    },
+
+    /// Pretty-print the trace.jsonl from a run directory.
+    Trace {
+        /// Run directory name (under runs/) or absolute/relative path.
+        run_id: String,
+
+        /// Stream raw JSONL to stdout instead of pretty-printing.
+        #[arg(long)]
+        json: bool,
+
+        /// Force color output even if stdout is not a tty.
+        #[arg(long, value_enum)]
+        color: Option<loker::commands::trace::ColorChoice>,
     },
 }
 
@@ -1125,6 +1140,16 @@ async fn main() -> Result<()> {
                 cli.verbose,
             )
             .await?;
+        }
+        Commands::Trace {
+            run_id,
+            json,
+            color,
+        } => {
+            let run_dir = resolve_run_dir(&run_id)?;
+            let trace_path = run_dir.join("trace.jsonl");
+            let color = color.unwrap_or(loker::commands::trace::ColorChoice::Auto);
+            loker::commands::trace::run(&trace_path, json, color)?;
         }
     }
 
