@@ -77,6 +77,50 @@ fn parse_rerun_phase(s: &str) -> Result<String, String> {
     Ok(phase_name.to_string())
 }
 
+/// Walk ancestors from CWD looking for `lok.toml` to find the project root.
+fn find_project_root() -> Option<std::path::PathBuf> {
+    let mut cwd = std::env::current_dir().ok()?;
+    loop {
+        if cwd.join("lok.toml").exists() {
+            return Some(cwd);
+        }
+        if !cwd.pop() {
+            return None;
+        }
+    }
+}
+
+/// Resolve a `<run_id>` argument to an absolute run directory path.
+///
+/// - Absolute path → validates existence, returns.
+/// - Relative path (multi-component) → validates existence, returns.
+/// - Bare name → resolves via `<project_root>/runs/<run_id>`.
+fn resolve_run_dir(run_id: &str) -> anyhow::Result<std::path::PathBuf> {
+    let p = std::path::Path::new(run_id);
+    if p.is_absolute() || p.components().count() > 1 {
+        if p.exists() {
+            Ok(p.to_path_buf())
+        } else {
+            anyhow::bail!("Run '{}' not found.", run_id)
+        }
+    } else {
+        // Walk ancestors looking for a project root (lok.toml), matching
+        // the convention used by `loker run`. This ensures bare run_id
+        // names work regardless of the user's CWD.
+        let project_root = find_project_root()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let candidate = project_root.join("runs").join(run_id);
+        if candidate.exists() {
+            Ok(candidate)
+        } else {
+            anyhow::bail!(
+                "Run '{}' not found in runs/ directory or as an absolute path.",
+                run_id
+            )
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "loker")]
 #[command(about = "LLM orchestration: cross-family aggregation, escalating retry, verify hooks")]
@@ -114,11 +158,18 @@ enum Commands {
         no_cache: bool,
     },
 
-    /// Resume a partially-completed run (planner scaffolding; execution not yet wired)
-    #[command(hide = true)]
+    /// Resume a partially-completed run from the last completed phase marker.
+    ///
+    /// <run_id> is either the directory name under runs/
+    /// (e.g. design-20260505-123456-abc1def2) or an absolute/relative path
+    /// to the run directory.
+    ///
+    /// Use `loker run --rerun phase=<name>` to force-rerun a specific phase;
+    /// use `loker resume` to continue an interrupted run without re-executing
+    /// already-completed phases.
     Resume {
-        /// Path to the run directory to resume.
-        run_dir: PathBuf,
+        /// Run directory name (under runs/) or absolute/relative path.
+        run_id: String,
         /// Heartbeat TTL in seconds. Defaults to the value stored in
         /// heartbeat.json, or 300 if absent. Must match the original run.
         #[arg(long)]
@@ -922,7 +973,8 @@ async fn main() -> Result<()> {
             println!("{}", "Full output saved.".green());
             println!("{}", result);
         }
-        Commands::Resume { run_dir, ttl } => {
+        Commands::Resume { run_id, ttl } => {
+            let run_dir = resolve_run_dir(&run_id)?;
             use crate::resume::lock::RunLock;
             use crate::run_state::{read_ttl, RunState};
 
@@ -2412,5 +2464,50 @@ mod tests {
     fn test_parse_pr_missing_pr_number() {
         let result = parse_pr_identifier("https://github.com/owner/repo/pull/", None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_run_dir_not_found_bare_name() {
+        let result = resolve_run_dir("no-such-run");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("not found"),
+            "Expected 'not found' in error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_resolve_run_dir_not_found_absolute() {
+        let result = resolve_run_dir("/tmp/loker-nonexistent-run-xyz123");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("not found"),
+            "Expected 'not found' in error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_resolve_run_dir_absolute_path_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("run-dir");
+        std::fs::create_dir_all(&path).unwrap();
+        let result = resolve_run_dir(path.to_str().unwrap());
+        assert!(result.is_ok(), "Expected Ok, got: {:?}", result);
+        assert_eq!(result.unwrap(), path);
+    }
+
+    #[test]
+    fn test_find_project_root_no_lok_toml() {
+        // In a temp directory with no lok.toml, find_project_root returns None.
+        let dir = tempfile::tempdir().unwrap();
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        let result = find_project_root();
+        std::env::set_current_dir(original).unwrap();
+        assert!(result.is_none());
     }
 }
