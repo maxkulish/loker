@@ -20,10 +20,10 @@ linear:
   priority: High
   branch_actual: feat/clo-319-advisory
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-06T10:35:32.163Z'
-  updated_at: '2026-05-06T12:55:22.455Z'
+  updated_at: '2026-05-06T13:16:57.502Z'
 phases:
   discovery:
     status: complete
@@ -65,13 +65,22 @@ phases:
     plan_file: docs/plans/clo-319-advisory-lock.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - bbfb25f
       - fe1dac9
       - c374fde
+      - b89cb63
+      - 1962ea1
+    codex_report: docs/reviews/clo-319-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-319-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-319-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
   complete:
     status: pending
 history:
@@ -153,5 +162,19 @@ history:
     action: implementation_complete
     phase: implement
     details: All 4 sub-tasks landed. make check green. 3 commits on feat/clo-319-advisory.
+  - timestamp: '2026-05-06T13:15:07.215Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (shell heredoc). Gemini: REVIEW_FAILED (shell heredoc). Claude (fallback): APPROVED.
+      Synthesis: approve_with_changes. F1 fix applied (truncation). 1 fix iteration.
+  - timestamp: '2026-05-06T13:15:16.361Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T13:16:57.502Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
 task_title: '[T-050] First-write-wins per-phase advisory lock'
 task_url: https://linear.app/cloud-ai/issue/CLO-319/t-050-first-write-wins-per-phase-advisory-lock
