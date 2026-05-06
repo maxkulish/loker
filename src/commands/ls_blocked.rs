@@ -40,13 +40,19 @@ pub fn scan_blocked(root: &Path) -> Result<Vec<BlockedEntry>> {
     {
         let run_entry = run_entry?;
         let run_dir = run_entry.path();
-        if !run_dir.is_dir() {
+        if !fs::symlink_metadata(&run_dir)
+            .map(|metadata| metadata.is_dir())
+            .unwrap_or(false)
+        {
             continue;
         }
 
         let run_id = run_entry.file_name().to_string_lossy().to_string();
         let pending_dir = run_dir.join("pending");
-        if !pending_dir.is_dir() {
+        if !fs::symlink_metadata(&pending_dir)
+            .map(|metadata| metadata.is_dir())
+            .unwrap_or(false)
+        {
             continue;
         }
 
@@ -155,13 +161,13 @@ pub fn render_table<W: Write>(
 
     writeln!(
         writer,
-        "{:<24} {:<16} {:<8} {:<6} RESPONSE",
+        "{:<36} {:<16} {:<8} {:<6} RESPONSE",
         "RUN", "PHASE", "SEVERITY", "AGE"
     )?;
     for entry in entries {
         writeln!(
             writer,
-            "{:<24} {:<16} {:<8} {:<6} {}",
+            "{:<36} {:<16} {:<8} {:<6} {}",
             entry.run_id,
             entry.phase,
             entry.severity.as_str(),

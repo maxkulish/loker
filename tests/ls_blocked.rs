@@ -94,8 +94,8 @@ fn snapshot_mixed_blocked_and_completed() {
     let out = String::from_utf8(out).unwrap();
 
     insta::assert_snapshot!(out, @r###"
-RUN                      PHASE            SEVERITY AGE    RESPONSE
-blocked-old              review           high     3h     runs/blocked-old/responses/review.json
-mixed-run                verify           medium   2h     runs/mixed-run/responses/verify.json
+RUN                                  PHASE            SEVERITY AGE    RESPONSE
+blocked-old                          review           high     3h     runs/blocked-old/responses/review.json
+mixed-run                            verify           medium   2h     runs/mixed-run/responses/verify.json
 "###);
 }
