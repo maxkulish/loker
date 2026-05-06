@@ -1,0 +1,10 @@
+name = "explain-missing-ref"
+description = "Invalid workflow with a missing phase reference."
+
+[[phases]]
+name = "review"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "review"
+inputs = ["phase:missing"]
+output = "review.md"

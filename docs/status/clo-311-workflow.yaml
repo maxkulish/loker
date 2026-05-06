@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-05T15:20:52.408Z'
-  updated_at: '2026-05-06T07:12:47.631Z'
+  updated_at: '2026-05-06T07:13:58.995Z'
 phases:
   discovery:
     status: complete
@@ -67,6 +67,7 @@ phases:
     commits:
       - df9311f
       - e1add76
+      - cbf9d18
   pr:
     status: pending
   complete:
@@ -186,3 +187,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST2 landed: add workflow explanation model, analyzer, renderer, and unit tests. Commit e1add76'
+  - timestamp: '2026-05-06T07:13:58.995Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: wire unified top-level CLI behavior with workflow-first detection. Commit cbf9d18'
