@@ -23,7 +23,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-06T10:35:32.163Z'
-  updated_at: '2026-05-06T13:16:57.502Z'
+  updated_at: '2026-05-06T13:22:21.974Z'
 phases:
   discovery:
     status: complete
@@ -81,6 +81,16 @@ phases:
     validation_synthesis_verdict: approve_with_changes
   pr:
     status: in_progress
+    commits:
+      - bbfb25f
+      - fe1dac9
+      - c374fde
+      - b89cb63
+      - 1962ea1
+      - b69e9e1
+    pr_number: 55
+    pr_url: https://github.com/maxkulish/loker/pull/55
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -176,5 +186,13 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-06T13:19:36.117Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #55 opened: https://github.com/maxkulish/loker/pull/55'
+  - timestamp: '2026-05-06T13:22:21.974Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required CI checks passing: format, clippy, test'
 task_title: '[T-050] First-write-wins per-phase advisory lock'
 task_url: https://linear.app/cloud-ai/issue/CLO-319/t-050-first-write-wins-per-phase-advisory-lock

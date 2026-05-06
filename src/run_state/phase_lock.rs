@@ -85,6 +85,7 @@ impl PhaseLock {
         // Validate phase name
         if phase.is_empty()
             || phase.contains('/')
+            || phase.contains('\\')
             || phase.contains('\0')
             || phase.trim() == "."
             || phase.trim() == ".."
@@ -94,11 +95,18 @@ impl PhaseLock {
             });
         }
 
-        // Symlink hardening: ensure run_dir is a real directory
-        if !run_dir.is_dir() {
+        // Symlink hardening: ensure run_dir is a real directory (not a symlink)
+        if !std::fs::symlink_metadata(run_dir)
+            .map(|m| m.is_dir())
+            .ok()
+            .unwrap_or_default()
+        {
             return Err(PhaseLockError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("run directory not found: {}", run_dir.display()),
+                format!(
+                    "run directory not found or is a symlink: {}",
+                    run_dir.display()
+                ),
             )));
         }
 
@@ -108,8 +116,10 @@ impl PhaseLock {
         // Check for existing lock and staleness *before* trying the OS lock.
         // This is an optimization: if the holder is live, we short-circuit
         // without hitting the filesystem lock at all.
+        // Use lenient reading: corrupt or unparseable JSON is treated as stale
+        // (the OS lock is the authoritative guard).
         if lock_path.exists() {
-            if let Some(body) = read_lock_body(&lock_path)? {
+            if let Ok(Some(body)) = read_lock_body(&lock_path) {
                 if is_lock_body_live(&body) {
                     return Err(PhaseLockError::LockInUse {
                         phase: phase.to_owned(),
