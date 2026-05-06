@@ -115,7 +115,16 @@ async fn probe_tensorzero(config: &Config) -> CheckRow {
         }
     };
 
-    let url = format!("{}/health", endpoint.trim_end_matches('/'));
+    let url = {
+        let base = endpoint.trim_end_matches('/');
+        // The endpoint may already contain the /openai/v1 normalisation used
+        // by the TensorZero backend. Strip it so /health hits the gateway root.
+        let base = base
+            .trim_end_matches("/openai/v1/")
+            .trim_end_matches("/openai/v1")
+            .trim_end_matches('/');
+        format!("{}/health", base)
+    };
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
@@ -254,15 +263,15 @@ pub fn print_rows(rows: &[CheckRow]) {
     println!();
     for row in rows {
         if row.name == "tensorzero" {
-            if row.is_ok {
-                println!("  {} {} - {}", "✓".green(), row.name, row.status.green());
-            } else if row.status.contains("not configured") {
+            if row.status.contains("not configured") {
                 println!(
                     "  {} {} - {}",
                     "○".dimmed(),
                     row.name.dimmed(),
                     row.status.dimmed()
                 );
+            } else if row.is_ok {
+                println!("  {} {} - {}", "✓".green(), row.name, row.status.green());
             } else {
                 println!("  {} {} - {}", "✗".red(), row.name, row.status.red());
                 if let Some(ref d) = row.detail {
