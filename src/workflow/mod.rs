@@ -3488,8 +3488,10 @@ pub async fn find_workflow_in(name: &str, dir: &Path) -> Result<WorkflowSource> 
     } else {
         dir.join(path)
     };
-    if tokio::fs::metadata(&candidate_path).await.is_ok() {
-        return Ok(WorkflowSource::File(candidate_path));
+    if let Ok(metadata) = tokio::fs::metadata(&candidate_path).await {
+        if metadata.is_file() {
+            return Ok(WorkflowSource::File(candidate_path));
+        }
     }
 
     // Add .toml extension if not present
