@@ -1,0 +1,177 @@
+task_id: CLO-311
+task_title: '[T-042] `loker explain <workflow>` - DAG and per-phase strategy summary'
+task_url: https://linear.app/cloud-ai/issue/CLO-311/t-042-loker-explain-workflow-dag-and-per-phase-strategy-summary
+task_type: development
+classification_reason: >-
+  Title does not match spec/ops prefixes after ticket tag; issue requests adding a CLI subcommand with implementation
+  and tests.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Medium
+  branch_suggested: kmamemo/clo-311-t-042-loker-explain-workflow-dag-and-per-phase-strategy
+  branch_actual: feat/clo-311-loker-explain
+  blocks: []
+  blocked_by: []
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-05T15:20:52.408Z'
+  updated_at: '2026-05-06T07:09:54.398Z'
+phases:
+  discovery:
+    status: complete
+    approved: true
+    problem_framed: true
+    prd_exists: true
+    prd_file: docs/prds/clo-311-loker-explain-workflow.md
+    prd_created: true
+    discovery_report: docs/discovery/clo-311.md
+    discovery_debt: []
+    baseline_score: 7
+    approaches_identified: 3
+    approach_chosen: Unified top-level loker explain workflow-first detection
+  design:
+    status: complete
+    design_doc: docs/designs/clo-311-loker-explain-workflow.md
+    draft_ready: true
+    draft_source: manual-fallback
+    discovery_context_used: true
+    review_completed: true
+    review_gemini: docs/reviews/clo-311-design-gemini.md
+    review_synthesis: docs/reviews/clo-311-design-synthesis.md
+    review_verdict: approve_with_changes
+    applied_suggestions:
+      - Clarified phase-based vs legacy step-only workflow behavior.
+      - Resolved lookup-root strategy in favor of workflow::find_workflow_in(name, dir).
+      - Made raw TOML phase-grammar parsing explicit.
+      - Narrowed codebase fallback test recommendation to avoid brittle snapshots.
+    flagged_suggestions: []
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-311-loker-explain-workflow.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-05T15:20:52.408Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-311 as development
+  - timestamp: '2026-05-05T15:21:16.500Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: title does not match spec/ops prefixes after ticket tag; issue requests adding a CLI
+      subcommand with implementation and tests.
+  - timestamp: '2026-05-05T15:21:29.710Z'
+    action: linear_status_updated
+    phase: init
+    details: Moved Linear issue from Backlog to Todo.
+  - timestamp: '2026-05-05T15:21:44.274Z'
+    action: linear_metadata_recorded
+    phase: init
+    details: Recorded Linear title, URL, priority, suggested branch, dependencies, and classification reason in workflow state.
+  - timestamp: '2026-05-05T15:21:47.455Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-05T15:21:50.938Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-05T15:22:15.066Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-311-loker-explain checked out from main
+  - timestamp: '2026-05-05T15:22:24.703Z'
+    action: problem_framing_started
+    phase: discovery
+    details: Read Linear issue and references for loker explain workflow summary.
+  - timestamp: '2026-05-05T15:24:02.416Z'
+    action: prd_created
+    phase: discovery
+    details: >-
+      Created docs/prds/clo-311-loker-explain-workflow.md because the Linear issue referenced FR-34 but did not include
+      a PRD section.
+  - timestamp: '2026-05-05T15:24:34.946Z'
+    action: discovery_report_created
+    phase: discovery
+    details: >-
+      Created docs/discovery/clo-311.md with problem framing, existing-code findings, baseline score, three approaches,
+      and selected approach.
+  - timestamp: '2026-05-05T15:24:44.175Z'
+    action: linear_discovery_comment_posted
+    phase: discovery
+    details: Posted Linear discovery summary comment with chosen approach and report path.
+  - timestamp: '2026-05-05T15:25:00.202Z'
+    action: linear_status_updated
+    phase: discovery
+    details: Moved Linear issue to In Progress for discovery/design work.
+  - timestamp: '2026-05-05T15:25:14.530Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Unified top-level loker explain workflow-first detection. Baseline 7/10. 3 approaches considered.'
+  - timestamp: '2026-05-05T15:25:19.601Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-05T15:36:25.245Z'
+    action: design_draft_workflow_failed
+    phase: design
+    details: >-
+      lok design-draft produced a permission-wait placeholder instead of a full draft; falling back to manual 7-section
+      design draft.
+  - timestamp: '2026-05-05T15:37:42.998Z'
+    action: design_draft_ready
+    phase: design
+    details: Manual fallback draft created and reviewed end-to-end at docs/designs/clo-311-loker-explain-workflow.md
+  - timestamp: '2026-05-05T15:39:42.433Z'
+    action: design_review_complete
+    phase: design
+    details: 'Review verdict: approve_with_changes. 4 applied, 0 flagged.'
+  - timestamp: '2026-05-05T16:26:29.759Z'
+    action: design_human_review_pending
+    phase: design
+    details: >-
+      Plannotator annotate opened for docs/designs/clo-311-loker-explain-workflow.md but did not complete before the
+      30-minute tool timeout; human review gate remains pending.
+  - timestamp: '2026-05-06T07:05:23.622Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-06T07:05:37.077Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase
+  - timestamp: '2026-05-06T07:05:43.523Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-06T07:09:40.422Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 5 sub-tasks at docs/plans/clo-311-loker-explain-workflow.md
+  - timestamp: '2026-05-06T07:09:50.245Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 5 sub-tasks queued.
+  - timestamp: '2026-05-06T07:09:54.398Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
