@@ -204,10 +204,10 @@ impl HumanVerifier {
     ) -> Result<(VerifyResult, HumanVerifyReport), VerifyError> {
         let preview_lines = u32::try_from(ctx.stdout.lines().count()).unwrap_or(u32::MAX);
         let summary = ctx.stdout.chars().take(160).collect::<String>();
-        let default_report = || {
+        let default_report = |timeout_at: Option<String>| {
             HumanVerifyReport::from_policy(
                 self.config.severity,
-                None,
+                timeout_at,
                 self.config
                     .timeout_policy
                     .rule_for(self.config.severity)
@@ -231,7 +231,10 @@ impl HumanVerifier {
                     "malformed or missing human response for {}: {}",
                     self.config.phase, err
                 ));
-                return Ok((VerifyResult::Fail { reason }, default_report()));
+                return Ok((
+                    VerifyResult::Fail { reason },
+                    default_report(payload.timeout_at.clone()),
+                ));
             }
         };
 
@@ -249,7 +252,10 @@ impl HumanVerifier {
                         "response phase mismatch for {}: expected {}, got {}",
                         self.config.phase, self.config.phase, response.phase
                     ));
-                    return Ok((VerifyResult::Fail { reason }, default_report()));
+                    return Ok((
+                        VerifyResult::Fail { reason },
+                        default_report(payload.timeout_at.clone()),
+                    ));
                 }
 
                 self.consume_response("handled")?;
@@ -265,7 +271,7 @@ impl HumanVerifier {
                         VerifyResult::fail("human comment_only is not treated as approval")
                     }
                 };
-                Ok((result, default_report()))
+                Ok((result, default_report(None)))
             }
             None => {
                 let payload = self.pending_payload(
@@ -942,6 +948,30 @@ mod tests {
                     .contains("review.json.handled.")
             });
         assert!(consumed);
+    }
+
+    #[tokio::test]
+    async fn malformed_response_report_preserves_timeout_at() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(&tmp, HumanSeverity::Low, t0, HumanTimeoutPolicy::default());
+        hook.verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        let expected: PendingRequest = serde_json::from_str(
+            &fs::read_to_string(tmp.path().join("pending/review.json")).unwrap(),
+        )
+        .unwrap();
+
+        let response_path = hook.response_path();
+        fs::create_dir_all(response_path.parent().unwrap()).unwrap();
+        fs::write(&response_path, b"{not valid json}").unwrap();
+
+        let (_result, report) = hook
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert_eq!(report.timeout_at, expected.timeout_at);
     }
 
     #[tokio::test]
