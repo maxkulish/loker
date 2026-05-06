@@ -1,0 +1,168 @@
+task_id: CLO-313
+task_title: '[T-044] `loker ls --blocked` enumerating HITL-pending runs (Should)'
+task_url: https://linear.app/cloud-ai/issue/CLO-313/t-044-loker-ls-blocked-enumerating-hitl-pending-runs-should
+task_type: development
+classification_reason: >-
+  Issue describes adding a new loker ls --blocked subcommand with implementation acceptance criteria and no
+  specification/operational signals.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  priority: Low
+  branch_suggested: kmamemo/clo-313-t-044-loker-ls-blocked-enumerating-hitl-pending-runs-should
+  branch_actual: feat/clo-313-ls
+  blocks: []
+  blocked_by: []
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-06T19:47:47.918Z'
+  updated_at: '2026-05-06T20:13:55.048Z'
+phases:
+  discovery:
+    status: complete
+    approved: true
+    problem_framed: true
+    prd_exists: true
+    prd_file: docs/prds/clo-313-ls-blocked.md
+    prd_created: true
+    discovery_report: docs/discovery/clo-313.md
+    discovery_debt: []
+    baseline_score: 8
+    approaches_identified: 3
+    approach_chosen: Additive command module scanning pending/response files
+  design:
+    status: complete
+    design_doc: docs/designs/clo-313-ls-blocked.md
+    draft_ready: true
+    draft_source: claude-designer
+    discovery_context_used: true
+    review_completed: true
+    review_gemini: docs/reviews/clo-313-design-gemini.md
+    review_synthesis: docs/reviews/clo-313-design-synthesis.md
+    review_verdict: approve_with_changes
+    review_skip_reason: >-
+      AI design review pipeline failed in this environment: provider validation returned no usable review content and
+      synthesis did not run.
+    applied_suggestions:
+      - Use project-relative response paths for deterministic snapshots.
+      - Resolve implementation open questions before human review.
+    flagged_suggestions: []
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-313-ls-blocked.md
+    approved: true
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-06T19:47:47.918Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-313 as development
+  - timestamp: '2026-05-06T19:48:08.833Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: Issue describes adding a new loker ls --blocked subcommand with implementation
+      acceptance criteria and no specification/operational signals. Linear metadata: team=Cloud-ai, project=Loker,
+      status_at_start=Backlog, priority=Low,
+      branch_suggested=kmamemo/clo-313-t-044-loker-ls-blocked-enumerating-hitl-pending-runs-should, blocks=[],
+      blocked_by=[]. Title: [T-044] `loker ls --blocked` enumerating HITL-pending runs (Should). URL:
+      https://linear.app/cloud-ai/issue/CLO-313/t-044-loker-ls-blocked-enumerating-hitl-pending-runs-should
+  - timestamp: '2026-05-06T19:48:18.241Z'
+    action: linear_status_updated
+    phase: init
+    details: Updated Linear status from Backlog to Todo.
+  - timestamp: '2026-05-06T19:48:26.097Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-06T19:48:41.957Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-06T19:48:55.444Z'
+    action: branch_created
+    phase: discovery
+    details: >-
+      Branch feat/clo-313-ls already checked out; using existing branch for discovery.
+      linear.branch_actual=feat/clo-313-ls
+  - timestamp: '2026-05-06T19:49:45.177Z'
+    action: prd_created
+    phase: discovery
+    details: >-
+      Created PRD supplement at docs/prds/clo-313-ls-blocked.md for `loker ls --blocked` because the Linear issue
+      referenced FR-37 but did not include a dedicated PRD section.
+  - timestamp: '2026-05-06T19:50:11.947Z'
+    action: discovery_report_written
+    phase: discovery
+    details: >-
+      Wrote discovery report at docs/discovery/clo-313.md. Baseline 8/10; three approaches identified; chose additive
+      command module scanning pending/response files.
+  - timestamp: '2026-05-06T19:50:20.128Z'
+    action: linear_status_updated
+    phase: discovery
+    details: Updated Linear status from Todo to In Progress.
+  - timestamp: '2026-05-06T19:50:22.967Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Additive command module scanning pending/response files. Baseline 8/10. 3 approaches considered.'
+  - timestamp: '2026-05-06T19:50:35.450Z'
+    action: linear_comment_added
+    phase: discovery
+    details: Posted discovery completion comment to Linear with approach and report path.
+  - timestamp: '2026-05-06T19:50:42.047Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-06T20:03:15.849Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Draft generated by lok design-draft workflow/claude-designer at docs/designs/clo-313-ls-blocked.md; reviewed
+      end-to-end and accepted for AI review.
+  - timestamp: '2026-05-06T20:04:16.800Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 2 applied, 0 flagged. AI review pipeline failed in this environment; skip
+      reason recorded in docs/reviews/clo-313-design-*.md.
+  - timestamp: '2026-05-06T20:06:57.902Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-06T20:07:13.502Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase.
+  - timestamp: '2026-05-06T20:07:21.615Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-06T20:13:42.611Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 5 sub-tasks at docs/plans/clo-313-ls-blocked.md
+  - timestamp: '2026-05-06T20:13:48.432Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 5 sub-tasks queued.
+  - timestamp: '2026-05-06T20:13:55.048Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
