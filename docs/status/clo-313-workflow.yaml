@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-06T19:47:47.918Z'
-  updated_at: '2026-05-06T20:16:52.455Z'
+  updated_at: '2026-05-06T20:17:33.912Z'
 phases:
   discovery:
     status: complete
@@ -69,6 +69,7 @@ phases:
       - bf90e3f
       - f7bb4b5
       - 5663d53
+      - 64ff0e1
   pr:
     status: pending
   complete:
@@ -182,3 +183,7 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: wired `loker ls --blocked` CLI and bare `loker ls` error path. Commit 5663d53'
+  - timestamp: '2026-05-06T20:17:33.912Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: added mixed blocked/completed integration snapshot coverage. Commit 64ff0e1'
