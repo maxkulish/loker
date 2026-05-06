@@ -121,10 +121,7 @@ fn resolve_run_dir(run_id: &str) -> anyhow::Result<std::path::PathBuf> {
         let candidate = project_root.join("runs").join(run_id);
         if candidate.exists() {
             if !candidate.is_dir() {
-                anyhow::bail!(
-                    "'{}' in runs/ is not a directory.",
-                    run_id
-                );
+                anyhow::bail!("'{}' in runs/ is not a directory.", run_id);
             }
             Ok(candidate)
         } else {
