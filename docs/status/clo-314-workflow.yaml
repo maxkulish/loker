@@ -23,7 +23,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-06T19:46:17.122Z'
-  updated_at: '2026-05-06T20:58:30.569Z'
+  updated_at: '2026-05-06T21:02:07.850Z'
 phases:
   discovery:
     status: complete
@@ -57,8 +57,12 @@ phases:
     validation_fix_iteration_count: 1
     validation_synthesis_report: docs/reviews/clo-314-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
+    commits:
+      - fcfb08a
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 58
+    pr_url: https://github.com/maxkulish/loker/pull/58
   complete:
     status: pending
 history:
@@ -146,5 +150,17 @@ history:
     details: >-
       Codex: REVIEW_FAILED (shell escaping bug). Gemini: REVIEW_FAILED (same). Claude fallback: approve_with_changes.
       Synthesis: approve_with_changes. 5 Must Fix items applied in 1 fix iteration.
+  - timestamp: '2026-05-06T20:59:36.321Z'
+    action: subtask_complete
+    phase: implement
+    details: All sub-tasks landed + validation fixes applied. Commit fcfb08a
+  - timestamp: '2026-05-06T21:01:00.410Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'All pre-flight checks pass: fmt, clippy, test'
+  - timestamp: '2026-05-06T21:02:07.850Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #58 created at https://github.com/maxkulish/loker/pull/58'
 task_title: '[T-045] README rewrite: thesis, primitives, install, one-page example'
 task_url: https://linear.app/cloud-ai/issue/CLO-314/t-045-readme-rewrite-thesis-primitives-install-one-page
