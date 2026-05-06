@@ -1,0 +1,155 @@
+task_id: CLO-318
+task_title: '[T-049] Severity ladder (low/medium/high) for HITL gates'
+task_url: https://linear.app/cloud-ai/issue/CLO-318/t-049-severity-ladder-lowmediumhigh-for-hitl-gates
+task_type: development
+classification_reason: >-
+  no specification/operational markers; feature adds HumanVerifier severity handling, runtime behavior, trace/status
+  surfacing, docs, and tests.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-318-t-049-severity-ladder-lowmediumhigh-for-hitl-gates
+  priority: Medium
+  branch_actual: feat/clo-318-severity
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-06T10:37:20.857Z'
+  updated_at: '2026-05-06T12:24:17.571Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: 'Approach A: Extend HumanVerifierConfig with policy + clock seam'
+    approaches_identified: 3
+    approved: true
+    baseline_score: 7
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-318.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-318-severity-ladder.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-318-severity-ladder.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - F1 - replace internal timeout outcome mutex/state with verify_with_report returning HumanVerifyReport
+    flagged_suggestions:
+      - id: F2
+        reason: >-
+          MarkerWriter builder pattern is stylistic; additive write_completed_with_hitl/write_failed_with_hitl helpers
+          preserve existing API and minimize churn.
+    review_completed: true
+    review_gemini: docs/reviews/clo-318-design-gemini.md
+    review_synthesis: docs/reviews/clo-318-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-318-severity-ladder.md
+    approved: true
+  implement:
+    status: in_progress
+    commits: []
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-06T10:37:20.857Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-318 as development
+  - timestamp: '2026-05-06T10:37:56.516Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: no specification/operational markers; feature adds HumanVerifier severity handling,
+      runtime behavior, trace/status surfacing, docs, and tests.
+  - timestamp: '2026-05-06T10:38:00.395Z'
+    action: linear_status_updated
+    phase: init
+    details: Linear issue CLO-318 was in Backlog; updated status to Todo.
+  - timestamp: '2026-05-06T10:38:02.846Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-06T10:38:21.214Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-06T10:38:34.064Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-318-severity already checked out for discovery from main.
+  - timestamp: '2026-05-06T10:39:33.999Z'
+    action: prd_created
+    phase: discovery
+    details: Created PRD at docs/prds/clo-318-severity-ladder.md from Linear issue goal, scope, and acceptance criteria.
+  - timestamp: '2026-05-06T10:40:05.058Z'
+    action: discovery_report_written
+    phase: discovery
+    details: >-
+      Wrote discovery report at docs/discovery/clo-318.md with problem framing, existing-code findings, baseline score
+      7, and 3 approaches.
+  - timestamp: '2026-05-06T10:40:14.701Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Approach A: Extend HumanVerifierConfig with policy + clock seam. Baseline 7/10. 3 approaches considered.'
+  - timestamp: '2026-05-06T10:40:26.106Z'
+    action: linear_discovery_updated
+    phase: discovery
+    details: Moved Linear issue to In Progress and posted discovery completion comment.
+  - timestamp: '2026-05-06T10:40:28.237Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-06T12:01:47.852Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Draft generated manually at docs/designs/clo-318-severity-ladder.md after lok design-draft timed out; discovery
+      context used.
+  - timestamp: '2026-05-06T12:04:00.199Z'
+    action: design_review_complete
+    phase: design
+    details: 'Review verdict: approve_with_changes. 1 applied, 1 flagged.'
+  - timestamp: '2026-05-06T12:04:49.503Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-06T12:04:58.298Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase.
+  - timestamp: '2026-05-06T12:05:04.250Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-06T12:23:30.801Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 6 sub-tasks at docs/plans/clo-318-severity-ladder.md
+  - timestamp: '2026-05-06T12:24:14.729Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 6 sub-tasks queued.
+  - timestamp: '2026-05-06T12:24:17.571Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement

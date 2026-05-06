@@ -209,7 +209,9 @@ mod tests {
     use super::*;
     use crate::manifest::Kind;
     use crate::phase_runner::{AggregatorName, PhaseConfig, StrategyName};
-    use crate::strategy::verify::{HumanDecision, HumanSeverity, HumanVerifierConfig};
+    use crate::strategy::verify::{
+        HumanDecision, HumanSeverity, HumanTimeoutPolicy, HumanVerifierConfig,
+    };
     use crate::strategy::TargetSpec;
     use std::path::PathBuf;
 
@@ -248,6 +250,7 @@ mod tests {
             artefact_kind: Kind::DesignMd,
             severity: HumanSeverity::Medium,
             decision_options: vec![HumanDecision::Approve],
+            timeout_policy: HumanTimeoutPolicy::default(),
         });
 
         let hook = resolve_verify_hook(&single, None)

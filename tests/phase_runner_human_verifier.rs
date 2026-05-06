@@ -6,7 +6,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
 use loker::manifest::Kind;
-use loker::strategy::verify::{HumanDecision, HumanResponse, HumanSeverity, HumanVerifierConfig};
+use loker::strategy::verify::{
+    HumanDecision, HumanResponse, HumanSeverity, HumanTimeoutPolicy, HumanVerifierConfig,
+};
 use loker::strategy::{PhaseContext, Prompt};
 use loker::{PhaseConfig, PhaseInputs, PhaseRunner, VerifyHookName};
 
@@ -80,6 +82,7 @@ async fn phase_human_verifier_blocks_until_response() {
         artefact_kind: Kind::ReviewMd,
         severity: HumanSeverity::Medium,
         decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
+        timeout_policy: HumanTimeoutPolicy::default(),
     });
 
     let backend: Arc<dyn Backend> = Arc::new(MockBackend {
@@ -126,6 +129,7 @@ async fn phase_human_verifier_ignores_stale_response_after_consume() {
         artefact_kind: Kind::ReviewMd,
         severity: HumanSeverity::Medium,
         decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
+        timeout_policy: HumanTimeoutPolicy::default(),
     });
 
     let response_path = tmp.path().join("responses").join("review.json");
