@@ -2011,7 +2011,14 @@ async fn run_explain_unified(
     }
 
     let codebase_dir = target
-        .map(PathBuf::from)
+        .map(|target| {
+            let target_path = Path::new(target);
+            if target_path.is_absolute() {
+                target_path.to_path_buf()
+            } else {
+                dir.join(target_path)
+            }
+        })
         .unwrap_or_else(|| dir.to_path_buf());
     run_explain(&codebase_dir, backend_filter, focus, config, verbose).await
 }

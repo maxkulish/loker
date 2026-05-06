@@ -25,7 +25,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-05T15:20:52.408Z'
-  updated_at: '2026-05-06T07:25:43.423Z'
+  updated_at: '2026-05-06T07:28:40.231Z'
 phases:
   discovery:
     status: complete
@@ -82,6 +82,7 @@ phases:
     status: in_progress
     pr_url: https://github.com/maxkulish/loker/pull/50
     pr_number: 50
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -231,3 +232,7 @@ history:
     action: pr_created
     phase: pr
     details: 'PR #50 opened: https://github.com/maxkulish/loker/pull/50'
+  - timestamp: '2026-05-06T07:28:40.231Z'
+    action: ci_passed
+    phase: pr
+    details: All required checks passing

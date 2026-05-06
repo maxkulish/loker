@@ -83,11 +83,6 @@ pub fn explain_workflow(
     workflow: &grammar::Workflow,
     source: impl Into<String>,
 ) -> Result<WorkflowExplanation> {
-    let errors = workflow.validate();
-    if !errors.is_empty() {
-        return Err(invalid_workflow_error(&source.into(), errors));
-    }
-
     let phases = workflow
         .phases
         .iter()
