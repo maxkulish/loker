@@ -3450,6 +3450,7 @@ pub(crate) fn extract_json_from_text(text: &str) -> Option<String> {
 }
 
 /// Result of finding a workflow - either a file path or embedded content
+#[derive(Debug)]
 pub enum WorkflowSource {
     /// Workflow loaded from a file
     File(PathBuf),
@@ -3473,12 +3474,24 @@ pub async fn load_workflow_from_source(source: WorkflowSource) -> Result<Workflo
     load_workflow_from_source_with_depth(source, 0).await
 }
 
-/// Find workflow by name, checking project-local, global, and embedded workflows
+/// Find workflow by name, checking project-local, global, and embedded workflows.
 pub async fn find_workflow(name: &str) -> Result<WorkflowSource> {
-    // If it's already a path, use it directly
+    find_workflow_in(name, Path::new(".")).await
+}
+
+/// Find workflow by name from an explicit base directory.
+pub async fn find_workflow_in(name: &str, dir: &Path) -> Result<WorkflowSource> {
+    // If it's already a path, use it directly. Relative paths resolve against `dir`.
     let path = Path::new(name);
-    if tokio::fs::metadata(path).await.is_ok() {
-        return Ok(WorkflowSource::File(path.to_path_buf()));
+    let candidate_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        dir.join(path)
+    };
+    if let Ok(metadata) = tokio::fs::metadata(&candidate_path).await {
+        if metadata.is_file() {
+            return Ok(WorkflowSource::File(candidate_path));
+        }
     }
 
     // Add .toml extension if not present
@@ -3491,8 +3504,8 @@ pub async fn find_workflow(name: &str) -> Result<WorkflowSource> {
     // Strip .toml for embedded lookup
     let workflow_name = name.trim_end_matches(".toml");
 
-    // Check project-local .lok/workflows/
-    let local_path = PathBuf::from(".lok/workflows").join(&filename);
+    // Check project-local .lok/workflows/ under the supplied base dir.
+    let local_path = dir.join(".lok/workflows").join(&filename);
     if tokio::fs::metadata(&local_path).await.is_ok() {
         return Ok(WorkflowSource::File(local_path));
     }
@@ -3514,8 +3527,9 @@ pub async fn find_workflow(name: &str) -> Result<WorkflowSource> {
     }
 
     anyhow::bail!(
-        "Workflow '{}' not found. Searched:\n  - .lok/workflows/{}\n  - ~/.config/lok/workflows/{}\n  - embedded workflows",
+        "Workflow '{}' not found. Searched:\n  - {}/.lok/workflows/{}\n  - ~/.config/lok/workflows/{}\n  - embedded workflows",
         name,
+        dir.display(),
         filename,
         filename
     )
@@ -3825,6 +3839,32 @@ mod tests {
     use super::*;
     use crate::apply_verify::AttemptRecord;
     use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn find_workflow_in_resolves_project_local_workflow() {
+        let dir = tempdir().unwrap();
+        let workflow_dir = dir.path().join(".lok/workflows");
+        tokio::fs::create_dir_all(&workflow_dir).await.unwrap();
+        let workflow_path = workflow_dir.join("example.toml");
+        tokio::fs::write(
+            &workflow_path,
+            r#"
+name = "example"
+
+[[steps]]
+name = "one"
+prompt = "hello"
+"#,
+        )
+        .await
+        .unwrap();
+
+        let source = find_workflow_in("example", dir.path()).await.unwrap();
+        match source {
+            WorkflowSource::File(path) => assert_eq!(path, workflow_path),
+            other => panic!("expected file workflow source, got {other:?}"),
+        }
+    }
 
     #[test]
     fn test_translate_contains_call() {
@@ -6950,5 +6990,6 @@ prompt = "p"
     }
 }
 
+pub mod explain;
 pub mod grammar;
 pub mod template;

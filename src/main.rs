@@ -439,10 +439,13 @@ enum Commands {
         backend: Option<String>,
     },
 
-    /// Explain a codebase structure and architecture
+    /// Explain a workflow DAG or codebase structure and architecture
     Explain {
-        /// Directory to analyze
-        #[arg(default_value = ".")]
+        /// Workflow name/path to explain, or directory for codebase explanation
+        target: Option<String>,
+
+        /// Directory used for workflow lookup and codebase explanation
+        #[arg(short, long, default_value = ".")]
         dir: PathBuf,
 
         /// Specific backends to use (comma-separated)
@@ -1081,11 +1084,13 @@ async fn main() -> Result<()> {
             .await?;
         }
         Commands::Explain {
+            target,
             dir,
             backend,
             focus,
         } => {
-            run_explain(
+            run_explain_unified(
+                target.as_deref(),
                 &dir,
                 backend.as_deref(),
                 focus.as_deref(),
@@ -1977,6 +1982,45 @@ Organize your review by severity (critical, important, minor, nitpick)."#
     }
 
     Ok(())
+}
+
+async fn run_explain_unified(
+    target: Option<&str>,
+    dir: &Path,
+    backend_filter: Option<&str>,
+    focus: Option<&str>,
+    config: &config::Config,
+    verbose: bool,
+) -> Result<()> {
+    if let Some(target) = target {
+        match workflow::find_workflow_in(target, dir).await {
+            Ok(source) => {
+                let explanation = workflow::explain::explain_workflow_source(source).await?;
+                print!("{}", workflow::explain::render_text(&explanation));
+                return Ok(());
+            }
+            Err(err) => {
+                let target_path = Path::new(target);
+                let dir_relative_target = dir.join(target_path);
+                if !target_path.is_dir() && !dir_relative_target.is_dir() {
+                    return Err(err);
+                }
+                // Not a workflow; preserve existing codebase explanation behavior for directories.
+            }
+        }
+    }
+
+    let codebase_dir = target
+        .map(|target| {
+            let target_path = Path::new(target);
+            if target_path.is_absolute() {
+                target_path.to_path_buf()
+            } else {
+                dir.join(target_path)
+            }
+        })
+        .unwrap_or_else(|| dir.to_path_buf());
+    run_explain(&codebase_dir, backend_filter, focus, config, verbose).await
 }
 
 async fn run_explain(
