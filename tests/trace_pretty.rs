@@ -42,7 +42,7 @@ fn json_passthrough_errors_when_file_missing() {
 }
 
 #[test]
-fn cli_smoke_run_id_resolution() {
+fn traceprinter_rundir_roundtrip() {
     use loker::run_state::RunDir;
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = RunDir::create(tmp.path(), "test-workflow").unwrap();

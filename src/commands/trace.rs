@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn renders_error_span_in_red_bold() {
-        colored::control::set_override(true);
+        let _guard = tests::ColorOverrideGuard::new(true);
         let span = serde_json::json!({
             "trace_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
             "span_id": "err7890abc123def4",
@@ -414,7 +414,25 @@ mod tests {
             "expected red ANSI escape in: {:?}",
             out
         );
-        colored::control::set_override(false);
+    }
+
+    /// RAII guard that restores the old `colored` override on drop.
+    struct ColorOverrideGuard {
+        previous: bool,
+    }
+
+    impl ColorOverrideGuard {
+        fn new(value: bool) -> Self {
+            let previous = control::SHOULD_COLORIZE.should_colorize();
+            control::set_override(value);
+            Self { previous }
+        }
+    }
+
+    impl Drop for ColorOverrideGuard {
+        fn drop(&mut self) {
+            control::set_override(self.previous);
+        }
     }
 
     #[test]
