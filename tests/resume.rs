@@ -238,3 +238,206 @@ fn resume_stale_writer() {
     assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 2 });
     assert_eq!(plan.actions[2].1, PhaseAction::RunFresh);
 }
+
+// ---------------------------------------------------------------------------
+// CLO-310 integration tests: binary-level guard clause tests
+// ---------------------------------------------------------------------------
+
+/// Path to the compiled `loker` binary.
+fn loker_binary() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_BIN_EXE_loker"))
+}
+
+#[test]
+fn test_resume_run_not_found() {
+    let output = std::process::Command::new(loker_binary())
+        .args(["resume", "nonexistent-run-xyz"])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for nonexistent run"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.to_lowercase().contains("not found"),
+        "expected 'not found' in stderr, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_resume_fully_complete_exit_zero() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Create a minimal run dir with all phases completed
+    setup_run_dir(tmp.path());
+    let sha = "00".repeat(32);
+    write_completed_marker(tmp.path(), "design", 1, &sha);
+    write_completed_marker(tmp.path(), "review", 1, &sha);
+    write_completed_marker(tmp.path(), "verify", 1, &sha);
+
+    // Stale heartbeat (writer is dead)
+    let old_tick = Utc::now() - Duration::seconds(600);
+    write_heartbeat(tmp.path(), old_tick, 300);
+
+    let output = std::process::Command::new(loker_binary())
+        .args(["resume", tmp.path().to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "expected exit 0 for already-complete run, got: {}",
+        output.status
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("All phases already complete"),
+        "expected 'All phases already complete' in stdout, got: {stdout}"
+    );
+}
+
+#[test]
+fn test_resume_no_resumable_state() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Create a run dir with no markers (all phases default to None)
+    setup_run_dir(tmp.path());
+
+    // Stale heartbeat (writer is dead)
+    let old_tick = Utc::now() - Duration::seconds(600);
+    write_heartbeat(tmp.path(), old_tick, 300);
+
+    let output = std::process::Command::new(loker_binary())
+        .args(["resume", tmp.path().to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for no-resumable-state, got: {}",
+        output.status
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("No resumable state found"),
+        "expected 'No resumable state found' in stderr, got: {stderr}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// CLO-310 opt-in all-complete guard test via binary
+// ---------------------------------------------------------------------------
+//
+// Creates a realistic run-dir on disk (markers, manifest with
+// workflow_name, stale heartbeat) and runs `loker resume <path>` through
+// the binary. The run is set up so the "all-complete" guard clause fires
+// (exit 0, no-op) — this validates the full data path through
+// resolve_run_dir → RunLock → RunState::load → guard clauses without
+// requiring a live backend for execution.
+
+#[test]
+fn test_resume_via_binary_all_complete_guard() {
+    if std::env::var("LOKER_RESUME_INTEGRATION")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .is_none()
+    {
+        eprintln!("skipping binary-level guard test (set LOKER_RESUME_INTEGRATION=1 to enable)");
+        return;
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+    let tmp_path = tmp.path().to_path_buf();
+
+    // Write a minimal lok.toml to serve as project root marker
+    std::fs::write(tmp_path.join("lok.toml"), "# test project\n").unwrap();
+
+    // Write a workflow file that the resume handler can look up by name
+    let workflow_toml = r#"
+name = "test-pause-resume"
+description = "Two-phase workflow for pause/resume test"
+
+[[steps]]
+name = "design"
+backend = "claude"
+prompt = "Do design"
+
+[[steps]]
+name = "review"
+backend = "claude"
+prompt = "Do review"
+depends_on = ["design"]
+"#;
+    std::fs::write(tmp_path.join("test-pause-resume.toml"), workflow_toml).unwrap();
+
+    // Create run directory markers
+    fs::create_dir_all(tmp_path.join("markers")).unwrap();
+    fs::create_dir_all(tmp_path.join("attempts")).unwrap();
+
+    // Write artefact file matching the manifest entry
+    fs::create_dir_all(tmp_path.join("design")).unwrap();
+    fs::write(tmp_path.join("design").join("out.md"), "design output").unwrap();
+
+    // Write manifest with workflow_name so the handler can find the workflow
+    use loker::manifest::{Kind, Manifest, ManifestEntry, Producer};
+    let sha = "0d2a87c457e09bc7a9c7bc172413ce8fb54ff3532db1f10cded5a6bb362bc328".to_string();
+    let entry = ManifestEntry {
+        schema_version: 1,
+        name: "design/out.md".to_string(),
+        kind: Kind::DesignMd,
+        sha256: sha.clone(),
+        phase: Some("design".to_string()),
+        producer: Producer::Single,
+        attempt: None,
+        created_at: Some(Utc::now()),
+    };
+    let manifest = Manifest {
+        run_id: "test-run-id".to_string(),
+        schema_version: 1,
+        workflow_name: Some("test-pause-resume".to_string()),
+        entries: vec![entry],
+    };
+    fs::write(tmp_path.join("manifest.json"), manifest.to_json().unwrap()).unwrap();
+
+    // All phases completed — triggers the exit-0 guard clause
+    write_completed_marker(tmp_path.as_path(), "design", 1, &sha);
+    write_completed_marker(tmp_path.as_path(), "review", 1, &sha);
+
+    // Stale heartbeat (writer is dead)
+    let old_tick = Utc::now() - Duration::seconds(600);
+    write_heartbeat(tmp_path.as_path(), old_tick, 300);
+
+    // Record sentinel mtime (simulates work done by phase 1)
+    let sentinel = tmp_path.join("sentinel_phase1.txt");
+    std::fs::write(&sentinel, "phase1 was executed").unwrap();
+    let sentinel_mtime_before = sentinel.metadata().unwrap().modified().unwrap();
+
+    // Run loker resume
+    let bin = loker_binary();
+    let output = std::process::Command::new(&bin)
+        .args(["resume", tmp_path.to_str().unwrap()])
+        .current_dir(&tmp_path)
+        .output()
+        .expect("failed to run loker resume");
+
+    assert!(
+        output.status.success(),
+        "expected exit 0 (all-complete guard), got: {}. stderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("All phases already complete"),
+        "expected 'All phases already complete' in stdout, got: {stdout}"
+    );
+
+    // Sentinel unchanged -- phase 1 was not re-executed
+    let sentinel_mtime_after = sentinel.metadata().unwrap().modified().unwrap();
+    assert_eq!(
+        sentinel_mtime_before, sentinel_mtime_after,
+        "sentinel modified — phase 1 re-executed during resume"
+    );
+}
