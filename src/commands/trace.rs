@@ -58,13 +58,13 @@ impl<W: Write> TracePrinter<W> {
 
     /// Render a single already-parsed JSON span.
     pub fn render_span(&mut self, span: &serde_json::Value) -> Result<()> {
-        let formatted = format_span(span);
-        if should_colorize(self.color) {
-            let colored = colorize_line(&formatted);
-            writeln!(self.writer, "{colored}")?;
+        let (formatted, status) = format_span(span);
+        let colored = if should_colorize(self.color) {
+            colorize_line(&formatted, status)
         } else {
-            writeln!(self.writer, "{formatted}")?;
-        }
+            formatted
+        };
+        writeln!(self.writer, "{colored}")?;
         Ok(())
     }
 }
@@ -101,23 +101,24 @@ fn should_colorize(choice: ColorChoice) -> bool {
     }
 }
 
-/// Apply color to tokens within a pre-formatted line based on status markers.
-fn colorize_line(line: &str) -> String {
-    if line.contains(" ERROR ")
-        || line.contains(" FAIL ")
-        || line.contains("[error]")
-        || line.starts_with("<error>")
-    {
-        line.red().bold().to_string()
-    } else if line.contains(" REPAIR ") || line.contains("[verify_failed]") {
-        line.yellow().to_string()
-    } else if line.contains(" PASS ")
-        || line.contains("[success]")
-        || line.contains("[verify_passed]")
-    {
-        line.green().to_string()
-    } else {
-        line.to_string()
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Status {
+    Pass,
+    Fail,
+    Repair,
+    Error,
+    Shortfall,
+    None,
+}
+
+/// Apply color to the formatted line based on its status.
+fn colorize_line(line: &str, status: Status) -> String {
+    match status {
+        Status::Error => line.red().bold().to_string(),
+        Status::Fail | Status::Shortfall => line.red().to_string(),
+        Status::Repair => line.yellow().to_string(),
+        Status::Pass => line.green().to_string(),
+        Status::None => line.to_string(),
     }
 }
 
@@ -134,22 +135,18 @@ enum SpanKind {
 
 impl SpanKind {
     fn from_name(name: &str) -> Self {
-        if name == "phase.finished" {
+        if name.ends_with(".finished") {
             Self::Finished
+        } else if name.ends_with(".error") {
+            Self::Error
         } else if name.starts_with("phase.") {
-            if name == "phase.error" || name.ends_with(".error") {
-                Self::Error
-            } else {
-                Self::Phase
-            }
+            Self::Phase
         } else if name.starts_with("backend.") {
             Self::Backend
         } else if name.starts_with("aggregator.") {
             Self::Aggregator
         } else if name.starts_with("verify.") {
             Self::Verify
-        } else if name == "phase.finished" || name.ends_with(".finished") {
-            Self::Finished
         } else {
             Self::Other
         }
@@ -168,10 +165,12 @@ impl SpanKind {
     }
 }
 
-fn format_span(span: &serde_json::Value) -> String {
+/// Format a JSON span into a single (plain, ≤80 visible char) line,
+/// together with its status classification.
+fn format_span(span: &serde_json::Value) -> (String, Status) {
     let obj = match span.as_object() {
         Some(o) => o,
-        None => return "<not-an-object>".to_string(),
+        None => return ("<not-an-object>".to_string(), Status::Error),
     };
 
     let stamp = obj
@@ -240,12 +239,37 @@ fn format_span(span: &serde_json::Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    let status = if !error_kind.is_empty() || !error_msg.is_empty() {
+    let min_responses_met = obj.get("loker.min_responses_met").and_then(|v| v.as_bool());
+
+    let mut status_str = if !error_kind.is_empty() || !error_msg.is_empty() {
         format!("[{}] {}", error_kind, error_msg)
     } else if !outcome.is_empty() && outcome != "success" {
         format!("[{}]", outcome)
     } else {
         String::new()
+    };
+    if min_responses_met == Some(false) {
+        status_str = if status_str.is_empty() {
+            "[shortfall]".to_string()
+        } else {
+            format!("{} [shortfall]", status_str)
+        };
+    }
+
+    let status = if min_responses_met == Some(false) {
+        Status::Shortfall
+    } else if !error_kind.is_empty() || !error_msg.is_empty() {
+        Status::Error
+    } else if !outcome.is_empty() {
+        match outcome {
+            "success" | "verify_passed" => Status::Pass,
+            "verify_failed" => Status::Fail,
+            "aggregator_failed" | "backend_error" | "io_failed" | "manifest_failed"
+            | "marker_failed" | "phase_failed" | "strategy_failed" | "timeout" => Status::Error,
+            _ => Status::Repair,
+        }
+    } else {
+        Status::None
     };
 
     // Build the line, truncating variable fields as needed.
@@ -254,7 +278,7 @@ fn format_span(span: &serde_json::Value) -> String {
     parts.push(phase.to_string());
     parts.push(kind.label().to_string());
     if !backend.is_empty() {
-        parts.push(fit(backend, 12));
+        parts.push(truncate(backend, 12));
     }
     if !dur.is_empty() {
         parts.push(dur);
@@ -262,32 +286,39 @@ fn format_span(span: &serde_json::Value) -> String {
     if !tokens.is_empty() {
         parts.push(tokens);
     }
-    if !status.is_empty() {
-        parts.push(fit(&status, 30));
+    if !status_str.is_empty() {
+        parts.push(truncate(&status_str, 30));
     }
 
     let mut line = parts.join(" ");
     if line.len() > 80 {
-        line = fit(&line, 79) + "…";
+        line = fit(&line, 80);
     }
-    line
+    (line, status)
 }
 
-/// Truncate `s` to at most `max` *bytes*, never splitting a multi-byte
-/// UTF-8 sequence.
+/// Truncate `s` to at most `max` *bytes* of visible content, appending
+/// `…` when truncation actually occurs. Never splits a multi-byte UTF-8
+/// sequence.
 fn fit(s: &str, max: usize) -> String {
     if s.len() <= max {
         return s.to_string();
     }
-    let mut end = max;
+    // Reserve 3 bytes for the ellipsis at the end.
+    let max_inner = max.saturating_sub(3);
+    let mut end = max_inner;
     while end > 0 && !s.is_char_boundary(end) {
         end -= 1;
     }
     if end == 0 {
-        // fall back to first char
         end = s.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
     }
-    s[..end].to_string()
+    format!("{}…", &s[..end])
+}
+
+/// Wrapper around `fit` that does nothing for non-truncated inputs.
+fn truncate(s: &str, max: usize) -> String {
+    fit(s, max)
 }
 
 /// Format token counts compactly (e.g. "1.2k+3.4k").
@@ -358,7 +389,8 @@ mod tests {
     }
 
     #[test]
-    fn renders_error_span() {
+    fn renders_error_span_in_red_bold() {
+        colored::control::set_override(true);
         let span = serde_json::json!({
             "trace_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
             "span_id": "err7890abc123def4",
@@ -376,6 +408,32 @@ mod tests {
         assert!(out.contains("error"));
         assert!(out.contains("backend_error"));
         assert!(out.contains("timeout"));
+        // ANSI red + bold escapes
+        assert!(
+            out.contains("\u{1b}[31m") || out.contains("\u{1b}[1;31m"),
+            "expected red ANSI escape in: {:?}",
+            out
+        );
+        colored::control::set_override(false);
+    }
+
+    #[test]
+    fn renders_min_responses_shortfall() {
+        let span = serde_json::json!({
+            "trace_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+            "span_id": "shf123abc456def78",
+            "timestamp": "2026-04-25T20:46:11Z",
+            "name": "aggregator.concat",
+            "loker.phase": "review",
+            "loker.outcome": "success",
+            "loker.min_responses_met": false,
+        });
+        let mut buf = Vec::new();
+        TracePrinter::new(&mut buf, ColorChoice::Never)
+            .render_span(&span)
+            .unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("[shortfall]"));
     }
 
     #[test]
@@ -410,31 +468,41 @@ mod tests {
             .render_span(&span)
             .unwrap();
         let line = String::from_utf8(buf).unwrap();
-        // visible bytes <= 80; the ... adds 3 bytes on top of truncation logic
         let visible = line.trim_end();
         assert!(visible.len() <= 80, "line too long: {}", visible.len());
+        assert!(visible.contains('…'));
     }
 
     #[test]
     fn fit_does_not_split_unicode() {
-        assert_eq!(fit("αβγδ", 3), "α");
-        assert_eq!(fit("αβγδ", 4), "αβ");
-        assert_eq!(fit("aαb", 2), "a");
+        assert_eq!(fit("αβγδ", 4), "α…");
+        assert_eq!(fit("αβγδ", 5), "α…");
+        assert_eq!(fit("αβγδ", 7), "αβ…");
+        assert_eq!(fit("aαb", 2), "a…");
+        assert_eq!(fit("hello", 8), "hello");
     }
 
     #[test]
     fn malformed_line_does_not_abort() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("trace.jsonl");
-        std::fs::write(&path, "\nbad json\n{\"timestamp\":\"2026-04-25T20:45:00Z\",\"name\":\"phase.x\",\"trace_id\":\"t\",\"span_id\":\"s\"}\n").unwrap();
+        std::fs::write(
+            &path,
+            r#"{"timestamp":"2026-04-25T20:45:00Z","name":"phase.x","trace_id":"t","span_id":"s1","loker.phase":"design"}
+bad json
+{"timestamp":"2026-04-25T20:45:01Z","name":"phase.y","trace_id":"t","span_id":"s2","loker.phase":"implement"}
+"#,
+        )
+        .unwrap();
 
         let mut buf = Vec::new();
         TracePrinter::new(&mut buf, ColorChoice::Never)
             .render_file(&path)
             .unwrap();
         let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("design"));
         assert!(out.contains("<malformed>"));
-        assert!(out.contains("phase"));
+        assert!(out.contains("implement"));
     }
 
     #[test]
@@ -448,6 +516,58 @@ mod tests {
         assert_eq!(SpanKind::from_name("verify.make_check"), SpanKind::Verify);
         assert_eq!(SpanKind::from_name("phase.finished"), SpanKind::Finished);
         assert_eq!(SpanKind::from_name("phase.error"), SpanKind::Error);
+        assert_eq!(SpanKind::from_name("phase.x.error"), SpanKind::Error);
+        assert_eq!(SpanKind::from_name("phase.x.finished"), SpanKind::Finished);
+    }
+
+    #[test]
+    fn status_derivation_table() {
+        let json = |o: &str, e: &str, mr: bool| {
+            let mut m = serde_json::Map::new();
+            if !o.is_empty() {
+                m.insert("loker.outcome".into(), serde_json::Value::String(o.into()));
+            }
+            if !e.is_empty() {
+                m.insert("error.kind".into(), serde_json::Value::String(e.into()));
+            }
+            m.insert(
+                "loker.min_responses_met".into(),
+                serde_json::Value::Bool(mr),
+            );
+            serde_json::Value::Object(m)
+        };
+
+        // error overrides everything
+        assert_eq!(
+            format_span(&json("success", "backend_error", true)).1,
+            Status::Error
+        );
+        // min_responses_met = false → Shortfall even with success
+        assert_eq!(
+            format_span(&json("success", "", false)).1,
+            Status::Shortfall
+        );
+        // normal outcomes
+        assert_eq!(
+            format_span(&json("verify_passed", "", true)).1,
+            Status::Pass
+        );
+        assert_eq!(
+            format_span(&json("verify_failed", "", true)).1,
+            Status::Fail
+        );
+        assert_eq!(
+            format_span(&json("strategy_failed", "", true)).1,
+            Status::Error
+        );
+        assert_eq!(
+            format_span(&json("backend_error", "", true)).1,
+            Status::Error
+        );
+        // unknown outcome
+        assert_eq!(format_span(&json("custom", "", true)).1, Status::Repair);
+        // no outcome, no error, min_responses_met = true → None
+        assert_eq!(format_span(&json("", "", true)).1, Status::None);
     }
 
     #[test]
