@@ -25,7 +25,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-05T15:20:52.408Z'
-  updated_at: '2026-05-06T07:09:54.398Z'
+  updated_at: '2026-05-06T07:11:28.241Z'
 phases:
   discovery:
     status: complete
@@ -63,7 +63,9 @@ phases:
     plan_file: docs/plans/clo-311-loker-explain-workflow.md
     approved: true
   implement:
-    status: pending
+    status: in_progress
+    commits:
+      - df9311f
   pr:
     status: pending
   complete:
@@ -175,3 +177,7 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-06T07:11:28.241Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: add workflow lookup from explicit base directory. Commit df9311f'
