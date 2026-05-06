@@ -18,10 +18,10 @@ linear:
   priority: High
   branch_actual: feat/clo-310-resume
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-05T15:16:31.958Z'
-  updated_at: '2026-05-06T07:37:20.020Z'
+  updated_at: '2026-05-06T08:44:31.130Z'
 phases:
   discovery:
     status: complete
@@ -61,14 +61,25 @@ phases:
     plan_file: docs/plans/clo-310-loker-resume.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - 32c96ae
       - 97930dd
       - 912d765
       - '4625805'
+      - b756056
+    codex_report: docs/reviews/clo-310-codex-validation.md
+    codex_validated: true
+    codex_verdict: rework
+    gemini_validation_report: docs/reviews/clo-310-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-310-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 52
+    pr_url: https://github.com/maxkulish/loker/pull/52
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -149,5 +160,28 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed (ST1-ST5). make check green. 4 commits.
+  - timestamp: '2026-05-06T08:36:59.340Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (script quoting bug). Gemini: REVIEW_FAILED (same bug). Synthesis: approve_with_changes
+      (after 1 fix iteration: F1 descoped, F2 removed nix, F3 find_project_root_from, F5 typos). Follow-up filed
+      CLO-325.
+  - timestamp: '2026-05-06T08:38:29.727Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T08:40:21.800Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-06T08:41:47.467Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #52 opened: https://github.com/maxkulish/loker/pull/52'
+  - timestamp: '2026-05-06T08:44:31.130Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required CI checks passing: clippy, format, test'
 task_title: '[T-041] `loker resume <run_id>` CLI subcommand'
 task_url: https://linear.app/cloud-ai/issue/CLO-310/t-041-loker-resume-run-id-cli-subcommand

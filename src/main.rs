@@ -112,8 +112,9 @@ fn resolve_run_dir(run_id: &str) -> anyhow::Result<std::path::PathBuf> {
         // Walk ancestors looking for a project root (lok.toml), matching
         // the convention used by `loker run`. This ensures bare run_id
         // names work regardless of the user's CWD.
-        let project_root =
-            find_project_root().unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let project_root = find_project_root()
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_default();
         let candidate = project_root.join("runs").join(run_id);
         if candidate.exists() {
             Ok(candidate)

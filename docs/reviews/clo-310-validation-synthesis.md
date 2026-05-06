@@ -47,7 +47,7 @@ pivot
 | **F4** (LOW) `loker_binary()` path | Deferred to follow-up hygiene pass | Deferred |
 | **F6** (LOW) Workflow YAML status | Updated by orchestrator as part of this phase | Done |
 
-**Follow-up filed:** CLO-XXX — "Add runner-level resume round-trip integration test after phase runner is wired into loker run"
+**Follow-up filed:** CLO-325 — "Add runner-level resume round-trip integration test after phase runner is wired into loker run"
 
 ## Updated Verdict
 approve_with_changes

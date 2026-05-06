@@ -245,10 +245,7 @@ fn resume_stale_writer() {
 
 /// Path to the compiled `loker` binary.
 fn loker_binary() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("debug")
-        .join("loker")
+    std::path::PathBuf::from(env!("CARGO_BIN_EXE_loker"))
 }
 
 #[test]
