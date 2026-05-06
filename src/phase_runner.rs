@@ -332,13 +332,6 @@ impl PhaseRunner {
         let (verify_result, verify_hitl_report) = if matches!(&cfg.verify, VerifyHookName::None) {
             (None, None)
         } else {
-            let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
-            let hook = hook.ok_or_else(|| {
-                PhaseError::InvalidConfig(format!(
-                    "verify hook {:?} requires PhaseInputs::verify",
-                    cfg.verify
-                ))
-            })?;
             let selected = strategy_output.attempts.get(selected_attempt as usize);
             let vctx = crate::strategy::VerifyContext {
                 stdout: String::from_utf8_lossy(&bytes).into_owned(),
@@ -358,7 +351,16 @@ impl PhaseRunner {
                     let (result, report) = verifier.verify_with_report(&vctx).await?;
                     (result, Some(report))
                 }
-                _ => (hook.verify(&vctx).await?, None),
+                _ => {
+                    let hook = dispatch::resolve_verify_hook(cfg, inputs.verify.clone())?;
+                    let hook = hook.ok_or_else(|| {
+                        PhaseError::InvalidConfig(format!(
+                            "verify hook {:?} requires PhaseInputs::verify",
+                            cfg.verify
+                        ))
+                    })?;
+                    (hook.verify(&vctx).await?, None)
+                }
             };
             let vdur = vstart.elapsed().as_millis() as u64;
             if let Some(t) = trace_sink {

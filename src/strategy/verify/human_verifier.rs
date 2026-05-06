@@ -94,6 +94,12 @@ impl HumanVerifier {
                     path.display()
                 ))
             })?;
+            if payload.schema_version != SCHEMA_VERSION {
+                return Err(VerifyError::new(format!(
+                    "unsupported pending schema version for phase {}: expected {}, got {}",
+                    self.config.phase, SCHEMA_VERSION, payload.schema_version
+                )));
+            }
             return Ok(payload);
         }
 
@@ -149,6 +155,15 @@ impl HumanVerifier {
                 self.config.phase
             ))
         })
+    }
+
+    fn existing_pending_timeout_at(&self) -> Option<String> {
+        let path = self.pending_path();
+        let text = std::fs::read_to_string(path).ok()?;
+        let payload: PendingRequest = serde_json::from_str(&text).ok()?;
+        (payload.schema_version == SCHEMA_VERSION)
+            .then_some(payload.timeout_at)
+            .flatten()
     }
 
     fn parse_response(&self) -> Result<Option<HumanResponse>, String> {
@@ -260,6 +275,7 @@ impl HumanVerifier {
 
                 self.consume_response("handled")?;
 
+                let timeout_at = self.existing_pending_timeout_at();
                 let result = match response.decision {
                     HumanDecision::Approve => VerifyResult::pass(),
                     HumanDecision::Reject => VerifyResult::fail(format!(
@@ -271,7 +287,7 @@ impl HumanVerifier {
                         VerifyResult::fail("human comment_only is not treated as approval")
                     }
                 };
-                Ok((result, default_report(None)))
+                Ok((result, default_report(timeout_at)))
             }
             None => {
                 let payload = self.pending_payload(
@@ -282,12 +298,27 @@ impl HumanVerifier {
                 )?;
                 self.ensure_pending_file(&payload)?;
                 let rule = self.config.timeout_policy.rule_for(payload.severity);
-                let timed_out = payload
-                    .timeout_at
-                    .as_deref()
-                    .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
-                    .map(|deadline| self.clock.now() >= deadline.with_timezone(&Utc))
-                    .unwrap_or(false);
+                let timed_out = match payload.timeout_at.as_deref() {
+                    Some(raw) => match DateTime::parse_from_rfc3339(raw) {
+                        Ok(deadline) => self.clock.now() >= deadline.with_timezone(&Utc),
+                        Err(err) => {
+                            let report = HumanVerifyReport::from_policy(
+                                payload.severity,
+                                payload.timeout_at.clone(),
+                                rule.on_timeout,
+                                HumanTimeoutOutcome::NotTimedOut,
+                            );
+                            return Ok((
+                                VerifyResult::fail(format!(
+                                    "invalid human review timeout_at for {}: {}",
+                                    self.config.phase, err
+                                )),
+                                report,
+                            ));
+                        }
+                    },
+                    None => false,
+                };
 
                 let outcome = if timed_out {
                     match rule.on_timeout {
@@ -948,6 +979,92 @@ mod tests {
                     .contains("review.json.handled.")
             });
         assert!(consumed);
+    }
+
+    #[tokio::test]
+    async fn existing_pending_schema_version_is_validated() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(&tmp, HumanSeverity::Low, t0, HumanTimeoutPolicy::default());
+        let path = tmp.path().join("pending/review.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            serde_json::json!({
+                "schema_version": 99,
+                "run_id": "run-1",
+                "workflow": "wf",
+                "phase": "review",
+                "severity": "low",
+                "opened_at": "2026-05-06T12:00:00Z",
+                "timeout_at": "2026-05-06T13:00:00Z",
+                "artefact": {"path":"review.md", "kind":"text/markdown", "preview_lines":1},
+                "context": {"preceded_by": [], "next_phase": null, "prompt_summary":"x"},
+                "decision_options": ["approve"]
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let err = hook
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("unsupported pending schema version"));
+    }
+
+    #[tokio::test]
+    async fn invalid_pending_timeout_at_fails_clearly() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(&tmp, HumanSeverity::Low, t0, HumanTimeoutPolicy::default());
+        hook.verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        let path = tmp.path().join("pending/review.json");
+        let mut pending: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        pending["timeout_at"] = serde_json::Value::String("not-a-date".into());
+        fs::write(&path, serde_json::to_vec_pretty(&pending).unwrap()).unwrap();
+
+        let (result, report) = hook
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(result.is_fail());
+        assert_eq!(report.timeout_at.as_deref(), Some("not-a-date"));
+        if let VerifyResult::Fail { reason } = result {
+            assert!(reason.summary.contains("invalid human review timeout_at"));
+        }
+    }
+
+    #[tokio::test]
+    async fn explicit_response_report_preserves_existing_timeout_at() {
+        let tmp = tempfile::tempdir().unwrap();
+        let t0 = Utc.with_ymd_and_hms(2026, 5, 6, 12, 0, 0).unwrap();
+        let hook = hook_at(&tmp, HumanSeverity::Low, t0, HumanTimeoutPolicy::default());
+        hook.verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        let pending: PendingRequest = serde_json::from_str(
+            &fs::read_to_string(tmp.path().join("pending/review.json")).unwrap(),
+        )
+        .unwrap();
+        write_response(
+            &hook.response_path(),
+            "review",
+            HumanDecision::Approve,
+            None,
+        );
+
+        let (result, report) = hook
+            .verify_with_report(&context_with_output("candidate output"))
+            .await
+            .unwrap();
+        assert!(result.is_pass());
+        assert_eq!(report.timeout_at, pending.timeout_at);
     }
 
     #[tokio::test]
