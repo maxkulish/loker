@@ -183,11 +183,24 @@ impl PhaseLock {
         })
     }
 
-    /// Release the lock by truncating the lock file and closing the fd.
+    /// Release the lock by truncating the lock file and unlocking it.
     /// The body is cleared from the lock file so that `inspect` returns
-    /// `Ok(None)`. The OS advisory lock is released when the fd closes.
+    /// `Ok(None)`. The OS advisory lock is released when the fd is
+    /// unlocked and closed.
     pub fn release(self) {
-        // Drop handles truncation + fd close.
+        // Explicitly trim and sync before dropping the file handle to ensure
+        // immediate visibility to other phases.
+        let _ = self.file.set_len(0);
+        let _ = self.file.sync_all();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::AsRawFd;
+            // fs2 only guarantees the advisory lock is released when the fd is
+            // closed, but forcing an unlock on Unix avoids a rare flakiness mode
+            // where the underlying handle can be observed as still locked.
+            let _ = unsafe { libc::flock(self.file.as_raw_fd(), libc::LOCK_UN) };
+        }
     }
 
     /// Path to the lock file under `run_dir/locks/`.

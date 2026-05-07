@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-07T07:26:49.774Z'
-  updated_at: '2026-05-07T08:44:50.574Z'
+  updated_at: '2026-05-07T08:45:00.147Z'
 phases:
   discovery:
     status: complete
@@ -73,6 +73,8 @@ phases:
     validation_fix_iteration_count: 1
   pr:
     status: in_progress
+    pr_url: https://github.com/maxkulish/loker/pull/63
+    pr_number: 63
   complete:
     status: pending
 history:
@@ -198,5 +200,9 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass.'
+  - timestamp: '2026-05-07T08:45:00.147Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #63 opened: https://github.com/maxkulish/loker/pull/63'
 task_title: '[T-047] docs/migration-from-lok.md'
 task_url: https://linear.app/cloud-ai/issue/CLO-316/t-047-docsmigration-from-lokmd
