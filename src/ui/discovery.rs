@@ -108,18 +108,22 @@ pub(crate) fn load_run_summary(dir_path: &Path, dir_name: &str) -> anyhow::Resul
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    // The manifest serialises run_id as "loker.run_id" (see Manifest struct).
     let run_id = manifest
-        .get("run_id")
+        .get("loker.run_id")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    // Attempt multiple timestamp fields for compatibility.
-    let created_at = manifest
-        .get("created_at")
-        .or_else(|| manifest.get("created"))
-        .or_else(|| manifest.get("timestamp"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    // Derive created_at from the directory's modification time as a fallback;
+    // the Manifest struct has no top-level timestamp field.
+    let created_at = dir_path
+        .metadata()
+        .ok()
+        .and_then(|m| m.created().or(m.modified()).ok())
+        .map(|t| {
+            let datetime: chrono::DateTime<chrono::Utc> = t.into();
+            datetime.to_rfc3339()
+        });
 
     // Scan markers directory for phase status.
     let phase_status = scan_markers(&dir_path.join("markers"));
@@ -184,16 +188,10 @@ fn classify_marker(name: &str) -> (Option<String>, &'static str, u8) {
     if let Some(phase) = name.strip_suffix(".failed") {
         return (Some(phase.to_string()), "failed", 2);
     }
-    // Match `.started` or `.started.<number>`
+    // Match `.started` or `<phase>.started.<attempt>`
     if let Some(phase) = name.strip_suffix(".started") {
         return (Some(phase.to_string()), "started", 1);
     }
-    if let Some(rest) = name.strip_suffix(".started") {
-        // Should not happen due to strip_suffix behaviour above,
-        // but handle .started.<n> format.
-        return (Some(rest.to_string()), "started", 1);
-    }
-    // Try splitting on ".started." to handle <phase>.started.<attempt>
     if let Some(idx) = name.find(".started.") {
         let phase = &name[..idx];
         if !phase.is_empty() {
@@ -223,8 +221,7 @@ mod tests {
         let manifest = serde_json::json!({
             "schema_version": 1,
             "workflow_name": workflow,
-            "run_id": format!("run-{workflow}"),
-            "created_at": "2026-05-07T00:00:00Z",
+            "loker.run_id": format!("run-{workflow}"),
             "entries": []
         });
         fs::write(dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();

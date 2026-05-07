@@ -117,8 +117,7 @@ mod tests {
         let manifest = serde_json::json!({
             "schema_version": 1,
             "workflow_name": "test-wf",
-            "run_id": "run-test-wf",
-            "created_at": "2026-05-07T00:00:00Z",
+            "loker.run_id": "run-test-wf",
             "entries": []
         });
         fs::write(

@@ -1,0 +1,11 @@
+name = "calculator-tutorial"
+description = "Tutorial workflow: read the calculator spec and echo its structure"
+
+[[steps]]
+name = "read_spec"
+shell = "echo '--- Calculator Spec ---' && cat examples/specs/calculator.md && echo '--- End of Spec ---'"
+
+[[steps]]
+name = "count_sections"
+shell = "echo 'Sections found:' && grep '^## ' examples/specs/calculator.md"
+depends_on = ["read_spec"]

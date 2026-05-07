@@ -55,8 +55,7 @@ impl DaemonFixture {
         let manifest = serde_json::json!({
             "schema_version": 1,
             "workflow_name": workflow,
-            "run_id": format!("run-{workflow}"),
-            "created_at": "2026-05-07T00:00:00Z",
+            "loker.run_id": format!("run-{workflow}"),
             "entries": []
         });
         fs::write(

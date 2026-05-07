@@ -84,7 +84,7 @@ The discovery report flags that T-051's `routes::router` and `AppState` are tied
 
 1. In `src/hitl_server/routes.rs`, extract the per-gate context rendering body (HTML + JSON view of one `GateConfig`) into a free function such as `render_gate_view(config: &GateConfig) -> Response`.
 2. The one-shot router keeps its current shape and calls `render_gate_view` from its `GET /` handler.
-3. The daemon's `ui::routes::ui_routes` composes a separate gate router that mounts at `/gates/:phase` and resolves a `GateConfig` from the run directory + phase path, then calls `render_gate_view`. POST handlers are intentionally not wired in v0 (gate decision flow remains via the one-shot path until T-053).
+3. The daemon's `ui::routes::ui_routes` is designed to compose a separate gate router at `/gates/:phase` in T-053. In v0, only `GET /` (runs list) is mounted — the gate view endpoint is deferred to T-053 alongside the sessions list. POST handlers are intentionally not wired in v0 (gate decision flow remains via the one-shot path until T-053).
 
 This satisfies FR-27 (route handler reuse) without forcing dummy state into the daemon.
 
@@ -167,7 +167,7 @@ pub struct AppState {
 /// Build the daemon's top-level router.
 ///
 /// - `GET /`              -> JSON runs list
-/// - `GET /gates/:phase`  -> per-gate view (composed from hitl_server free fns)
+/// - `GET /gates/:phase`  -> deferred to T-053 (per-run gate views)
 pub fn ui_routes(project_root: PathBuf) -> Router;
 ```
 
