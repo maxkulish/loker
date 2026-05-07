@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-07T07:26:49.774Z'
-  updated_at: '2026-05-07T08:55:55.349Z'
+  updated_at: '2026-05-07T08:56:40.031Z'
 phases:
   discovery:
     status: complete
@@ -216,5 +216,13 @@ history:
     action: ci_passed
     phase: pr
     details: CI checks green on rerun after phase-lock fix; test job passes, format and clippy passing.
+  - timestamp: '2026-05-07T08:56:40.031Z'
+    action: reviews_addressed
+    phase: pr
+    details: >-
+      Addressed all four PR inline bot/collaboration comments on docs/migration-from-lok.md (phases mapping, command
+      list incl `spec`/`implement`/`ls --blocked`, trace --color value enum, and `lok` workflow definitions wording).
+      Pushed follow-up commit b0a893e with all reviewer-requested edits and replied to each comment with `/gemini
+      review`.
 task_title: '[T-047] docs/migration-from-lok.md'
 task_url: https://linear.app/cloud-ai/issue/CLO-316/t-047-docsmigration-from-lokmd
