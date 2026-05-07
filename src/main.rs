@@ -23,6 +23,7 @@ pub mod family;
 mod git_agent;
 pub mod hitl_server;
 pub mod manifest;
+pub mod ui;
 mod output;
 pub mod phase_runner;
 pub mod resume;

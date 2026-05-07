@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-07T07:13:11.783Z'
-  updated_at: '2026-05-07T08:32:50.665Z'
+  updated_at: '2026-05-07T08:35:12.871Z'
 phases:
   discovery:
     status: complete
@@ -67,6 +67,8 @@ phases:
     approved: true
   implement:
     status: pending
+    commits:
+      - feb7318
   pr:
     status: pending
   complete:
@@ -145,5 +147,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-07T08:35:12.871Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: extract render_gate_view free function. Commit feb7318'
 task_title: '[T-052] Daemon mode: loker ui --serve'
 task_url: https://linear.app/cloud-ai/issue/CLO-321/t-052-daemon-mode-loker-ui-serve
