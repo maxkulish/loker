@@ -1,94 +1,94 @@
 # Migrating from lok to loker
 
-This guide maps legacy `lok` concepts and commands to current `loker` equivalents for M9 users.
+This guide maps legacy `lok` concepts and commands to current `loker` behavior for M9 users.
 
 ## At a glance
 
-`loker` is a hard fork of `lok` and keeps the original command surface for common workflows (`ask`, `hunt`, `audit`, `diff`) while adding new workflow orchestration commands (`run` + `workflow`, `resume`, `explain`, `context`, `report`, etc.).
-
-As of this writing, `lok.toml` and `.lok/workflows/` are still in use; no hard deprecation switch has shipped yet.
+`loker` is a hard fork of `lok` with a familiar single-shot experience (`ask`, `hunt`, `audit`, `diff`) plus first-class workflow orchestration (`workflow`, `run`, `resume`, `trace`, etc.).
 
 ## Concept mapping
 
 | lok concept | loker equivalent | Notes |
 |---|---|---|
-| Command surface | `ask`, `hunt`, `audit`, `diff`, `doctor`, `fix`, `ci`, `pr`, `report` | `ask/hunt/audit/diff` are preserved; other commands are added by the fork. |
-| Workflow config file | `lok.toml` | Still read by `loker` via workspace/project config search. |
-| Workflow definitions | `.lok/workflows/` | Still expected as workflow lookup location and command path. |
-| Backend model family | Configured backends (e.g. `claude`, `codex`, `gemini`, `ollama`, `tensorzero/...`) | Existing subprocess backends are still supported; TensorZero family-named backends are available as part of migration. |
-| Orchestration entrypoint | Workflow runner (`loker run` / `loker workflow run`) | New orchestration capabilities beyond legacy `lok` command set. |
-| Artifacts | `runs/<id>/...` directory (CLI generated) | Artifacts are run-scoped with manifest and trace files where supported by workflow definitions. |
+| Command surface | legacy `ask`/`hunt`/`audit`/`diff` + expanded orchestration verbs | The legacy single-command ergonomics remain; orchestration gained new commands. |
+| Config file | `lok.toml` | Same discovery model remains: `loker` reads project `lok.toml` (and ancestor config fallbacks). No hard rename yet. |
+| Workflow definitions | `.lok/workflows/` (project) and `~/.config/lok/workflows/` (user) + embedded defaults | Same lookup order and override pattern as current `loker`. |
+| Backend model family | `[backends]` in `lok.toml`, including subprocess backends and optional `tensorzero/<id>` families | See the backend strategy examples in `README.md` (CLI + TensorZero notes). |
+| Run artifacts | `runs/<run_id>/...` | `run_id` directories hold planner/output traces, manifests, and checkpoints used by resume and trace workflows. |
 
-## Command translation
+## Legacy command translation
 
 | Legacy lok command | loker equivalent | Notes |
 |---|---|---|
 | `lok ask "<prompt>"` | `loker ask "<prompt>"` | Preserved. |
 | `lok hunt .` | `loker hunt .` | Preserved. |
 | `lok audit .` | `loker audit .` | Preserved. |
-| `lok diff main..HEAD` | `loker diff main..HEAD` | Preserved; behavior now aligned to current `loker` argument conventions. |
-| `lok run ...` | `loker run ...` | New in loker: shorthand to `loker workflow run`. |
-| `lok workflow run` | `loker workflow run` | Preserved in form and intent. |
-| `lok workflow list` | `loker workflow list` | Preserved in form and intent. |
-| `lok workflow validate <path>` | `loker workflow validate <path>` | Preserved in form and intent. |
-| `lok resume <run_dir>` | `loker resume <run_dir>` | Added in loker docs/CLI as resume path for run scaffolding. |
-| `loker init` | `loker init` | Initializes/creates `lok.toml` in the current project. |
-| `loker backends` | `loker backends` | New command to list detected backend plugins. |
-| `loker explain <dir-or-spec>` | `loker explain` | New orchestration-era command for architecture/codebase explanation. |
+| `lok diff main..HEAD` | `loker diff main..HEAD` | Preserved (supports same positional diff spec style). |
+| `lok workflow run` | `loker workflow run` | Preserved path for workflow execution in modern CLI structure. |
+| `lok workflow list` | `loker workflow list` | Preserved listing command. |
+| `lok workflow validate <path>` | `loker workflow validate <path>` | Preserved file validation entrypoint. |
+
+## New in loker (no one-to-one legacy `lok` equivalent)
+
+- `loker run <workflow>` — shorthand orchestration entrypoint (`workflow run`).
+- `loker workflow` (as a command family with `run`/`list`/`validate`).
+- `loker resume <run_id>` — continue a partially completed run.
+- `loker trace <run_id>` — pretty-print `trace.jsonl` (with `--json`, `--color`).
+- `loker explain`, `loker backends`, `loker doctor`, `loker context`, `loker report`, `loker fix`, `loker ci`, `loker pr`, `loker conduct`, `loker debate`, `loker suggest`, `loker smart`, `loker team`, `loker spawn`, `loker ls`, `loker init`.
 
 ## Breaking changes and compatibility notes
 
-- **`loker trace` is not present** in the currently installed CLI in this branch; command migration should use available commands only.
-- **Resume/run behavior now runs through workflow execution paths** rather than only static review-like helpers; users should treat `loker run/workflow` as the primary path.
-- **Read more than command names from `--help` output at migration time**: syntax and flags are source-of-truth and may drift across releases.
+- No breaking changes were introduced for the canonical `lok` workflow commands in this migration scope (`ask`, `hunt`, `audit`, `diff`, and workflow validation/list/run commands above).
+- New orchestration commands (`run`, `resume`, `trace`, `workflow`, etc.) are additive and intentionally scoped to modern `loker` pipelines.
+- Migration behavior and syntax are validated from live CLI help output because option names and positional arguments can drift across releases.
 
-## Not ported (or intentionally changed)
+## Not ported (or intentionally undefined)
 
-The following legacy `lok`-era behaviors were intentionally narrowed to documented, shipped `loker` behavior:
+The following legacy-era behaviors are not documented as guaranteed compatibility in this PR:
 
-- `lok`-era trace command parity is explicitly not documented here because the CLI in this environment exposes `ask/hunt/audit/diff/workflow` and related orchestration commands without `trace`.
-- Any direct behavior assumptions not reflected in `loker --help` or current docs are intentionally omitted until the command is present and verified.
+- Any non-command surface assumption about third-party shell aliases or wrappers outside the documented `loker` commands.
+- Behavior not explicitly validated via command help in this document.
+- Commands introduced after the lok era and listed above under “New in loker”.
 
 ## Compatibility and rollout posture
 
 ### Compatibility surface
 
-- `lok.toml`:
-  - still used/config-driven behavior remains.
-- `.lok/workflows/`:
-  - still used for workflow files.
-- Migration is documentation-only for this task; no runtime semantics change is included.
+- `lok.toml`: still in place and read for project/workflow behavior.
+- `.lok/workflows/`: still in place and looked up for local workflow overrides.
 
 ### Deprecation window
 
-`lok.toml` and `.lok/workflows/` are still in use. The repo handoff notes that these names are kept during a config-rename milestone with a planned deprecation window for both names afterward. This task intentionally documents the current names without inventing new cut-off dates.
+`lok.toml` and `.lok/workflows/` are still in use. The handoff notes that these names are kept during a config-rename milestone with a planned deprecation window after that milestone.
+This task only documents the current state and does not invent concrete end-of-life dates.
 
 ## Verification appendix
 
-All command examples below were checked against the current binary help output in this branch:
+Commands were validated against this branch using `cargo run -- <command> --help` (local binary built from source):
 
 - `loker --help`
-- `loker ask --help`
-- `loker hunt --help`
-- `loker audit --help`
-- `loker diff --help`
-- `loker run --help`
-- `loker workflow --help`
-- `loker workflow run --help`
-- `loker resume --help`
-- `loker explain --help`
-- `loker backends --help`
-- `loker doctor --help`
-- `loker workflow list` (verifies workflow registry surface)
+- `loker ask --help` — `Usage: loker ask [OPTIONS] <PROMPT>`
+- `loker hunt --help` — `Usage: loker hunt [OPTIONS] [DIR]`
+- `loker audit --help` — `Usage: loker audit [OPTIONS] [DIR]`
+- `loker diff --help` — `Usage: loker diff [OPTIONS] [SPEC]`
+- `loker run --help` — `Usage: loker run [OPTIONS] <NAME> [ARGS]...`
+- `loker workflow --help` — `Usage: loker workflow [OPTIONS] <COMMAND>`
+- `loker workflow run --help` — `Usage: loker workflow run [OPTIONS] <NAME> [ARGS]...`
+- `loker workflow list --help` — `Usage: loker workflow list [OPTIONS]`
+- `loker workflow validate --help` — `Usage: loker workflow validate [OPTIONS] <PATH>`
+- `loker resume --help` — `Usage: loker resume [OPTIONS] <RUN_ID>`
+- `loker trace --help` — `Usage: loker trace [OPTIONS] <RUN_ID>`
+- `loker explain --help` — `Usage: loker explain [OPTIONS] [TARGET]`
+- `loker backends --help` — `Usage: loker backends [OPTIONS]`
+- `loker doctor --help` — `Usage: loker doctor [OPTIONS]`
+
+> This list is source-of-truth for the examples below; run these commands again before each migration-bridge release if needed.
 
 Verified artifacts (non-executable):
-- `docs/status/clo-316-workflow.yaml` remains the source-of-truth task metadata.
-- `README.md` references this document (added in ST3) as a single discoverability link.
+- `README.md` contains the discoverability callout (ST3).
 
-## Quick upgrade mapping summary
+## Quick upgrade summary
 
-If you are a `lok` user coming to `loker`:
-
-1. Keep using familiar commands first (`ask`, `hunt`, `audit`, `diff`).
-2. Move to workflow execution for larger tasks using `loker run` / `loker workflow run`.
-3. Confirm command syntax from `loker <command> --help` during upgrades, as this is the most reliable compatibility signal.
+1. Continue using `ask`, `hunt`, `audit`, `diff` first.
+2. For orchestrated work, prefer `loker run` / `loker workflow run`.
+3. Re-check signatures with `<command> --help` whenever upgrading across milestones.
