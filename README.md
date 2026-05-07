@@ -90,7 +90,8 @@ make release          # auto-versions, builds, installs to /usr/local/bin
 
 Once published on crates.io: `cargo install loker`.
 
-> **Note:** loker is pre-v0. `make release` is the current path.
+> **Note:** loker is pre-v0. `make release` is the maintainer path (auto-versions, tags, installs to `/usr/local/bin`).
+> For a local build: `make install` or `cargo install --path .`.
 
 ## One-page example
 
@@ -124,14 +125,13 @@ Design-doc-tdd workflow (4 phases):
 Each run lands in `runs/<workflow>-<timestamp>-<id>/` with:
 - `trace.jsonl` — spans for each phase, backend, and verify step
 - `manifest.json` — artefact inventory with sha256 hashes
-- Per-phase artefacts under `attempts/<n>/<phase>/`
+- Per-phase artefacts under `attempts/<phase>/<n>/`
 
 Workflows are TOML files under `.lok/workflows/`. See
 [`.lok/workflows/design-doc-tdd.toml`](.lok/workflows/design-doc-tdd.toml)
 for the full definition.
 
-> For a full end-to-end run example (requires Ollama), see
-> [`docs/guides/quickstart.md`](docs/guides/quickstart.md) once written.
+> For a full end-to-end run example (requires Ollama), see the Quickstart guide (not yet written).
 
 ---
 

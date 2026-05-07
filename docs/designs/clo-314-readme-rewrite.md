@@ -74,8 +74,11 @@ This is a documentation-only change. The README is a single Markdown file at the
 |------|-------------|-------------|
 | `README.md` | Modified | Full rewrite with new structure |
 | `docs/old-readme.md` | New | Archive of current README content |
-
-No other files are touched.
+| `docs/discovery/clo-314.md` | Existing | Referenced from README primitives/discovery section |
+| `docs/prds/clo-314-readme-rewrite.md` | Existing | Referenced PRD for this task |
+| `docs/plans/clo-314-readme-rewrite.md` | Existing | Referenced implementation plan |
+| `docs/reviews/` | Existing | Validation reports linked from PR description |
+| `docs/status/clo-314-workflow.yaml` | Existing | Workflow tracking updated with new phases |
 
 ---
 
