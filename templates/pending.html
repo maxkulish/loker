@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block title %}Pending Gates{% endblock %}
+{% block content %}
+<h2 class="section-title">Pending Gates</h2>
+{% if gates.is_empty() %}
+<div class="empty-state">
+  <p>All gates resolved.</p>
+  <p style="font-size:0.9rem;margin-top:0.5rem">No pending HITL gates across any runs.</p>
+</div>
+{% else %}
+{% for gate in gates %}
+<div class="gate-card">
+  <h3>
+    {{ gate.phase }}
+    <span class="status-badge status-{{ gate.severity }}">{{ gate.severity }}</span>
+  </h3>
+  <div class="meta">
+    Run: <code>{{ gate.run_id }}</code> &mdash; Workflow: <strong>{{ gate.workflow }}</strong>
+  </div>
+  {% if !gate.artefact_path.is_empty() %}
+  <div class="meta">Artefact: <code>{{ gate.artefact_path }}</code></div>
+  {% endif %}
+  <form method="post" action="/gates/{{ gate.run_id }}/{{ gate.phase }}/approve">
+    <textarea name="comment" rows="2" placeholder="Optional comment (approve)..."></textarea>
+    <div style="display:flex;gap:0.5rem">
+      <button type="submit" class="btn btn-approve">Approve</button>
+    </div>
+  </form>
+  <form method="post" action="/gates/{{ gate.run_id }}/{{ gate.phase }}/reject">
+    <textarea name="comment" rows="2" placeholder="Optional comment (reject)..."></textarea>
+    <div style="display:flex;gap:0.5rem">
+      <button type="submit" class="btn btn-reject">Reject</button>
+    </div>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

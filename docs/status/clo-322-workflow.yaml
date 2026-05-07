@@ -1,0 +1,170 @@
+task_id: CLO-322
+task_type: development
+classification_reason: >-
+  Build/implement task — core UI views with server-rendered HTML, real data rendering. No specification or operational
+  markers present.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-322-t-053-sessions-list-per-run-trace-pending-panel
+  priority: Medium
+  branch_actual: feat/clo-322-sessions
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-07T10:29:52.683Z'
+  updated_at: '2026-05-07T12:09:33.321Z'
+phases:
+  discovery:
+    status: complete
+    discovery.status: complete
+    discovery.problem_framed: true
+    discovery.approaches_identified: 2
+    discovery.discovery_debt: []
+    discovery.prd_exists: true
+    discovery.approach_chosen: Askama (compile-time templates)
+    discovery.approved: true
+    discovery.baseline_score: 7
+    discovery.discovery_report: docs/discovery/clo-322.md
+    discovery.prd_created: true
+    discovery.prd_file: docs/prds/clo-322-sessions-ui.md
+  design:
+    status: complete
+    design.status: in_progress
+    design_doc: docs/designs/clo-322-sessions-ui.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - Sanitize run_id path parameter in run_detail handler (reject .., /, empty)
+      - Add error.html template for 4xx/5xx responses
+      - Use tokio::task::spawn_blocking for sync filesystem I/O in async handlers (add section 3.6)
+      - Extract shared manifest.json parsing into src/ui/manifest.rs
+      - Add /health endpoint returning 200 OK
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-322-review-gemini.md
+    review_synthesis: docs/reviews/clo-322-review-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    plannotator_annotations: ''
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-322-sessions-ui.md
+    approved: true
+  implement:
+    status: pending
+    implement.commits: []
+    implement.last_phase_completed: null
+    implement.status: in_progress
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-07T10:29:52.683Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-322 as development
+  - timestamp: '2026-05-07T10:30:56.579Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: title "[T-053] Sessions list + per-run trace + pending panel" describes building core
+      UI views (implementing features). No specification or operational markers in body/title.
+  - timestamp: '2026-05-07T10:31:06.125Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-07T10:31:19.131Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-07T10:31:58.121Z'
+    action: discovery_started
+    phase: discovery
+    details: Beginning discovery phase for CLO-322.
+  - timestamp: '2026-05-07T10:36:14.842Z'
+    action: problem_framed
+    phase: discovery
+    details: >-
+      Problem: Build server-rendered HTML views (index, run detail, pending gates) on top of T-052 daemon
+      infrastructure. No JS framework, minimal CSS, localhost-only.
+  - timestamp: '2026-05-07T10:39:19.051Z'
+    action: discovery_report_complete
+    phase: discovery
+    details: >-
+      Solution space explored: 3 HTML templating approaches, 3 views to build. Existing infra: T-052 daemon (axum 0.7,
+      GET / JSON), T-051 HITL routes (render_gate_view, approve/reject POST), minijinja already in deps, RunSummary
+      struct in discovery.rs.
+  - timestamp: '2026-05-07T10:42:04.858Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-322-sessions already checked out at c353fba (latest main).
+  - timestamp: '2026-05-07T10:45:23.128Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Askama (compile-time templates). Baseline 7/10. 2 approaches considered.'
+  - timestamp: '2026-05-07T10:52:24.731Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-07T10:54:05.776Z'
+    action: design_started
+    phase: design
+    details: 'Starting design phase. Discovery context loaded: Askama approach, baseline 7/10.'
+  - timestamp: '2026-05-07T11:43:07.484Z'
+    action: design_draft_ready
+    phase: design
+    details: >-
+      Draft generated manually at docs/designs/clo-322-sessions-ui.md (293 lines, 12,223 bytes). 7-section structure
+      validated.
+  - timestamp: '2026-05-07T11:55:02.929Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_suggestions. 4 applied, 0 flagged. Gemini external failed (empty output), Ollama
+      failed (model not found), Claude fallback produced review.
+  - timestamp: '2026-05-07T11:55:48.959Z'
+    action: design_human_review_complete
+    phase: design
+    details: Plannotator annotate session closed with no annotations.
+  - timestamp: '2026-05-07T11:57:21.459Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase. 388 lines, all sections complete, review feedback applied.
+  - timestamp: '2026-05-07T11:58:53.181Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-07T12:07:12.048Z'
+    action: plan_created
+    phase: plan
+    details: >-
+      Plan with 6 sub-tasks at docs/plans/clo-322-sessions-ui.md. Critical path: ST1 → ST4 → ST5 → ST6 (ST2/ST3
+      parallel).
+  - timestamp: '2026-05-07T12:07:30.076Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 6 sub-tasks queued (S/S/S/M/L/M).
+  - timestamp: '2026-05-07T12:07:45.688Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-07T12:09:33.321Z'
+    action: implementation_started
+    phase: implement
+    details: 'Beginning implementation of 6 sub-tasks. Plan: docs/plans/clo-322-sessions-ui.md.'
+task_title: '[T-053] Sessions list + per-run trace + pending panel'
+task_url: https://linear.app/cloud-ai/issue/CLO-322/t-053-sessions-list-per-run-trace-pending-panel

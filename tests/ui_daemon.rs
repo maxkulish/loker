@@ -85,16 +85,13 @@ async fn daemon_serves_runs_list() {
     let resp = client.get(fixture.url()).send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let runs: Vec<serde_json::Value> = resp.json().await.unwrap();
-    assert_eq!(runs.len(), 1);
-    assert_eq!(
-        runs[0].get("id").and_then(|v| v.as_str()),
-        Some("my-run-123")
+    let body = resp.text().await.unwrap();
+    assert!(body.contains("my-run-123"), "HTML should contain run ID");
+    assert!(
+        body.contains("test-wf"),
+        "HTML should contain workflow name"
     );
-    assert_eq!(
-        runs[0].get("workflow").and_then(|v| v.as_str()),
-        Some("test-wf")
-    );
+    assert!(body.contains("<!DOCTYPE html>"), "Should be HTML");
 }
 
 #[tokio::test]
@@ -105,8 +102,9 @@ async fn daemon_returns_empty_list_when_no_runs() {
     let resp = client.get(fixture.url()).send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let runs: Vec<serde_json::Value> = resp.json().await.unwrap();
-    assert!(runs.is_empty());
+    let body = resp.text().await.unwrap();
+    assert!(body.contains("No runs yet"), "HTML should show empty state");
+    assert!(body.contains("<!DOCTYPE html>"), "Should be HTML");
 }
 
 #[tokio::test]
@@ -150,13 +148,12 @@ async fn daemon_skips_corrupt_run_directory() {
     let resp = client.get(fixture.url()).send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let runs: Vec<serde_json::Value> = resp.json().await.unwrap();
-    assert_eq!(
-        runs.len(),
-        1,
-        "only the valid run should appear; corrupt one is skipped"
+    let body = resp.text().await.unwrap();
+    assert!(body.contains("good-run"), "HTML should contain valid run");
+    assert!(
+        !body.contains("corrupt-run"),
+        "HTML should NOT contain corrupt run"
     );
-    assert_eq!(runs[0].get("id").and_then(|v| v.as_str()), Some("good-run"));
 
     // Verify a second request also succeeds (daemon stays up).
     let resp2 = client.get(fixture.url()).send().await.unwrap();

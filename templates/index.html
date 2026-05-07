@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block title %}Runs{% endblock %}
+{% block content %}
+<h2 class="section-title">Runs</h2>
+{% if runs.is_empty() %}
+<div class="empty-state">
+  <p>No runs yet.</p>
+  <p style="font-size:0.9rem;margin-top:0.5rem">Run <code>loker run &lt;workflow&gt;</code> to create one.</p>
+</div>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Run ID</th>
+      <th>Workflow</th>
+      <th>Phases</th>
+      <th>Started</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for run in runs %}
+    <tr>
+      <td><a href="/runs/{{ run.id }}">{{ run.id }}</a></td>
+      <td>{{ run.workflow.as_deref().unwrap_or("-") }}</td>
+      <td>
+        {% if run.phase_status.is_empty() %}
+        <span class="status-badge status-pending">starting</span>
+        {% else %}
+        {% for (phase, status) in run.phase_status.iter() %}
+        <span class="status-badge status-{{ status }}">{{ phase }}: {{ status }}</span>
+        {% endfor %}
+        {% endif %}
+      </td>
+      <td>{{ run.created_at.as_deref().unwrap_or("-") }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

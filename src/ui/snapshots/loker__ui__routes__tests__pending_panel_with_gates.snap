@@ -1,0 +1,210 @@
+---
+source: src/ui/routes.rs
+expression: "&html"
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pending Gates</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --fg: #1a1a1a;
+    --border: #ddd;
+    --muted: #666;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --warning: #d97706;
+    --header-bg: #fff;
+    --card-bg: #fff;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  header {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 600; }
+  header nav { display: flex; gap: 1rem; }
+  header nav a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  header nav a:hover { text-decoration: underline; }
+  main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  th { background: #f5f5f5; font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8f9ff; }
+  code {
+    background: #f0f0f0;
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 0.15em 0.5em;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: 500;
+  }
+  .status-completed { background: #dcfce7; color: #166534; }
+  .status-failed    { background: #fce4ec; color: #9b1c1c; }
+  .status-started   { background: #fef3c7; color: #92400e; }
+  .status-pending   { background: #f3f4f6; color: #6b7280; }
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+  }
+  .empty-state p { font-size: 1.1rem; }
+  .btn {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: none;
+    color: #fff;
+  }
+  .btn-approve { background: var(--success); }
+  .btn-approve:hover { background: #15803d; }
+  .btn-reject  { background: var(--danger); }
+  .btn-reject:hover  { background: #b91c1c; }
+  .btn-secondary {
+    background: #e5e7eb;
+    color: var(--fg);
+  }
+  .btn-secondary:hover { background: #d1d5db; }
+  .gate-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .gate-card h3 { margin-bottom: 0.5rem; }
+  .gate-card .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .gate-card form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+  .gate-card textarea {
+    width: 100%;
+    padding: 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--font);
+    font-size: 0.85rem;
+    resize: vertical;
+  }
+  .section-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.75rem;
+  }
+  pre.trace-event {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    margin-bottom: 0.4rem;
+    white-space: pre-wrap;
+  }
+  .timeline { list-style: none; }
+  .timeline li {
+    padding: 0.4rem 0;
+    border-left: 2px solid var(--border);
+    padding-left: 1rem;
+    position: relative;
+  }
+  .timeline li::before {
+    content: '';
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    position: absolute;
+    left: -6px; top: 0.6rem;
+  }
+  .timeline li.completed::before { background: var(--success); }
+  .timeline li.failed::before { background: var(--danger); }
+  .timeline li.started::before { background: var(--warning); }
+  .error-page { text-align: center; padding: 4rem 1rem; }
+  .error-page h2 { font-size: 3rem; color: var(--danger); margin-bottom: 1rem; }
+  .error-page p { color: var(--muted); margin-bottom: 2rem; }
+</style>
+
+</head>
+<body>
+<header>
+  <h1>loker</h1>
+  <nav>
+    <a href="/">Runs</a>
+    <a href="/pending">Pending</a>
+  </nav>
+</header>
+<main>
+
+<h2 class="section-title">Pending Gates</h2>
+
+
+<div class="gate-card">
+  <h3>
+    review
+    <span class="status-badge status-high">high</span>
+  </h3>
+  <div class="meta">
+    Run: <code>pending-run-001</code> &mdash; Workflow: <strong>pending-wf</strong>
+  </div>
+  
+  <div class="meta">Artefact: <code>review.md</code></div>
+  
+  <form method="post" action="/gates/pending-run-001/review/approve">
+    <textarea name="comment" rows="2" placeholder="Optional comment (approve)..."></textarea>
+    <div style="display:flex;gap:0.5rem">
+      <button type="submit" class="btn btn-approve">Approve</button>
+    </div>
+  </form>
+  <form method="post" action="/gates/pending-run-001/review/reject">
+    <textarea name="comment" rows="2" placeholder="Optional comment (reject)..."></textarea>
+    <div style="display:flex;gap:0.5rem">
+      <button type="submit" class="btn btn-reject">Reject</button>
+    </div>
+  </form>
+</div>
+
+
+
+</main>
+</body>
+</html>

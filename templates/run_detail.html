@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% block title %}Run: {{ run_id }}{% endblock %}
+{% block content %}
+<h2 class="section-title">Run: {{ run_id }}</h2>
+<p>Workflow: <strong>{{ workflow.as_deref().unwrap_or("unknown") }}</strong></p>
+
+{# Manifest entries #}
+<h3 class="section-title" style="margin-top:1rem">Manifest</h3>
+{% if manifest_entries.is_empty() %}
+<p class="empty-state" style="text-align:left;padding:1rem 0">No manifest entries.</p>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Kind</th>
+      <th>Schema</th>
+      <th>SHA256</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in manifest_entries %}
+    <tr>
+      <td><code>{{ entry.name }}</code></td>
+      <td>{{ entry.kind }}</td>
+      <td>{{ entry.schema_version }}</td>
+      <td>
+      {% match entry.sha256 %}
+        {% when Some with (sha) %}
+        <code>{{ sha }}</code>
+        {% when None %}
+        -
+      {% endmatch %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{# Phase timeline #}
+<h3 class="section-title">Phase Timeline</h3>
+{% if phase_timeline.is_empty() %}
+<p class="empty-state" style="text-align:left;padding:1rem 0">No phase markers.</p>
+{% else %}
+<ul class="timeline">
+  {% for step in phase_timeline %}
+  <li class="{{ step.status }}">
+    <strong>{{ step.name }}</strong>
+    <span class="status-badge status-{{ step.status }}">{{ step.status }}</span>
+    {% if let Some(started) = step.started_at %}
+    <br><small>Started: {{ started }}</small>
+    {% endif %}
+    {% if let Some(completed) = step.completed_at %}
+    <br><small>Completed: {{ completed }}</small>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{# Trace events #}
+<h3 class="section-title">Trace Events (last {{ trace_events.len() }})</h3>
+{% if trace_events.is_empty() %}
+<p class="empty-state" style="text-align:left;padding:1rem 0">No trace events.</p>
+{% else %}
+{% for event in trace_events %}
+<div class="trace-event">{% if !event.timestamp.is_empty() %}<strong>{{ event.timestamp }}</strong> {% endif %}[{{ event.event_type }}] {{ event.summary }}</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

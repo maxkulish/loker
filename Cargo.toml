@@ -60,6 +60,7 @@ tempfile = "3"
 slug = "0.1.6"
 axum = "0.7"
 tower = "0.5"
+askama = "0.12"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
