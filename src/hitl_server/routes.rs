@@ -49,17 +49,26 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-async fn gate_context(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
-    let pending_path = state
-        .config
+/// Render the per-gate context view (HTML form for human approval/rejection).
+///
+/// Shared between the one-shot fallback server (T-051) and the daemon (T-052).
+/// Reads `pending/<phase>.json` from the run directory and renders it as an
+/// HTML page with Approve/Reject buttons. Falls back to an empty-context page
+/// if the pending file cannot be read.
+pub async fn render_gate_view(config: &GateConfig) -> Result<Html<String>, StatusCode> {
+    let pending_path = config
         .run_dir
         .join("pending")
-        .join(format!("{}.json", state.config.phase));
+        .join(format!("{}.json", config.phase));
     let body = match tokio::fs::read_to_string(&pending_path).await {
-        Ok(json) => render_html(&state.config, &json),
-        Err(_) => render_html_fallback(&state.config),
+        Ok(json) => render_html(config, &json),
+        Err(_) => render_html_fallback(config),
     };
     Ok(Html(body))
+}
+
+async fn gate_context(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
+    render_gate_view(&state.config).await
 }
 
 async fn approve(State(state): State<AppState>, Form(form): Form<DecisionForm>) -> StatusCode {
@@ -255,5 +264,74 @@ mod tests {
         let clean = html_escape(dirty);
         assert!(!clean.contains('<'));
         assert!(clean.contains("\u{0026}lt;"));
+    }
+
+    #[tokio::test]
+    async fn render_gate_view_returns_gate_context() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pending_dir = tmp.path().join("pending");
+        std::fs::create_dir_all(&pending_dir).unwrap();
+        let pending_json = serde_json::json!({
+            "context": {"prompt_summary": "Candidate output preview"},
+            "artefact": {"path": "review.md", "kind": "text/markdown"}
+        });
+        std::fs::write(
+            pending_dir.join("review.json"),
+            pending_json.to_string().as_bytes(),
+        )
+        .unwrap();
+
+        let config = GateConfig {
+            run_dir: tmp.path().to_path_buf(),
+            run_id: "run-1".into(),
+            phase: "review".into(),
+            workflow: "design-doc-tdd".into(),
+            severity: "high".into(),
+            artefact_path: "review.md".into(),
+            artefact_kind: "text/markdown".into(),
+            prompt_summary: "fallback".into(),
+            preview_lines: 17,
+            timeout_at: None,
+            decision_options: vec!["approve".into(), "reject".into()],
+        };
+
+        let result = render_gate_view(&config).await;
+        assert!(result.is_ok());
+        let html = result.unwrap().0;
+        assert!(html.contains("review"));
+        assert!(html.contains("design-doc-tdd"));
+        assert!(html.contains("high"));
+        assert!(html.contains("review.md"));
+        assert!(html.contains("/approve"));
+        assert!(html.contains("/reject"));
+        // Uses the pending file content, not the fallback prompt_summary
+        assert!(html.contains("Candidate output preview"));
+    }
+
+    #[tokio::test]
+    async fn render_gate_view_fallback_when_pending_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        let config = GateConfig {
+            run_dir: tmp.path().to_path_buf(),
+            run_id: "run-2".into(),
+            phase: "approval".into(),
+            workflow: "test-wf".into(),
+            severity: "low".into(),
+            artefact_path: "report.md".into(),
+            artefact_kind: "text/markdown".into(),
+            prompt_summary: "Fallback summary".into(),
+            preview_lines: 5,
+            timeout_at: None,
+            decision_options: vec!["approve".into()],
+        };
+
+        let result = render_gate_view(&config).await;
+        assert!(result.is_ok());
+        let html = result.unwrap().0;
+        // Fallback uses the config's prompt_summary, not a file
+        assert!(html.contains("Fallback summary"));
+        assert!(html.contains("approval"));
+        assert!(html.contains("test-wf"));
     }
 }
