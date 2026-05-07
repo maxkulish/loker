@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::hitl_server::{one_shot, GateConfig, ServerOutcome};
 use crate::manifest::Kind;
 use crate::run_state::atomic_write;
 use crate::strategy::verify::{
@@ -31,6 +32,8 @@ pub struct HumanVerifierConfig {
     pub severity: HumanSeverity,
     pub decision_options: Vec<HumanDecision>,
     pub timeout_policy: HumanTimeoutPolicy,
+    /// When true and no response exists, spawn a one-shot HTTP server.
+    pub fallback_server: bool,
 }
 
 impl HumanVerifierConfig {
@@ -320,6 +323,73 @@ impl HumanVerifier {
                     None => false,
                 };
 
+                // If fallback_server is enabled and not yet timed out, spawn the server.
+                if self.config.fallback_server && !timed_out {
+                    let gate_config = GateConfig {
+                        run_dir: self.config.run_dir.clone(),
+                        run_id: self.config.run_id.clone(),
+                        phase: self.config.phase.clone(),
+                        workflow: self.config.workflow.clone(),
+                        severity: self.config.severity.as_str().to_string(),
+                        artefact_path: self.config.artefact_name.clone(),
+                        artefact_kind: kind_str(&self.config.artefact_kind).to_string(),
+                        prompt_summary: summary.clone(),
+                        preview_lines,
+                        timeout_at: payload.timeout_at.clone(),
+                        decision_options: self.config.decision_options.iter()
+                            .map(|d| format!("{:?}", d).to_lowercase())
+                            .collect(),
+                    };
+
+                    match one_shot::start(gate_config).await {
+                        Ok(handle) => {
+                            println!("HITL gate open: http://{}/", handle.addr);
+                            let timeout_duration = rule.timeout.and_then(|d| d.to_std().ok());
+                            let server_outcome = if let Some(duration) = timeout_duration {
+                                match tokio::time::timeout(duration, handle.outcome()).await {
+                                    Ok(outcome) => outcome,
+                                    Err(_) => ServerOutcome::TimedOut,
+                                }
+                            } else {
+                                handle.outcome().await
+                            };
+
+                            match server_outcome {
+                                ServerOutcome::Decided { .. } | ServerOutcome::TimedOut => {
+                                    // Re-enter: the server wrote the response file (or
+                                    // the timeout fires on the next pass).
+                                    return Box::pin(self.verify_with_report(ctx)).await;
+                                }
+                                ServerOutcome::Cancelled => {
+                                    let reason = FailureReason::new(format!(
+                                        "HITL server for {} was cancelled",
+                                        self.config.phase
+                                    ));
+                                    let report = HumanVerifyReport::from_policy(
+                                        payload.severity,
+                                        payload.timeout_at.clone(),
+                                        rule.on_timeout,
+                                        HumanTimeoutOutcome::Blocking,
+                                    );
+                                    return Ok((VerifyResult::Fail { reason }, report));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let reason = FailureReason::new(format!(
+                                "failed to start HITL server: {e}"
+                            ));
+                            let report = HumanVerifyReport::from_policy(
+                                payload.severity,
+                                payload.timeout_at.clone(),
+                                rule.on_timeout,
+                                HumanTimeoutOutcome::Blocking,
+                            );
+                            return Ok((VerifyResult::Fail { reason }, report));
+                        }
+                    }
+                }
+
                 let outcome = if timed_out {
                     match rule.on_timeout {
                         HumanTimeoutAction::AutoApprove => HumanTimeoutOutcome::AutoApproved,
@@ -604,6 +674,7 @@ mod tests {
                 HumanDecision::CommentOnly,
             ],
             timeout_policy: HumanTimeoutPolicy::default(),
+            fallback_server: false,
         })
     }
 
@@ -628,6 +699,7 @@ mod tests {
                     HumanDecision::CommentOnly,
                 ],
                 timeout_policy: policy,
+                fallback_server: false,
             },
             Arc::new(FixedClock(now)),
         )
@@ -744,6 +816,7 @@ mod tests {
             severity: HumanSeverity::Medium,
             decision_options: vec![HumanDecision::Approve],
             timeout_policy: HumanTimeoutPolicy::default(),
+            fallback_server: false,
         });
 
         assert_eq!(
@@ -1123,6 +1196,7 @@ mod tests {
             severity: HumanSeverity::Medium,
             decision_options: vec![HumanDecision::Approve],
             timeout_policy: HumanTimeoutPolicy::default(),
+            fallback_server: false,
         });
         let response_path = hook.response_path();
 
