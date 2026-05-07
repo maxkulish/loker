@@ -152,6 +152,8 @@ with ClickHouse-backed observability.
 
 ## Design docs & roadmap
 
+Migrating from lok? See [docs/migration-from-lok.md](docs/migration-from-lok.md).
+
 For depth, read:
 
 - **[`docs/handoff.md`](docs/handoff.md)** — project WHY, intent, constraints
