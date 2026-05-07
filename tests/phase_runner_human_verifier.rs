@@ -63,6 +63,7 @@ fn human_cfg(tmp: &tempfile::TempDir, severity: HumanSeverity) -> HumanVerifierC
         severity,
         decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
         timeout_policy: HumanTimeoutPolicy::default(),
+        fallback_server: false,
     }
 }
 

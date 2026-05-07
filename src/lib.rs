@@ -8,6 +8,7 @@
 pub mod aggregator;
 pub mod backend;
 pub mod family;
+pub mod hitl_server;
 pub mod manifest;
 pub mod phase_runner;
 #[doc(hidden)]

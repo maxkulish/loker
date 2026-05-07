@@ -21,6 +21,7 @@ mod doctor;
 pub mod commands;
 pub mod family;
 mod git_agent;
+pub mod hitl_server;
 pub mod manifest;
 mod output;
 pub mod phase_runner;

@@ -251,6 +251,7 @@ mod tests {
             severity: HumanSeverity::Medium,
             decision_options: vec![HumanDecision::Approve],
             timeout_policy: HumanTimeoutPolicy::default(),
+            fallback_server: false,
         });
 
         let hook = resolve_verify_hook(&single, None)
