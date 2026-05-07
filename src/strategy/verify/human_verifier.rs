@@ -336,7 +336,10 @@ impl HumanVerifier {
                         prompt_summary: summary.clone(),
                         preview_lines,
                         timeout_at: payload.timeout_at.clone(),
-                        decision_options: self.config.decision_options.iter()
+                        decision_options: self
+                            .config
+                            .decision_options
+                            .iter()
                             .map(|d| format!("{:?}", d).to_lowercase())
                             .collect(),
                     };
@@ -376,9 +379,8 @@ impl HumanVerifier {
                             }
                         }
                         Err(e) => {
-                            let reason = FailureReason::new(format!(
-                                "failed to start HITL server: {e}"
-                            ));
+                            let reason =
+                                FailureReason::new(format!("failed to start HITL server: {e}"));
                             let report = HumanVerifyReport::from_policy(
                                 payload.severity,
                                 payload.timeout_at.clone(),

@@ -62,14 +62,8 @@ async fn gate_context(State(state): State<AppState>) -> Result<Html<String>, Sta
     Ok(Html(body))
 }
 
-async fn approve(
-    State(state): State<AppState>,
-    Form(form): Form<DecisionForm>,
-) -> StatusCode {
-    match write_response(&state.config,
-        HumanDecision::Approve,
-        form.comment.clone(),
-    ).await {
+async fn approve(State(state): State<AppState>, Form(form): Form<DecisionForm>) -> StatusCode {
+    match write_response(&state.config, HumanDecision::Approve, form.comment.clone()).await {
         Ok(()) => {
             if let Ok(mut tx) = state.decision_tx.lock() {
                 if let Some(tx) = tx.take() {
@@ -87,15 +81,8 @@ async fn approve(
     }
 }
 
-async fn reject(
-    State(state): State<AppState>,
-    Form(form): Form<DecisionForm>,
-) -> StatusCode {
-    match write_response(
-        &state.config,
-        HumanDecision::Reject,
-        form.comment.clone(),
-    ).await {
+async fn reject(State(state): State<AppState>, Form(form): Form<DecisionForm>) -> StatusCode {
+    match write_response(&state.config, HumanDecision::Reject, form.comment.clone()).await {
         Ok(()) => {
             if let Ok(mut tx) = state.decision_tx.lock() {
                 if let Some(tx) = tx.take() {
@@ -132,19 +119,13 @@ async fn write_response(
 ) -> Result<(), ResponseWriteError> {
     // Acquire the per-phase advisory lock (PhaseLock::acquire is sync;
     // the oneshot server has exactly one target, so brief blocking is fine).
-    let _lock = PhaseLock::acquire(
-        &config.run_dir,
-        &config.phase,
-        &config.run_id,
-        None,
-    )
-    .map_err(|e| match e {
-        PhaseLockError::LockInUse { .. } => ResponseWriteError::Locked,
-        other => ResponseWriteError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            other.to_string(),
-        )),
-    })?;
+    let _lock =
+        PhaseLock::acquire(&config.run_dir, &config.phase, &config.run_id, None).map_err(|e| {
+            match e {
+                PhaseLockError::LockInUse { .. } => ResponseWriteError::Locked,
+                other => ResponseWriteError::Io(std::io::Error::other(other.to_string())),
+            }
+        })?;
 
     // Race guard: if another POST already wrote the response.
     let response_path = config

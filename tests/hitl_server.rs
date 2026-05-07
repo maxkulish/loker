@@ -176,11 +176,7 @@ async fn server_shuts_down_after_decision() {
     });
 
     // Outcome should resolve within 2 seconds
-    let outcome = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        handle.outcome(),
-    )
-    .await;
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(2), handle.outcome()).await;
     assert!(outcome.is_ok(), "server did not shut down within 2s");
 }
 

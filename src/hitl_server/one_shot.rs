@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
-use crate::hitl_server::routes::{AppState, router};
+use crate::hitl_server::routes::{router, AppState};
 use crate::hitl_server::{GateConfig, ServerError, ServerOutcome};
 
 /// Handle to a running one-shot server.
