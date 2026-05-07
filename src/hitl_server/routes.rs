@@ -166,6 +166,10 @@ async fn write_response(
     };
     let json = serde_json::to_vec_pretty(&response).map_err(ResponseWriteError::Json)?;
 
+    if let Some(dir) = response_path.parent() {
+        std::fs::create_dir_all(dir).map_err(ResponseWriteError::Io)?;
+    }
+
     atomic_write(&response_path, &json).map_err(ResponseWriteError::Io)?;
 
     Ok(())
