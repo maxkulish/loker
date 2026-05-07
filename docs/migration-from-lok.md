@@ -12,7 +12,8 @@ This guide maps legacy `lok` concepts and commands to current `loker` behavior f
 |---|---|---|
 | Command surface | legacy `ask`/`hunt`/`audit`/`diff` + expanded orchestration verbs | The legacy single-command ergonomics remain; orchestration gained new commands. |
 | Config file | `lok.toml` | Same discovery model remains: `loker` reads project `lok.toml` (and ancestor config fallbacks). No hard rename yet. |
-| Workflow definitions | `.lok/workflows/` (project) and `~/.config/lok/workflows/` (user) + embedded defaults | Same lookup order and override pattern as current `loker`. |
+| Workflow definitions | `.lok/workflows/` (project) and `~/.config/lok/workflows/` (user) + embedded defaults | Same lookup order and override pattern as legacy `lok`, preserved in `loker` for compatibility. |
+| Workflow phases | Implicit one-shot execution in legacy `lok` | `design`, `plan`, `implement`, and `verify` phases with per-phase resume/restart semantics |
 | Backend model family | `[backends]` in `lok.toml`, including subprocess backends and optional `tensorzero/<id>` families | See the backend strategy examples in `README.md` (CLI + TensorZero notes). |
 | Run artifacts | `runs/<run_id>/...` | `run_id` directories hold planner/output traces, manifests, and checkpoints used by resume and trace workflows. |
 
@@ -33,8 +34,8 @@ This guide maps legacy `lok` concepts and commands to current `loker` behavior f
 - `loker run <workflow>` — shorthand orchestration entrypoint (`workflow run`).
 - `loker workflow` (as a command family with `run`/`list`/`validate`).
 - `loker resume <run_id>` — continue a partially completed run.
-- `loker trace <run_id>` — pretty-print `trace.jsonl` (with `--json`, `--color`).
-- `loker explain`, `loker backends`, `loker doctor`, `loker context`, `loker report`, `loker fix`, `loker ci`, `loker pr`, `loker conduct`, `loker debate`, `loker suggest`, `loker smart`, `loker team`, `loker spawn`, `loker ls`, `loker init`.
+- `loker trace <run_id>` — pretty-print `trace.jsonl` (with `--json`, `--color <auto|always|never>`).
+- `loker explain`, `loker backends`, `loker doctor`, `loker context`, `loker report`, `loker fix`, `loker ci`, `loker pr`, `loker conduct`, `loker debate`, `loker suggest`, `loker smart`, `loker team`, `loker spawn`, `loker ls --blocked`, `loker init`, `loker spec`, `loker implement`.
 
 ## Breaking changes and compatibility notes
 

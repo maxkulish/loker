@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-07T07:26:49.774Z'
-  updated_at: '2026-05-07T08:45:00.147Z'
+  updated_at: '2026-05-07T08:55:55.349Z'
 phases:
   discovery:
     status: complete
@@ -75,6 +75,7 @@ phases:
     status: in_progress
     pr_url: https://github.com/maxkulish/loker/pull/63
     pr_number: 63
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -204,5 +205,16 @@ history:
     action: pr_created
     phase: pr
     details: 'PR #63 opened: https://github.com/maxkulish/loker/pull/63'
+  - timestamp: '2026-05-07T08:52:46.834Z'
+    action: ci_iteration
+    phase: pr
+    details: >-
+      Initial PR checks failed (test job) with flaky run_state::phase_lock::tests::release_allows_reacquire (lock
+      reported pid=0/unknown). Fixed by making PhaseLock::release explicitly trim/sync and issue Unix LOCK_UN via
+      libc::flock before drop to avoid stale advisory lock hold; pushed hotfix commit 1234d0e.
+  - timestamp: '2026-05-07T08:55:55.349Z'
+    action: ci_passed
+    phase: pr
+    details: CI checks green on rerun after phase-lock fix; test job passes, format and clippy passing.
 task_title: '[T-047] docs/migration-from-lok.md'
 task_url: https://linear.app/cloud-ai/issue/CLO-316/t-047-docsmigration-from-lokmd
