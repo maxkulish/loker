@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-07T07:26:49.774Z'
-  updated_at: '2026-05-07T08:32:42.003Z'
+  updated_at: '2026-05-07T08:43:04.452Z'
 phases:
   discovery:
     status: complete
@@ -56,10 +56,18 @@ phases:
     plan_file: docs/plans/clo-316-migration-from-lok.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - d409a22
       - 9b5dbc7
+      - a8f4072
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    codex_report: docs/reviews/clo-316-codex-validation.md
+    gemini_validation_report: docs/reviews/clo-316-gemini-validation.md
+    validation_synthesis_report: docs/reviews/clo-316-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+    validation_fix_iteration_count: 1
   pr:
     status: pending
   complete:
@@ -161,5 +169,11 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 2 commits.
+  - timestamp: '2026-05-07T08:43:04.452Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Synthesized review now approve_with_changes; implemented working-tree corrections in final commit and reran make
+      check before validation closeout.
 task_title: '[T-047] docs/migration-from-lok.md'
 task_url: https://linear.app/cloud-ai/issue/CLO-316/t-047-docsmigration-from-lokmd

@@ -54,3 +54,8 @@ echo "$OUTPUT"
 sh: -c: line 38: unexpected EOF while looking for matching `''
 sh: -c: line 46: syntax error: unexpected end of file
 
+## Verdict
+rework
+
+**Note:** Reviewer tooling failed before invoking Gemini; this is a process artifact, not a doc finding.
+

@@ -45,3 +45,8 @@ echo "$OUTPUT"
 sh: -c: line 30: unexpected EOF while looking for matching `''
 sh: -c: line 37: syntax error: unexpected end of file
 
+## Verdict
+rework
+
+**Note:** Reviewer tooling failed before invoking Codex; this is a process artifact, not a doc finding.
+
