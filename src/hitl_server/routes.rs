@@ -181,8 +181,10 @@ fn render_html(config: &GateConfig, pending_json: &str) -> String {
 <p>Artefact: <code>{artefact}</code></p>
 <p>Timeout: {timeout}</p>
 <hr>
+<p><strong>Summary:</strong> <pre>{summary}</pre></p>
+<hr>
 <form method="post" action="/approve">
-  <textarea name="comment" rows="3" cols="60" placeholder="Optional comment (approve)">{comment}</textarea><br>
+  <textarea name="comment" rows="3" cols="60" placeholder="Optional comment (approve)"></textarea><br>
   <button type="submit">Approve</button>
 </form>
 <hr>
@@ -196,7 +198,7 @@ fn render_html(config: &GateConfig, pending_json: &str) -> String {
         severity = html_escape(&config.severity),
         artefact = html_escape(artefact),
         timeout = config.timeout_at.as_deref().unwrap_or("none"),
-        comment = html_escape(prompt_summary),
+        summary = html_escape(prompt_summary),
     )
 }
 

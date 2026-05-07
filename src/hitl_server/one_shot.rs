@@ -17,30 +17,28 @@ pub struct ServerHandle {
     pub addr: SocketAddr,
     /// Receiver that resolves when the server gets a decision.
     decision_rx: oneshot::Receiver<ServerOutcome>,
-    /// The spawned server task. Aborted on outcome or cancel.
-    task: tokio::task::JoinHandle<()>,
+    /// Sender to trigger graceful shutdown (cancellation path).
+    shutdown_tx: tokio::sync::watch::Sender<()>,
 }
 
 impl ServerHandle {
     /// Wait for the server to resolve (decision, timeout, or cancellation).
-    ///
-    /// Aborts the background server task before returning.
     pub async fn outcome(self) -> ServerOutcome {
         match self.decision_rx.await {
             Ok(outcome) => {
-                self.task.abort();
+                let _ = self.shutdown_tx.send(());
                 outcome
             }
             Err(_) => {
-                self.task.abort();
+                let _ = self.shutdown_tx.send(());
                 ServerOutcome::Cancelled
             }
         }
     }
 
-    /// Cancel the server immediately (abort the background task).
+    /// Cancel the server gracefully.
     pub fn cancel(self) {
-        self.task.abort();
+        let _ = self.shutdown_tx.send(());
     }
 }
 
@@ -49,7 +47,7 @@ impl ServerHandle {
 ///
 /// The server exits when:
 /// - A POST handler successfully writes a response and sends a decision.
-/// - The caller invokes [`ServerHandle::cancel`] or drops the handle.
+/// - The caller invokes [`ServerHandle::cancel`].
 /// - The background task panics.
 pub async fn start(config: GateConfig) -> Result<ServerHandle, ServerError> {
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -58,17 +56,23 @@ pub async fn start(config: GateConfig) -> Result<ServerHandle, ServerError> {
     let addr = listener.local_addr().map_err(ServerError::Bind)?;
 
     let (dec_tx, dec_rx) = oneshot::channel();
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
     let state = AppState::new(config, dec_tx);
     let app = router(state);
 
-    let task = tokio::spawn(async move {
-        let _ = axum::serve(listener, app).await;
+    tokio::spawn(async move {
+        let mut shutdown_rx = shutdown_rx;
+        let _ = axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                let _ = shutdown_rx.changed().await;
+            })
+            .await;
     });
 
     Ok(ServerHandle {
         addr,
         decision_rx: dec_rx,
-        task,
+        shutdown_tx,
     })
 }

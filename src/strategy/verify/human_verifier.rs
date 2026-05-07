@@ -340,7 +340,11 @@ impl HumanVerifier {
                             .config
                             .decision_options
                             .iter()
-                            .map(|d| format!("{:?}", d).to_lowercase())
+                            .filter_map(|d| {
+                                serde_json::to_value(d)
+                                    .ok()
+                                    .and_then(|v| v.as_str().map(|s| s.to_owned()))
+                            })
                             .collect(),
                     };
 
@@ -1245,5 +1249,23 @@ mod tests {
             .unwrap();
         assert!(pending.is_fail());
         assert!(tmp.path().join("pending/review.json").is_file());
+    }
+
+    #[test]
+    fn decision_options_serializes_to_snake_case() {
+        let opts = vec![
+            HumanDecision::Approve,
+            HumanDecision::Reject,
+            HumanDecision::CommentOnly,
+        ];
+        let strings: Vec<String> = opts
+            .iter()
+            .filter_map(|d| {
+                serde_json::to_value(d)
+                    .ok()
+                    .and_then(|v| v.as_str().map(|s| s.to_owned()))
+            })
+            .collect();
+        assert_eq!(strings, vec!["approve", "reject", "comment_only"]);
     }
 }

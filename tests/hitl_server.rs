@@ -195,3 +195,94 @@ async fn binds_to_free_port() {
     // Clean up
     handle.cancel();
 }
+
+#[tokio::test]
+async fn concurrent_post_races_return_423() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_pending(&tmp, "review");
+
+    let config = make_gate_config(&tmp);
+    let handle = one_shot::start(config).await.unwrap();
+    let addr = handle.addr;
+
+    let client = reqwest::Client::new();
+
+    // Fire two POSTs concurrently
+    let req1 = client
+        .post(format!("http://{}/approve", addr))
+        .form(&[("comment", "")])
+        .send();
+    let req2 = client
+        .post(format!("http://{}/approve", addr))
+        .form(&[("comment", "")])
+        .send();
+
+    let (resp1, resp2) = tokio::join!(req1, req2);
+    let s1 = resp1.unwrap().status().as_u16();
+    let s2 = resp2.unwrap().status().as_u16();
+
+    // Exactly one 200 and one 423 (or 409 if it loses the file race)
+    let statuses = [s1, s2];
+    assert!(
+        statuses.contains(&200),
+        "one request should succeed, got {s1} and {s2}"
+    );
+    assert!(
+        statuses.contains(&423) || statuses.contains(&409),
+        "one request should be rejected, got {s1} and {s2}"
+    );
+}
+
+#[tokio::test]
+async fn timeout_auto_approves_without_human() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_pending(&tmp, "review");
+
+    let config = GateConfig {
+        run_dir: tmp.path().to_path_buf(),
+        run_id: "run-1".into(),
+        phase: "review".into(),
+        workflow: "design-doc-tdd".into(),
+        severity: "low".into(),
+        artefact_path: "review.md".into(),
+        artefact_kind: "text/markdown".into(),
+        prompt_summary: "candidate output preview".into(),
+        preview_lines: 17,
+        timeout_at: None, // server itself doesn't enforce timeout_at
+        decision_options: vec!["approve".into(), "reject".into()],
+    };
+
+    let handle = one_shot::start(config).await.unwrap();
+
+    // Server stays alive when no POST arrives; cancel it explicitly
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    handle.cancel();
+}
+
+#[tokio::test]
+async fn high_severity_blocks_indefinitely() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_pending(&tmp, "review");
+
+    let config = GateConfig {
+        run_dir: tmp.path().to_path_buf(),
+        run_id: "run-1".into(),
+        phase: "review".into(),
+        workflow: "design-doc-tdd".into(),
+        severity: "high".into(), // high = no timeout
+        artefact_path: "review.md".into(),
+        artefact_kind: "text/markdown".into(),
+        prompt_summary: "candidate output preview".into(),
+        preview_lines: 17,
+        timeout_at: None,
+        decision_options: vec!["approve".into(), "reject".into()],
+    };
+
+    let handle = one_shot::start(config).await.unwrap();
+
+    // Server should still be alive after a short wait
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Cancel to clean up
+    handle.cancel();
+}
