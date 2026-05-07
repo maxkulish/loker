@@ -544,6 +544,17 @@ enum Commands {
         #[arg(long)]
         blocked: bool,
     },
+
+    /// Start the loker UI daemon.
+    Ui {
+        /// Run as a long-lived daemon.
+        #[arg(long)]
+        serve: bool,
+
+        /// Bind address. Defaults to localhost:8080.
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        bind: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1168,6 +1179,14 @@ async fn main() -> Result<()> {
                 .or_else(|| std::env::current_dir().ok())
                 .ok_or_else(|| anyhow::anyhow!("could not determine project root"))?;
             loker::commands::ls_blocked::run(&root)?;
+        }
+        Commands::Ui { serve, bind } => {
+            if !serve {
+                anyhow::bail!("use --serve to start the daemon; see loker ui --help");
+            }
+            let project_root = find_project_root()
+                .ok_or_else(|| anyhow::anyhow!("no lok.toml found; run from a loker project directory"))?;
+            ui::serve::serve(&bind, project_root).await?;
         }
     }
 
