@@ -1252,6 +1252,25 @@ mod tests {
     }
 
     #[test]
+    fn fallback_server_field_does_not_panic_on_true() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hook = HumanVerifier::new(HumanVerifierConfig {
+            run_dir: tmp.path().to_path_buf(),
+            run_id: "run-1".into(),
+            workflow: "wf".into(),
+            phase: "review".into(),
+            artefact_name: "review.md".into(),
+            artefact_kind: Kind::ReviewMd,
+            severity: HumanSeverity::Medium,
+            decision_options: vec![HumanDecision::Approve, HumanDecision::Reject],
+            timeout_policy: HumanTimeoutPolicy::default(),
+            fallback_server: true,
+        });
+        assert_eq!(hook.config.fallback_server, true);
+        assert_eq!(hook.config.phase, "review");
+    }
+
+    #[test]
     fn decision_options_serializes_to_snake_case() {
         let opts = vec![
             HumanDecision::Approve,

@@ -234,7 +234,7 @@ async fn concurrent_post_races_return_423() {
 }
 
 #[tokio::test]
-async fn timeout_auto_approves_without_human() {
+async fn server_remains_running_without_post() {
     let tmp = tempfile::tempdir().unwrap();
     write_pending(&tmp, "review");
 

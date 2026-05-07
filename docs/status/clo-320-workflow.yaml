@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-06T19:37:55.023Z'
-  updated_at: '2026-05-07T06:46:17.186Z'
+  updated_at: '2026-05-07T06:51:36.373Z'
 phases:
   discovery:
     status: complete
@@ -73,6 +73,9 @@ phases:
     validation_synthesis_verdict: approve_with_changes
   pr:
     status: in_progress
+    pr_number: 61
+    pr_url: https://github.com/maxkulish/loker/pull/61
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -170,5 +173,13 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-07T06:48:09.204Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #61 opened: https://github.com/maxkulish/loker/pull/61'
+  - timestamp: '2026-05-07T06:51:36.373Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format (14s), clippy (1m17s), test (3m5s)'
 task_title: '[T-051] Per-gate fallback axum server for HITL approval'
 task_url: https://linear.app/cloud-ai/issue/CLO-320/t-051-per-gate-fallback-axum-server-for-hitl-approval
