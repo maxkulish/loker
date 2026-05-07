@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}Error {{ status_code }}{% endblock %}
+{% block content %}
+<div class="error-page">
+  <h2>{{ status_code }}</h2>
+  <p>{{ message }}</p>
+  <a href="/" class="btn btn-secondary">Back to Runs</a>
+</div>
+{% endblock %}
