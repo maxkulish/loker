@@ -112,8 +112,9 @@ mod tests {
         let resp = client.get(format!("http://{addr}/")).send().await.unwrap();
         assert_eq!(resp.status(), 200);
 
-        let body: serde_json::Value = resp.json().await.unwrap();
-        assert_eq!(body, serde_json::json!([]));
+        let body = resp.text().await.unwrap();
+        assert!(body.contains("No runs yet"), "HTML should contain empty state");
+        assert!(body.contains("<!DOCTYPE html>"), "Should be HTML");
     }
 
     #[tokio::test]
@@ -139,12 +140,9 @@ mod tests {
         let resp = client.get(format!("http://{addr}/")).send().await.unwrap();
         assert_eq!(resp.status(), 200);
 
-        let body: serde_json::Value = resp.json().await.unwrap();
-        let runs = body.as_array().unwrap();
-        assert_eq!(runs.len(), 1);
-        assert_eq!(
-            runs[0].get("id").and_then(|v| v.as_str()),
-            Some("my-run-456")
-        );
+        let body = resp.text().await.unwrap();
+        assert!(body.contains("my-run-456"), "HTML should contain run ID");
+        assert!(body.contains("test-wf"), "HTML should contain workflow name");
+        assert!(body.contains("<!DOCTYPE html>"), "Should be HTML");
     }
 }
