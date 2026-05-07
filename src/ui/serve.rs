@@ -18,6 +18,13 @@ pub async fn serve(bind: &str, project_root: PathBuf) -> Result<()> {
     let listener = TcpListener::bind(bind).await?;
     let addr = listener.local_addr()?;
 
+    if !addr.ip().is_loopback() {
+        eprintln!(
+            "WARN: binding to a non-loopback address ({}) may expose run metadata over the network.",
+            addr.ip()
+        );
+    }
+
     // stderr: daemon convention — status messages go to stderr.
     eprintln!("loker UI daemon listening on http://{addr}");
 

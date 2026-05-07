@@ -30,7 +30,7 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
 /// Handler for `GET /` — returns a JSON array of run summaries.
 async fn runs_list(state: axum::extract::State<AppState>) -> Json<Value> {
     let runs = discovery::discover_runs(&state.project_root);
-    Json(serde_json::to_value(runs).unwrap_or_default())
+    Json(serde_json::to_value(runs).unwrap_or_else(|_| serde_json::json!([])))
 }
 
 // ---------------------------------------------------------------------------
