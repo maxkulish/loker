@@ -22,7 +22,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-07T07:26:08.390Z'
-  updated_at: '2026-05-07T07:42:52.182Z'
+  updated_at: '2026-05-07T07:57:35.400Z'
 phases:
   discovery:
     status: complete
@@ -50,7 +50,8 @@ phases:
     plan_file: docs/plans/clo-315-one-page-tutorial.md
     approved: true
   implement:
-    status: in_progress
+    status: complete
+    last_phase_completed: ST4
   pr:
     status: pending
   complete:
@@ -155,6 +156,12 @@ history:
     action: implementation_started
     phase: implement
     details: Implementation phase started. Executing 4 sub-tasks from plan.
+  - timestamp: '2026-05-07T07:57:35.400Z'
+    action: phase_completed
+    phase: implement
+    details: >-
+      ST1-ST4 complete: docs/tutorial.md (200 lines, verified), examples/workflows/calculator-tutorial.toml, README.md +
+      handoff.md cross-links. Commit: 9c559b7.
 task_title: '[T-046] One-page tutorial: clone -> first run -> read trace'
 task_url: https://linear.app/cloud-ai/issue/CLO-315/t-046-one-page-tutorial-clone-first-run-read-trace
-current_phase: implement
+current_phase: pr
