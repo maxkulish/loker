@@ -30,3 +30,10 @@ approve_with_changes
 
 ## Recommendation
 PROCEED_WITH_FIXES. The four Must-Fix items are bounded and self-contained: write the four ST6 tests, fix the `decision_options` serialization, replace `task.abort()` with `with_graceful_shutdown`, and decouple the prompt summary from the approve textarea. All four can land in one iteration without touching the design or schema. After that, ship the PR. Separately, the orchestrator's `pi/agents` Codex+Gemini wrapper scripts have a heredoc quoting bug that should be fixed so future reviews aren't single-sourced.
+
+## Re-validation
+- F1: Added `concurrent_post_races_return_423`, `timeout_auto_approves_without_human`, `high_severity_blocks_indefinitely` in `tests/hitl_server.rs`; `server_url_printed_to_stdout` deferred (stdout capture is a HumanVerifier concern, not server-level).
+- F2: Replaced `format!("{:?}", d).to_lowercase()` with `serde_json::to_value(d).ok().and_then(|v| v.as_str().map(|s| s.to_owned()))` in `human_verifier.rs`; added `decision_options_serializes_to_snake_case` unit test.
+- F3: Replaced `task.abort()` with `axum::serve(..).with_graceful_shutdown(..)` via `tokio::sync::watch` in `one_shot.rs`.
+- F4: Moved `prompt_summary` to a `<pre>` block above both forms; both textareas now empty.
+- `make check` green on commit 0597c46.
