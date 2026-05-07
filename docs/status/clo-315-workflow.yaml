@@ -1,0 +1,167 @@
+task_id: CLO-315
+task_type: development
+classification_reason: >-
+  Title lacks operational keywords, no [spec]/[ops] labels, and acceptance criteria require real CLI verification with
+  copy-pasteable commands and actual run outputs.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-315-t-046-one-page-tutorial-clone-first-run-read-trace
+  priority: Medium
+workflow:
+  current_phase: implement
+  status: active
+  created_at: '2026-05-07T07:26:08.390Z'
+  updated_at: '2026-05-07T07:57:35.400Z'
+phases:
+  discovery:
+    status: complete
+    problem_framed: true
+    approach_chosen: >-
+      Pragmatic tutorial — clone/build → doctor → explain → simple workflow run with calculator spec → inspect run
+      directory (manifest.json) → loker trace command (noting phase-based runner writes trace.jsonl in T-041)
+    approaches_identified: 3
+    discovery_debt: 1
+    approved: true
+  design:
+    status: complete
+    design_doc: docs/design-docs/clo-315-one-page-tutorial.md
+    discovery_context_used: true
+    draft_ready: true
+    review_applied: false
+    review_completed: true
+    review_gemini: null
+    review_ollama: null
+    review_verdict: approve
+    finalized: true
+    human_review_completed: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-315-one-page-tutorial.md
+    approved: true
+  implement:
+    status: complete
+    last_phase_completed: ST4
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-07T07:26:08.390Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-315 as development
+  - timestamp: '2026-05-07T07:29:10.191Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: Title lacks operational keywords, no [spec]/[ops] labels, and acceptance criteria
+      require real CLI verification with copy-pasteable commands and actual run outputs.
+  - timestamp: '2026-05-07T07:29:14.972Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-07T07:29:20.241Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-07T07:29:26.935Z'
+    action: discovery_started
+    phase: discovery
+    details: Discovery phase started for CLO-315
+  - timestamp: '2026-05-07T07:29:38.580Z'
+    action: problem_framed
+    phase: discovery
+    details: >-
+      Problem framed: Loker lacks a getting-started tutorial; new users need a 10-minute path from clone to first trace
+      inspection. Constraints include real CLI verification and calculator example dependency.
+  - timestamp: '2026-05-07T07:38:54.036Z'
+    action: approach_selected
+    phase: discovery
+    details: >-
+      Selected Approach 1: Pragmatic tutorial showing what works today. Step-based runner creates run directories with
+      manifest.json; loker trace is ready for phase-based workflows (T-041). Tutorial will be honest about current CLI
+      surface and future-compatible.
+  - timestamp: '2026-05-07T07:39:00.836Z'
+    action: discovery_approved
+    phase: discovery
+    details: Discovery checkpoint approved. Proceeding to design phase.
+  - timestamp: '2026-05-07T07:39:10.176Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-07T07:39:27.256Z'
+    action: design_started
+    phase: design
+    details: Design phase started for CLO-315. No existing design doc found.
+  - timestamp: '2026-05-07T07:41:00.409Z'
+    action: design_draft_ready
+    phase: design
+    details: Design document created at docs/design-docs/clo-315-one-page-tutorial.md
+  - timestamp: '2026-05-07T07:41:23.052Z'
+    action: review_completed
+    phase: design
+    details: >-
+      AI review skipped in pi (no /design-doc:review command available). Manual self-review performed against template
+      requirements — all sections present, constraints and evaluation populated.
+  - timestamp: '2026-05-07T07:41:30.342Z'
+    action: design_finalized
+    phase: design
+    details: >-
+      Design finalized. Manual review passed. All template sections present. Branch feat/clo-315-one-page-tutorial
+      created. Linear comment posted.
+  - timestamp: '2026-05-07T07:41:41.349Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Manual self-review completed against template requirements. All sections present, constraints and evaluation
+      populated.
+  - timestamp: '2026-05-07T07:41:46.409Z'
+    action: design_human_review_complete
+    phase: design
+    details: User approved design checkpoint. Proceeding to plan phase.
+  - timestamp: '2026-05-07T07:41:51.856Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-07T07:42:03.931Z'
+    action: plan_started
+    phase: plan
+    details: Creating implementation plan from design document.
+  - timestamp: '2026-05-07T07:42:23.343Z'
+    action: plan_created
+    phase: plan
+    details: >-
+      Implementation plan created at docs/plans/clo-315-one-page-tutorial.md. 4 sub-tasks: ST1 tutorial file, ST2
+      workflow example, ST3 cross-links, ST4 verification.
+  - timestamp: '2026-05-07T07:42:32.657Z'
+    action: plan_approved
+    phase: plan
+    details: Plan approved. 4 sub-tasks to implement in single PR. Proceeding to implement phase.
+  - timestamp: '2026-05-07T07:42:38.622Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-07T07:42:52.182Z'
+    action: implementation_started
+    phase: implement
+    details: Implementation phase started. Executing 4 sub-tasks from plan.
+  - timestamp: '2026-05-07T07:57:35.400Z'
+    action: phase_completed
+    phase: implement
+    details: >-
+      ST1-ST4 complete: docs/tutorial.md (200 lines, verified), examples/workflows/calculator-tutorial.toml, README.md +
+      handoff.md cross-links. Commit: 9c559b7.
+task_title: '[T-046] One-page tutorial: clone -> first run -> read trace'
+task_url: https://linear.app/cloud-ai/issue/CLO-315/t-046-one-page-tutorial-clone-first-run-read-trace
+current_phase: pr

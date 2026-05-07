@@ -22,6 +22,11 @@ M0 (fork prep) done. Active milestone: M1 (TensorZero backend). For the
 full milestone list with test contracts, read the design doc; for active
 work, read `docs/plans/2026-04-25-m1-tensorzero-backend.md`.
 
+## Getting Started
+
+New to loker? Follow the **[Tutorial](tutorial.md)** for a 10-minute
+walkthrough from `git clone` to your first workflow run.
+
 ## Intent (decision boundaries)
 
 - TDD-first for orchestration primitives. Read the design doc §8 M_N

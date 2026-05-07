@@ -131,7 +131,7 @@ Workflows are TOML files under `.lok/workflows/`. See
 [`.lok/workflows/design-doc-tdd.toml`](.lok/workflows/design-doc-tdd.toml)
 for the full definition.
 
-> For a full end-to-end run example (requires Ollama), see the Quickstart guide (not yet written).
+> For a full end-to-end run example, see the **[Tutorial](docs/tutorial.md)**.
 
 ---
 
