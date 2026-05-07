@@ -87,7 +87,11 @@ pub fn discover_pending_gates(project_root: &Path) -> Vec<PendingGate> {
                 Ok(e) => e,
                 Err(_) => continue,
             };
-            if !pending_entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            if !pending_entry
+                .file_type()
+                .map(|t| t.is_file())
+                .unwrap_or(false)
+            {
                 continue;
             }
 

@@ -31,7 +31,10 @@ pub fn read_manifest_entries(manifest_path: &Path) -> Vec<ManifestEntry> {
             let name = entry.get("name")?.as_str()?.to_string();
             let kind = entry.get("kind")?.as_str()?.to_string();
             let schema_version = entry.get("schema_version")?.as_u64()? as u32;
-            let sha256 = entry.get("sha256").and_then(|v| v.as_str()).map(String::from);
+            let sha256 = entry
+                .get("sha256")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             Some(ManifestEntry {
                 name,
                 kind,

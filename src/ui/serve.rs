@@ -113,7 +113,10 @@ mod tests {
         assert_eq!(resp.status(), 200);
 
         let body = resp.text().await.unwrap();
-        assert!(body.contains("No runs yet"), "HTML should contain empty state");
+        assert!(
+            body.contains("No runs yet"),
+            "HTML should contain empty state"
+        );
         assert!(body.contains("<!DOCTYPE html>"), "Should be HTML");
     }
 
@@ -142,7 +145,10 @@ mod tests {
 
         let body = resp.text().await.unwrap();
         assert!(body.contains("my-run-456"), "HTML should contain run ID");
-        assert!(body.contains("test-wf"), "HTML should contain workflow name");
+        assert!(
+            body.contains("test-wf"),
+            "HTML should contain workflow name"
+        );
         assert!(body.contains("<!DOCTYPE html>"), "Should be HTML");
     }
 }

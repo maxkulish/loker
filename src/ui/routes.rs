@@ -50,14 +50,8 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
         .route("/health", get(health_check))
         .route("/runs/:id", get(run_detail))
         .route("/pending", get(pending_panel))
-        .route(
-            "/gates/:run_id/:phase/approve",
-            post(hitl_approve),
-        )
-        .route(
-            "/gates/:run_id/:phase/reject",
-            post(hitl_reject),
-        )
+        .route("/gates/:run_id/:phase/approve", post(hitl_approve))
+        .route("/gates/:run_id/:phase/reject", post(hitl_reject))
         .with_state(state)
 }
 
@@ -84,10 +78,7 @@ async fn health_check() -> impl IntoResponse {
 }
 
 /// GET /runs/:id — per-run detail page.
-async fn run_detail(
-    State(state): State<AppState>,
-    Path(run_id): Path<String>,
-) -> Response {
+async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
     // Sanitize run_id — reject path traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
@@ -167,7 +158,15 @@ async fn hitl_approve(
         .into_response();
     }
 
-    match write_gate_response(&run_dir, &run_id, &phase, HumanDecision::Approve, form.comment).await {
+    match write_gate_response(
+        &run_dir,
+        &run_id,
+        &phase,
+        HumanDecision::Approve,
+        form.comment,
+    )
+    .await
+    {
         Ok(()) => {
             // Redirect to pending panel on success
             let location = "/pending";
@@ -187,20 +186,16 @@ async fn hitl_approve(
             )
                 .into_response()
         }
-        Err(GateError::Locked) => {
-            templates::ErrorTemplate {
-                status_code: 423,
-                message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
-            }
-            .into_response()
+        Err(GateError::Locked) => templates::ErrorTemplate {
+            status_code: 423,
+            message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
         }
-        Err(e) => {
-            templates::ErrorTemplate {
-                status_code: 500,
-                message: format!("Failed to write response: {e}"),
-            }
-            .into_response()
+        .into_response(),
+        Err(e) => templates::ErrorTemplate {
+            status_code: 500,
+            message: format!("Failed to write response: {e}"),
         }
+        .into_response(),
     }
 }
 
@@ -219,7 +214,15 @@ async fn hitl_reject(
         .into_response();
     }
 
-    match write_gate_response(&run_dir, &run_id, &phase, HumanDecision::Reject, form.comment).await {
+    match write_gate_response(
+        &run_dir,
+        &run_id,
+        &phase,
+        HumanDecision::Reject,
+        form.comment,
+    )
+    .await
+    {
         Ok(()) => {
             let location = "/pending";
             (
@@ -238,20 +241,16 @@ async fn hitl_reject(
             )
                 .into_response()
         }
-        Err(GateError::Locked) => {
-            templates::ErrorTemplate {
-                status_code: 423,
-                message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
-            }
-            .into_response()
+        Err(GateError::Locked) => templates::ErrorTemplate {
+            status_code: 423,
+            message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
         }
-        Err(e) => {
-            templates::ErrorTemplate {
-                status_code: 500,
-                message: format!("Failed to write response: {e}"),
-            }
-            .into_response()
+        .into_response(),
+        Err(e) => templates::ErrorTemplate {
+            status_code: 500,
+            message: format!("Failed to write response: {e}"),
         }
+        .into_response(),
     }
 }
 
@@ -291,10 +290,12 @@ async fn write_gate_response(
 
     // Acquire advisory lock in blocking task
     task::spawn_blocking(move || {
-        let _lock = PhaseLock::acquire(&run_dir_owned, &phase_owned, &run_id_owned, None)
-            .map_err(|e| match e {
-                PhaseLockError::LockInUse { .. } => GateError::Locked,
-                other => GateError::Io(other.to_string()),
+        let _lock =
+            PhaseLock::acquire(&run_dir_owned, &phase_owned, &run_id_owned, None).map_err(|e| {
+                match e {
+                    PhaseLockError::LockInUse { .. } => GateError::Locked,
+                    other => GateError::Io(other.to_string()),
+                }
             })?;
 
         let response_path = run_dir_owned
@@ -316,16 +317,14 @@ async fn write_gate_response(
             inline_comments_path: None,
         };
 
-        let json = serde_json::to_vec_pretty(&response)
-            .map_err(|e| GateError::Io(e.to_string()))?;
+        let json =
+            serde_json::to_vec_pretty(&response).map_err(|e| GateError::Io(e.to_string()))?;
 
         if let Some(dir) = response_path.parent() {
-            std::fs::create_dir_all(dir)
-                .map_err(|e| GateError::Io(e.to_string()))?;
+            std::fs::create_dir_all(dir).map_err(|e| GateError::Io(e.to_string()))?;
         }
 
-        atomic_write(&response_path, &json)
-            .map_err(|e| GateError::Io(e.to_string()))?;
+        atomic_write(&response_path, &json).map_err(|e| GateError::Io(e.to_string()))?;
 
         Ok(())
     })
@@ -361,7 +360,11 @@ mod tests {
             "loker.run_id": "run-test-111",
             "entries": []
         });
-        fs::write(runs_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            runs_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
         // Add a marker
         let markers_dir = runs_dir.join("markers");
         fs::create_dir_all(&markers_dir).unwrap();
@@ -380,7 +383,10 @@ mod tests {
             .unwrap();
         let html = String::from_utf8(body.to_vec()).unwrap();
         assert!(html.contains("wf-run-111"), "HTML should contain run ID");
-        assert!(html.contains("test-workflow"), "HTML should contain workflow name");
+        assert!(
+            html.contains("test-workflow"),
+            "HTML should contain workflow name"
+        );
         assert!(html.contains("design"), "HTML should contain phase info");
         assert!(html.contains("completed"), "HTML should contain status");
     }
@@ -412,7 +418,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -438,7 +449,11 @@ mod tests {
                 {"name": "review.md", "kind": "text/markdown", "schema_version": 1}
             ]
         });
-        fs::write(run_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            run_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
         // Markers
         let markers_dir = run_dir.join("markers");
         fs::create_dir_all(&markers_dir).unwrap();
@@ -454,7 +469,12 @@ mod tests {
 
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(Request::builder().uri("/runs/detail-run-001").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/runs/detail-run-001")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -482,7 +502,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(Request::builder().uri("/runs/nonexistent").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/runs/nonexistent")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -502,7 +527,12 @@ mod tests {
         // Request a non-existent run — should get 404 from handler
         let response = app
             .clone()
-            .oneshot(Request::builder().uri("/runs/non-existent").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/runs/non-existent")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -523,7 +553,11 @@ mod tests {
             "loker.run_id": "run-pending-001",
             "entries": []
         });
-        fs::write(run_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            run_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
         // Create a pending gate
         let pending_dir = run_dir.join("pending");
         fs::create_dir_all(&pending_dir).unwrap();
@@ -531,11 +565,20 @@ mod tests {
             "severity": "high",
             "artefact": {"path": "review.md", "kind": "text/markdown"}
         });
-        fs::write(pending_dir.join("review.json"), pending.to_string().as_bytes()).unwrap();
+        fs::write(
+            pending_dir.join("review.json"),
+            pending.to_string().as_bytes(),
+        )
+        .unwrap();
 
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(Request::builder().uri("/pending").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/pending")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -557,7 +600,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(Request::builder().uri("/pending").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/pending")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -567,7 +615,10 @@ mod tests {
             .await
             .unwrap();
         let html = String::from_utf8(body.to_vec()).unwrap();
-        assert!(html.contains("All gates resolved"), "Should show empty state");
+        assert!(
+            html.contains("All gates resolved"),
+            "Should show empty state"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -585,7 +636,11 @@ mod tests {
             "loker.run_id": "run-gate-001",
             "entries": []
         });
-        fs::write(run_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            run_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
         // Create pending file so the gate exists
         let pending_dir = run_dir.join("pending");
         fs::create_dir_all(&pending_dir).unwrap();
@@ -617,7 +672,10 @@ mod tests {
         let response_path = run_dir.join("responses").join("review.json");
         assert!(response_path.exists(), "Response file should exist");
         let content = fs::read_to_string(&response_path).unwrap();
-        assert!(content.contains(r#""approve""#), "Should contain approval decision");
+        assert!(
+            content.contains(r#""approve""#),
+            "Should contain approval decision"
+        );
     }
 
     #[tokio::test]
@@ -631,7 +689,11 @@ mod tests {
             "loker.run_id": "run-gate-002",
             "entries": []
         });
-        fs::write(run_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            run_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
         let pending_dir = run_dir.join("pending");
         fs::create_dir_all(&pending_dir).unwrap();
         fs::write(pending_dir.join("review.json"), b"{}").unwrap();
@@ -659,7 +721,10 @@ mod tests {
         let response_path = run_dir.join("responses").join("review.json");
         assert!(response_path.exists(), "Response file should exist");
         let content = fs::read_to_string(&response_path).unwrap();
-        assert!(content.contains(r#""reject""#), "Should contain rejection decision");
+        assert!(
+            content.contains(r#""reject""#),
+            "Should contain rejection decision"
+        );
     }
 
     #[tokio::test]
@@ -673,7 +738,11 @@ mod tests {
             "loker.run_id": "run-gate-003",
             "entries": []
         });
-        fs::write(run_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            run_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
         let pending_dir = run_dir.join("pending");
         fs::create_dir_all(&pending_dir).unwrap();
         fs::write(pending_dir.join("review.json"), b"{}").unwrap();
@@ -693,7 +762,11 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(resp1.status(), StatusCode::SEE_OTHER, "First approve should redirect");
+        assert_eq!(
+            resp1.status(),
+            StatusCode::SEE_OTHER,
+            "First approve should redirect"
+        );
 
         // Second approval should also redirect (already exists → still redirect)
         let resp2 = app
@@ -708,6 +781,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(resp2.status(), StatusCode::SEE_OTHER, "Second approve should also redirect");
+        assert_eq!(
+            resp2.status(),
+            StatusCode::SEE_OTHER,
+            "Second approve should also redirect"
+        );
     }
 }

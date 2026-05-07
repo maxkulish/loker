@@ -121,9 +121,12 @@ impl IntoResponse for PendingTemplate {
 impl IntoResponse for ErrorTemplate {
     fn into_response(self) -> Response {
         match self.render() {
-            Ok(html) => (axum::http::StatusCode::from_u16(self.status_code).unwrap_or(
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            ), Html(html)).into_response(),
+            Ok(html) => (
+                axum::http::StatusCode::from_u16(self.status_code)
+                    .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
+                Html(html),
+            )
+                .into_response(),
             Err(e) => {
                 let msg = format!("Template error: {}", e);
                 (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
