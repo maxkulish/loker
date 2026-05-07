@@ -1,0 +1,166 @@
+task_id: CLO-314
+task_type: development
+classification_reason: >-
+  title starts with roadmap ref [T-045] but content is a documentation/README rewrite with clear ACs; no spec/ops
+  signals present; defaults to development per classification rules.
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-314-t-045-readme-rewrite-thesis-primitives-install-one-page
+  priority: Medium
+  branch_actual: feat/clo-314-readme
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-05-06T19:46:17.122Z'
+  updated_at: '2026-05-06T21:02:07.850Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: Full rewrite from scratch
+    approaches_identified: 3
+    approved: true
+    baseline_score: 3
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-314.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-314-readme-rewrite.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-314-readme-rewrite.md
+    draft_ready: true
+    review_completed: true
+    human_review_completed: true
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-314-readme-rewrite.md
+    approved: true
+  implement:
+    status: complete
+    codex_report: docs/reviews/clo-314-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-314-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-314-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+    commits:
+      - fcfb08a
+  pr:
+    status: in_progress
+    pr_number: 58
+    pr_url: https://github.com/maxkulish/loker/pull/58
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-06T19:46:17.122Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for CLO-314 as development
+  - timestamp: '2026-05-06T19:49:59.959Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: title starts with roadmap ref [T-045] but content is a documentation/README rewrite
+      with clear ACs; no spec/ops signals present; defaults to development per classification rules.
+  - timestamp: '2026-05-06T19:50:14.743Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo.
+  - timestamp: '2026-05-06T19:50:42.574Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-06T19:51:31.295Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-314-readme already exists from previous work.
+  - timestamp: '2026-05-06T19:56:31.893Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: Full rewrite from scratch. Baseline 3/10. 3 approaches considered.'
+  - timestamp: '2026-05-06T19:56:50.102Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-06T20:04:23.432Z'
+    action: design_approved
+    phase: design
+    details: >-
+      Design document written at docs/designs/clo-314-readme-rewrite.md. Full rewrite from scratch approach. 5 ACs, 3
+      open questions escalated.
+  - timestamp: '2026-05-06T20:06:04.695Z'
+    action: design_draft_ready
+    phase: design
+    details: Design document drafted at docs/designs/clo-314-readme-rewrite.md
+  - timestamp: '2026-05-06T20:06:13.844Z'
+    action: design_review_complete
+    phase: design
+    details: 'Self-review: all sections filled, ACs verifiable, constraints documented, no Rust code changes.'
+  - timestamp: '2026-05-06T20:06:40.366Z'
+    action: design_human_review_complete
+    phase: design
+    details: Documentation-only task; design is clear and self-consistent, no human review needed.
+  - timestamp: '2026-05-06T20:07:07.234Z'
+    action: design_finalized
+    phase: design
+    details: 'Design finalized. Approach: Full README rewrite. Design doc at docs/designs/clo-314-readme-rewrite.md'
+  - timestamp: '2026-05-06T20:07:20.663Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-06T20:11:17.171Z'
+    action: plan_created
+    phase: plan
+    details: 'Plan created at docs/plans/clo-314-readme-rewrite.md. 7 sub-tasks. Documentation-only: write/archive/verify.'
+  - timestamp: '2026-05-06T20:11:39.498Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 7 sub-tasks. Documentation-only: no Rust changes. All verification steps planned.'
+  - timestamp: '2026-05-06T20:12:02.261Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-06T20:25:28.152Z'
+    action: implementation_complete
+    phase: implement
+    details: >-
+      ST1-ST3: New README.md written (176 lines, 6 sections). ST4: Old README archived to docs/old-readme.md. ST5-ST7:
+      make check passes, install+run section at 46 lines (under one screen), no Rust changes.
+  - timestamp: '2026-05-06T20:25:38.027Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-06T20:58:30.569Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (shell escaping bug). Gemini: REVIEW_FAILED (same). Claude fallback: approve_with_changes.
+      Synthesis: approve_with_changes. 5 Must Fix items applied in 1 fix iteration.
+  - timestamp: '2026-05-06T20:59:36.321Z'
+    action: subtask_complete
+    phase: implement
+    details: All sub-tasks landed + validation fixes applied. Commit fcfb08a
+  - timestamp: '2026-05-06T21:01:00.410Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'All pre-flight checks pass: fmt, clippy, test'
+  - timestamp: '2026-05-06T21:02:07.850Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #58 created at https://github.com/maxkulish/loker/pull/58'
+task_title: '[T-045] README rewrite: thesis, primitives, install, one-page example'
+task_url: https://linear.app/cloud-ai/issue/CLO-314/t-045-readme-rewrite-thesis-primitives-install-one-page
