@@ -18,6 +18,7 @@ pub mod strategy;
 pub mod summary;
 pub mod template;
 pub mod trace;
+pub mod ui;
 
 mod apply_verify;
 mod cache;
