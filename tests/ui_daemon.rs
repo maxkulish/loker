@@ -4,7 +4,6 @@
 //! The `spawn_test_daemon` helper from `ui::serve` is used for bootstrap.
 
 use std::fs;
-use std::path::Path;
 
 use reqwest::Client;
 use tempfile::TempDir;
@@ -25,9 +24,7 @@ impl DaemonFixture {
         let project_root = tmp.path().to_path_buf();
         let app = loker::ui::routes::ui_routes(project_root);
 
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
         let handle = tokio::spawn(async move {
@@ -62,7 +59,11 @@ impl DaemonFixture {
             "created_at": "2026-05-07T00:00:00Z",
             "entries": []
         });
-        fs::write(run_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            run_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
     }
 
     fn create_corrupt_run(&self, name: &str) {
@@ -116,14 +117,14 @@ async fn daemon_custom_bind_address() {
 
     // Bind to a specific port via port 0 to avoid races, then verify.
     let app = loker::ui::routes::ui_routes(project_root);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
 
     let handle = tokio::spawn(async move {
         axum::serve(listener, app)
-            .with_graceful_shutdown(async { tokio::signal::ctrl_c().await.ok(); })
+            .with_graceful_shutdown(async {
+                tokio::signal::ctrl_c().await.ok();
+            })
             .await
             .ok();
     });
@@ -156,10 +157,7 @@ async fn daemon_skips_corrupt_run_directory() {
         1,
         "only the valid run should appear; corrupt one is skipped"
     );
-    assert_eq!(
-        runs[0].get("id").and_then(|v| v.as_str()),
-        Some("good-run")
-    );
+    assert_eq!(runs[0].get("id").and_then(|v| v.as_str()), Some("good-run"));
 
     // Verify a second request also succeeds (daemon stays up).
     let resp2 = client.get(fixture.url()).send().await.unwrap();

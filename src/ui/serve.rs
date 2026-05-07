@@ -67,15 +67,15 @@ pub async fn spawn_test_daemon(
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("failed to bind test daemon");
-    let addr = listener.local_addr().expect("failed to get test daemon addr");
+    let addr = listener
+        .local_addr()
+        .expect("failed to get test daemon addr");
 
     let handle = tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app)
             .with_graceful_shutdown(async {
                 // Listen for Ctrl-C or SIGTERM, but tests can abort via drop.
-                tokio::signal::ctrl_c()
-                    .await
-                    .ok();
+                tokio::signal::ctrl_c().await.ok();
             })
             .await
         {
@@ -93,8 +93,8 @@ pub async fn spawn_test_daemon(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use reqwest::Client;
+    use std::fs;
 
     #[tokio::test]
     async fn serve_binds_and_responds() {
@@ -102,11 +102,7 @@ mod tests {
         let (_handle, addr) = spawn_test_daemon(tmp.path().to_path_buf()).await;
 
         let client = Client::new();
-        let resp = client
-            .get(format!("http://{addr}/"))
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get(format!("http://{addr}/")).send().await.unwrap();
         assert_eq!(resp.status(), 200);
 
         let body: serde_json::Value = resp.json().await.unwrap();
@@ -125,16 +121,16 @@ mod tests {
             "created_at": "2026-05-07T00:00:00Z",
             "entries": []
         });
-        fs::write(runs_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            runs_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
 
         let (_handle, addr) = spawn_test_daemon(tmp.path().to_path_buf()).await;
 
         let client = Client::new();
-        let resp = client
-            .get(format!("http://{addr}/"))
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get(format!("http://{addr}/")).send().await.unwrap();
         assert_eq!(resp.status(), 200);
 
         let body: serde_json::Value = resp.json().await.unwrap();

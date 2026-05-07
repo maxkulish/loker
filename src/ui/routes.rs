@@ -24,9 +24,7 @@ pub struct AppState {
 pub fn ui_routes(project_root: PathBuf) -> Router {
     let state = AppState { project_root };
 
-    Router::new()
-        .route("/", get(runs_list))
-        .with_state(state)
+    Router::new().route("/", get(runs_list)).with_state(state)
 }
 
 /// Handler for `GET /` — returns a JSON array of run summaries.
@@ -60,16 +58,15 @@ mod tests {
             "created_at": "2026-05-07T00:00:00Z",
             "entries": []
         });
-        fs::write(runs_dir.join("manifest.json"), manifest.to_string().as_bytes()).unwrap();
+        fs::write(
+            runs_dir.join("manifest.json"),
+            manifest.to_string().as_bytes(),
+        )
+        .unwrap();
 
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
 
@@ -80,7 +77,10 @@ mod tests {
             .unwrap();
         let json: Vec<Value> = serde_json::from_slice(&body).unwrap();
         assert_eq!(json.len(), 1);
-        assert_eq!(json[0].get("id").and_then(|v| v.as_str()), Some("my-run-123"));
+        assert_eq!(
+            json[0].get("id").and_then(|v| v.as_str()),
+            Some("my-run-123")
+        );
         assert_eq!(
             json[0].get("workflow").and_then(|v| v.as_str()),
             Some("test-wf")
@@ -93,12 +93,7 @@ mod tests {
 
         let app = ui_routes(tmp.path().to_path_buf());
         let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
 

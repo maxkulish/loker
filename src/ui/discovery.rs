@@ -41,7 +41,10 @@ pub fn discover_runs(project_root: &Path) -> Vec<RunSummary> {
     let dir_entries = match fs::read_dir(&runs_dir) {
         Ok(entries) => entries,
         Err(e) => {
-            eprintln!("WARN: failed to read runs directory {}: {e}", runs_dir.display());
+            eprintln!(
+                "WARN: failed to read runs directory {}: {e}",
+                runs_dir.display()
+            );
             return Vec::new();
         }
     };
@@ -74,10 +77,7 @@ pub fn discover_runs(project_root: &Path) -> Vec<RunSummary> {
         }
 
         let dir_path = entry.path();
-        let dir_name = entry
-            .file_name()
-            .to_string_lossy()
-            .to_string();
+        let dir_name = entry.file_name().to_string_lossy().to_string();
 
         match load_run_summary(&dir_path, &dir_name) {
             Ok(summary) => runs.push(summary),
@@ -292,19 +292,16 @@ mod tests {
         assert_eq!(runs[1].id, "zzz-workflow-222");
 
         // Check metadata.
-        assert_eq!(
-            runs[0].workflow.as_deref(),
-            Some("test-workflow-a")
-        );
-        assert_eq!(
-            runs[0].run_id.as_deref(),
-            Some("run-test-workflow-a")
-        );
+        assert_eq!(runs[0].workflow.as_deref(), Some("test-workflow-a"));
+        assert_eq!(runs[0].run_id.as_deref(), Some("run-test-workflow-a"));
         assert!(runs[0].created_at.is_some());
 
         // Check phase status.
         let status_a = &runs[0].phase_status;
-        assert_eq!(status_a.get("design").map(|s| s.as_str()), Some("completed"));
+        assert_eq!(
+            status_a.get("design").map(|s| s.as_str()),
+            Some("completed")
+        );
         assert_eq!(status_a.get("review").map(|s| s.as_str()), Some("started"));
 
         let status_b = &runs[1].phase_status;

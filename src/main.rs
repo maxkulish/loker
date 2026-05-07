@@ -23,7 +23,6 @@ pub mod family;
 mod git_agent;
 pub mod hitl_server;
 pub mod manifest;
-pub mod ui;
 mod output;
 pub mod phase_runner;
 pub mod resume;
@@ -35,6 +34,7 @@ mod tasks;
 mod team;
 mod template;
 pub mod trace;
+pub mod ui;
 mod utils;
 pub mod workflow;
 mod workflows;
@@ -1184,8 +1184,9 @@ async fn main() -> Result<()> {
             if !serve {
                 anyhow::bail!("use --serve to start the daemon; see loker ui --help");
             }
-            let project_root = find_project_root()
-                .ok_or_else(|| anyhow::anyhow!("no lok.toml found; run from a loker project directory"))?;
+            let project_root = find_project_root().ok_or_else(|| {
+                anyhow::anyhow!("no lok.toml found; run from a loker project directory")
+            })?;
             ui::serve::serve(&bind, project_root).await?;
         }
     }
