@@ -21,7 +21,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-07T07:26:49.774Z'
-  updated_at: '2026-05-07T08:56:40.031Z'
+  updated_at: '2026-05-07T08:59:42.226Z'
 phases:
   discovery:
     status: complete
@@ -224,5 +224,11 @@ history:
       list incl `spec`/`implement`/`ls --blocked`, trace --color value enum, and `lok` workflow definitions wording).
       Pushed follow-up commit b0a893e with all reviewer-requested edits and replied to each comment with `/gemini
       review`.
+  - timestamp: '2026-05-07T08:59:42.226Z'
+    action: ci_passed
+    phase: pr
+    details: >-
+      Rerun CI on latest commit `2807d75` passed (`run 25486126142`): format, clippy, test all green. Node.js 20
+      deprecation warnings are informational only.
 task_title: '[T-047] docs/migration-from-lok.md'
 task_url: https://linear.app/cloud-ai/issue/CLO-316/t-047-docsmigration-from-lokmd
