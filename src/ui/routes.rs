@@ -149,6 +149,15 @@ async fn hitl_approve(
     Path((run_id, phase)): Path<(String, String)>,
     Form(form): Form<DecisionForm>,
 ) -> Response {
+    // Sanitize run_id — reject traversal and empty IDs.
+    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+        return templates::ErrorTemplate {
+            status_code: 400,
+            message: format!("Invalid run ID: {}", run_id),
+        }
+        .into_response();
+    }
+
     let run_dir = state.project_root.join("runs").join(&run_id);
     if !run_dir.exists() {
         return templates::ErrorTemplate {
@@ -205,6 +214,15 @@ async fn hitl_reject(
     Path((run_id, phase)): Path<(String, String)>,
     Form(form): Form<DecisionForm>,
 ) -> Response {
+    // Sanitize run_id — reject traversal and empty IDs.
+    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+        return templates::ErrorTemplate {
+            status_code: 400,
+            message: format!("Invalid run ID: {}", run_id),
+        }
+        .into_response();
+    }
+
     let run_dir = state.project_root.join("runs").join(&run_id);
     if !run_dir.exists() {
         return templates::ErrorTemplate {
@@ -343,6 +361,8 @@ mod tests {
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
+    use insta::assert_snapshot;
+    use regex::Regex;
     use tower::ServiceExt;
 
     // -----------------------------------------------------------------------
@@ -389,6 +409,11 @@ mod tests {
         );
         assert!(html.contains("design"), "HTML should contain phase info");
         assert!(html.contains("completed"), "HTML should contain status");
+
+        // Snapshot test — stable fixture data (strip dynamic timestamps)
+        let ts_re = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d:+Z.-]+").unwrap();
+        let snapshot_html = ts_re.replace_all(&html, "<TIMESTAMP>");
+        assert_snapshot!("index_page_with_runs", &snapshot_html.as_ref());
     }
 
     #[tokio::test]
@@ -407,6 +432,9 @@ mod tests {
             .unwrap();
         let html = String::from_utf8(body.to_vec()).unwrap();
         assert!(html.contains("No runs yet"), "HTML should show empty state");
+
+        // Snapshot test — empty state is fully deterministic
+        assert_snapshot!("index_page_empty", &html);
     }
 
     // -----------------------------------------------------------------------
@@ -495,6 +523,11 @@ mod tests {
         // Trace
         assert!(html.contains("event 0"), "Should show trace events");
         assert!(html.contains("event 4"), "Should show trace events");
+
+        // Snapshot test — fixture data (strip dynamic timestamps)
+        let ts_re = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d:+Z.-]+").unwrap();
+        let snapshot_html = ts_re.replace_all(&html, "<TIMESTAMP>");
+        assert_snapshot!("run_detail_with_data", &snapshot_html.as_ref());
     }
 
     #[tokio::test]
@@ -593,6 +626,9 @@ mod tests {
         assert!(html.contains("pending-wf"), "Should show workflow name");
         assert!(html.contains("approve"), "Should have approve form");
         assert!(html.contains("reject"), "Should have reject form");
+
+        // Snapshot test — fixture data, deterministic
+        assert_snapshot!("pending_panel_with_gates", &html);
     }
 
     #[tokio::test]

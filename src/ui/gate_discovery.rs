@@ -107,6 +107,12 @@ pub fn discover_pending_gates(project_root: &Path) -> Vec<PendingGate> {
 
             let pending_path = pending_entry.path();
 
+            // Skip gates that already have a response (already resolved).
+            let response_path = run_dir.join("responses").join(format!("{phase}.json"));
+            if response_path.exists() {
+                continue;
+            }
+
             // Read pending file for severity and artefact path
             let (severity, artefact_path) = fs::read_to_string(&pending_path)
                 .ok()
