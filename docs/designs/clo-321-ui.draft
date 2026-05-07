@@ -1,0 +1,1 @@
+Wrote design to `docs/designs/CLO-321-ui.md` (7 sections: Problem, Goals/Non-goals, Architecture with ASCII flow, Public API surface in real Rust, Test plan with named functions, Migration/rollout, Open questions left genuinely open).
