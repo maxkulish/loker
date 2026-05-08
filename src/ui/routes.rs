@@ -12,12 +12,15 @@ use std::path::PathBuf;
 
 use axum::{
     extract::{Form, Path, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
 use tokio::task;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use futures::StreamExt;
 
 use crate::hitl_server::routes::DecisionForm;
 use crate::run_state::atomic_write;
@@ -49,6 +52,7 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
         .route("/", get(index_page))
         .route("/health", get(health_check))
         .route("/runs/:id", get(run_detail))
+        .route("/runs/:id/trace/sse", get(run_trace_sse))
         .route("/pending", get(pending_panel))
         .route("/gates/:run_id/:phase/approve", post(hitl_approve))
         .route("/gates/:run_id/:phase/reject", post(hitl_reject))
@@ -348,6 +352,66 @@ async fn write_gate_response(
     })
     .await
     .map_err(|e| GateError::Io(e.to_string()))?
+}
+
+/// GET /runs/:id/trace/sse — stream live trace events.
+async fn run_trace_sse(
+    State(state): State<AppState>,
+    Path(run_id): Path<String>,
+) -> Response {
+    // Sanitize run_id
+    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+        return templates::ErrorTemplate {
+            status_code: 400,
+            message: format!("Invalid run ID: {}", run_id),
+        }
+        .into_response();
+    }
+
+    let run_dir = state.project_root.join("runs").join(&run_id);
+    let trace_path = run_dir.join("trace.jsonl");
+
+    if !trace_path.exists() {
+        return templates::ErrorTemplate {
+            status_code: 404,
+            message: format!("Trace file not found for run: {}", run_id),
+        }
+        .into_response();
+    }
+
+    // Get current offset (EOF) as starting point
+    let initial_offset = match std::fs::metadata(&trace_path) {
+        Ok(m) => m.len(),
+        Err(_) => return templates::ErrorTemplate {
+            status_code: 500,
+            message: "Failed to read trace file metadata".to_string(),
+        }
+        .into_response(),
+    };
+
+    let (tx, rx) = mpsc::channel(100);
+    let watcher = crate::ui::sse::TraceWatcher::new(trace_path, initial_offset);
+
+    // Spawn the watcher in the background
+    tokio::spawn(async move {
+        if let Err(e) = watcher.watch(tx).await {
+            tracing::error!("Trace watcher failed for run {}: {}", run_id, e);
+        }
+    });
+
+    // Convert receiver to a stream of bytes
+    let stream = ReceiverStream::new(rx).map(move |line| {
+        let sse_event = crate::ui::sse::format_line_as_sse(&initial_offset.to_string(), &line)
+            .unwrap_or_else(|| "data: Error parsing line\n\n".to_string());
+        Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(sse_event))
+    });
+
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .header(header::CONNECTION, "keep-alive")
+        .body(axum::body::Body::from_stream(stream))
+        .unwrap()
 }
 
 // ---------------------------------------------------------------------------

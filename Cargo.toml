@@ -62,6 +62,8 @@ axum = "0.7"
 tower = "0.5"
 askama = "0.12"
 notify = "8.2.0"
+tokio-stream = "0.1.18"
+tracing = "0.1.44"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
