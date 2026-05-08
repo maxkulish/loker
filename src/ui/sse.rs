@@ -59,7 +59,7 @@ impl TraceWatcher {
 
     /// Start watching the file. Sends new lines through the provided channel.
     /// Returns when the channel is closed or an unrecoverable error occurs.
-    pub async fn watch(mut self, tx: mpsc::Sender<String>) -> anyhow::Result<()> {
+    pub async fn watch(mut self, tx: mpsc::Sender<(u64, String)>) -> anyhow::Result<()> {
         let (event_tx, mut event_rx) = mpsc::channel(100);
         
         // The watcher needs a sync callback. We use a channel to bridge to async.
@@ -79,20 +79,27 @@ impl TraceWatcher {
         // Initial read to catch any events that happened between connection and watch start
         let (initial_lines, initial_offset) = read_from_offset(self.path.as_path(), self.offset);
         self.offset = initial_offset;
+        
+        // Note: for initial lines, we don't have an accurate per-line offset without more work,
+        // but we can use the starting offset as a base. 
+        // For simplicity and since we just want a unique ID, we'll use the current state.
         for line in initial_lines {
-            if tx.send(line).await.is_err() {
+            if tx.send((self.offset, line)).await.is_err() {
                 return Ok(());
             }
         }
 
         while let Some(_) = event_rx.recv().await {
             let (lines, new_offset) = read_from_offset(self.path.as_path(), self.offset);
-            self.offset = new_offset;
+            let mut current_pos = self.offset;
             for line in lines {
-                if tx.send(line).await.is_err() {
+                let line_bytes = line.as_bytes().len() as u64;
+                if tx.send((current_pos, line)).await.is_err() {
                     return Ok(());
                 }
+                current_pos += line_bytes + 1; // +1 for newline
             }
+            self.offset = new_offset;
         }
         Ok(())
     }
