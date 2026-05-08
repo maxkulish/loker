@@ -54,8 +54,10 @@ async fn one_shot_approve_resolves_gate() {
 
     // POST approve with a comment
     let client = reqwest::Client::new();
+    let origin = format!("http://127.0.0.1:{}", addr.port());
     let resp = client
         .post(format!("http://{}/approve", addr))
+        .header("Origin", &origin)
         .form(&[("comment", "looks good")])
         .send()
         .await
@@ -83,8 +85,10 @@ async fn one_shot_reject_resolves_gate() {
     let addr = handle.addr;
 
     let client = reqwest::Client::new();
+    let origin = format!("http://127.0.0.1:{}", addr.port());
     let resp = client
         .post(format!("http://{}/reject", addr))
+        .header("Origin", &origin)
         .form(&[("comment", "needs work")])
         .send()
         .await
@@ -136,10 +140,12 @@ async fn second_post_after_first_returns_409() {
     let addr = handle.addr;
 
     let client = reqwest::Client::new();
+    let origin = format!("http://127.0.0.1:{}", addr.port());
 
     // First POST succeeds
     let resp1 = client
         .post(format!("http://{}/approve", addr))
+        .header("Origin", &origin)
         .form(&[("comment", "")])
         .send()
         .await
@@ -149,6 +155,7 @@ async fn second_post_after_first_returns_409() {
     // Second POST sees the already-written response file
     let resp2 = client
         .post(format!("http://{}/approve", addr))
+        .header("Origin", &origin)
         .form(&[("comment", "")])
         .send()
         .await
@@ -166,10 +173,12 @@ async fn server_shuts_down_after_decision() {
     let addr = handle.addr;
 
     // Send the POST in a background task
+    let origin = format!("http://127.0.0.1:{}", addr.port());
     tokio::spawn(async move {
         let client = reqwest::Client::new();
         let _ = client
             .post(format!("http://{}/approve", addr))
+            .header("Origin", &origin)
             .form(&[("comment", "test")])
             .send()
             .await;
@@ -206,14 +215,17 @@ async fn concurrent_post_races_return_423() {
     let addr = handle.addr;
 
     let client = reqwest::Client::new();
+    let origin = format!("http://127.0.0.1:{}", addr.port());
 
     // Fire two POSTs concurrently
     let req1 = client
         .post(format!("http://{}/approve", addr))
+        .header("Origin", &origin)
         .form(&[("comment", "")])
         .send();
     let req2 = client
         .post(format!("http://{}/approve", addr))
+        .header("Origin", &origin)
         .form(&[("comment", "")])
         .send();
 

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use axum::{
     extract::{Form, State},
     http::StatusCode,
-    response::Html,
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Router,
 };
@@ -19,6 +19,8 @@ use crate::run_state::atomic_write;
 use crate::run_state::phase_lock::{PhaseLock, PhaseLockError};
 use crate::strategy::verify::{HumanDecision, HumanResponse};
 
+use crate::ui::security::{add_security_headers, check_post_origin, PostGuardConfig};
+
 #[derive(Deserialize)]
 pub struct DecisionForm {
     pub comment: Option<String>,
@@ -29,13 +31,15 @@ pub struct DecisionForm {
 pub struct AppState {
     pub config: GateConfig,
     pub decision_tx: Arc<std::sync::Mutex<Option<Sender<ServerOutcome>>>>,
+    pub post_guard_config: Option<PostGuardConfig>,
 }
 
 impl AppState {
-    pub fn new(config: GateConfig, decision_tx: Sender<ServerOutcome>) -> Self {
+    pub fn new(config: GateConfig, decision_tx: Sender<ServerOutcome>, port: Option<u16>) -> Self {
         Self {
             config,
             decision_tx: Arc::new(std::sync::Mutex::new(Some(decision_tx))),
+            post_guard_config: port.map(PostGuardConfig::for_loopback),
         }
     }
 }
@@ -67,46 +71,91 @@ pub async fn render_gate_view(config: &GateConfig) -> Result<Html<String>, Statu
     Ok(Html(body))
 }
 
-async fn gate_context(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
-    render_gate_view(&state.config).await
-}
-
-async fn approve(State(state): State<AppState>, Form(form): Form<DecisionForm>) -> StatusCode {
-    match write_response(&state.config, HumanDecision::Approve, form.comment.clone()).await {
-        Ok(()) => {
-            if let Ok(mut tx) = state.decision_tx.lock() {
-                if let Some(tx) = tx.take() {
-                    let _ = tx.send(ServerOutcome::Decided {
-                        decision: HumanDecision::Approve,
-                        comment: form.comment,
-                    });
-                }
-            }
-            StatusCode::OK
+async fn gate_context(State(state): State<AppState>) -> Response {
+    match render_gate_view(&state.config).await {
+        Ok(html) => {
+            let mut response = html.into_response();
+            add_security_headers(&mut response);
+            response
         }
-        Err(ResponseWriteError::Locked) => StatusCode::LOCKED,
-        Err(ResponseWriteError::AlreadyExists) => StatusCode::CONFLICT,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(status) => {
+            let mut response = status.into_response();
+            add_security_headers(&mut response);
+            response
+        }
     }
 }
 
-async fn reject(State(state): State<AppState>, Form(form): Form<DecisionForm>) -> StatusCode {
-    match write_response(&state.config, HumanDecision::Reject, form.comment.clone()).await {
-        Ok(()) => {
-            if let Ok(mut tx) = state.decision_tx.lock() {
-                if let Some(tx) = tx.take() {
-                    let _ = tx.send(ServerOutcome::Decided {
-                        decision: HumanDecision::Reject,
-                        comment: form.comment,
-                    });
-                }
-            }
-            StatusCode::OK
+async fn approve(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<DecisionForm>,
+) -> Response {
+    // POST guard
+    if let Some(ref config) = state.post_guard_config {
+        if let Err((status, msg)) = check_post_origin(&headers, config) {
+            let mut response = (status, msg).into_response();
+            add_security_headers(&mut response);
+            return response;
         }
-        Err(ResponseWriteError::Locked) => StatusCode::LOCKED,
-        Err(ResponseWriteError::AlreadyExists) => StatusCode::CONFLICT,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
+
+    let status =
+        match write_response(&state.config, HumanDecision::Approve, form.comment.clone()).await {
+            Ok(()) => {
+                if let Ok(mut tx) = state.decision_tx.lock() {
+                    if let Some(tx) = tx.take() {
+                        let _ = tx.send(ServerOutcome::Decided {
+                            decision: HumanDecision::Approve,
+                            comment: form.comment,
+                        });
+                    }
+                }
+                StatusCode::OK
+            }
+            Err(ResponseWriteError::Locked) => StatusCode::LOCKED,
+            Err(ResponseWriteError::AlreadyExists) => StatusCode::CONFLICT,
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+    let mut response = status.into_response();
+    add_security_headers(&mut response);
+    response
+}
+
+async fn reject(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<DecisionForm>,
+) -> Response {
+    // POST guard
+    if let Some(ref config) = state.post_guard_config {
+        if let Err((status, msg)) = check_post_origin(&headers, config) {
+            let mut response = (status, msg).into_response();
+            add_security_headers(&mut response);
+            return response;
+        }
+    }
+
+    let status =
+        match write_response(&state.config, HumanDecision::Reject, form.comment.clone()).await {
+            Ok(()) => {
+                if let Ok(mut tx) = state.decision_tx.lock() {
+                    if let Some(tx) = tx.take() {
+                        let _ = tx.send(ServerOutcome::Decided {
+                            decision: HumanDecision::Reject,
+                            comment: form.comment,
+                        });
+                    }
+                }
+                StatusCode::OK
+            }
+            Err(ResponseWriteError::Locked) => StatusCode::LOCKED,
+            Err(ResponseWriteError::AlreadyExists) => StatusCode::CONFLICT,
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+    let mut response = status.into_response();
+    add_security_headers(&mut response);
+    response
 }
 
 // ---------------------------------------------------------------------------

@@ -3,10 +3,12 @@
 //! Long-running daemon that discovers all run directories under
 //! `<project_root>/runs/` and serves a JSON runs list on `GET /`.
 
+pub mod artefact;
 pub mod discovery;
 pub mod gate_discovery;
 pub mod manifest;
 pub mod routes;
+pub mod security;
 pub mod serve;
 pub mod sse;
 pub mod templates;

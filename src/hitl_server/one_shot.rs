@@ -58,7 +58,7 @@ pub async fn start(config: GateConfig) -> Result<ServerHandle, ServerError> {
     let (dec_tx, dec_rx) = oneshot::channel();
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
-    let state = AppState::new(config, dec_tx);
+    let state = AppState::new(config, dec_tx, Some(addr.port()));
     let app = router(state);
 
     tokio::spawn(async move {

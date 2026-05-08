@@ -22,36 +22,49 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tokio_stream::wrappers::ReceiverStream;
 
+use crate::ui::security::{add_security_headers, check_post_origin, PostGuardConfig};
+use crate::ui::{
+    artefact::{resolve_artefact, ArtefactError},
+    discovery, gate_discovery, manifest, templates, trace_reader,
+};
+
 use crate::hitl_server::routes::DecisionForm;
 use crate::run_state::atomic_write;
 use crate::run_state::phase_lock::{PhaseLock, PhaseLockError};
 use crate::strategy::verify::{HumanDecision, HumanResponse};
-use crate::ui::{discovery, gate_discovery, manifest, templates, trace_reader};
 
 /// Combined state for the daemon's route handlers.
 #[derive(Clone)]
 pub struct AppState {
     pub project_root: PathBuf,
     pub max_trace_events: usize,
+    pub post_guard_config: Option<PostGuardConfig>,
 }
 
 impl AppState {
-    fn new(project_root: PathBuf) -> Self {
+    fn new(project_root: PathBuf, port: Option<u16>) -> Self {
         Self {
             project_root,
             max_trace_events: 50,
+            post_guard_config: port.map(PostGuardConfig::for_loopback),
         }
     }
 }
 
-/// Build the daemon's top-level router.
+/// Build the daemon's top-level router (no POST guard, for unit tests).
 pub fn ui_routes(project_root: PathBuf) -> Router {
-    let state = AppState::new(project_root);
+    ui_routes_with_port(project_root, None)
+}
+
+/// Build the daemon's top-level router with an optional port for POST guard.
+pub fn ui_routes_with_port(project_root: PathBuf, port: Option<u16>) -> Router {
+    let state = AppState::new(project_root, port);
 
     Router::new()
         .route("/", get(index_page))
         .route("/health", get(health_check))
         .route("/runs/:id", get(run_detail))
+        .route("/runs/:id/artefact/*path", get(get_artefact))
         .route("/runs/:id/trace/sse", get(run_trace_sse))
         .route("/pending", get(pending_panel))
         .route("/gates/:run_id/:phase/approve", post(hitl_approve))
@@ -63,33 +76,44 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
 // Handlers
 // ---------------------------------------------------------------------------
 
+/// Wrap a response with security headers.
+fn with_headers(response: impl IntoResponse) -> Response {
+    let mut r = response.into_response();
+    add_security_headers(&mut r);
+    r
+}
+
 /// GET / - HTML sessions index page.
 async fn index_page(State(state): State<AppState>) -> Response {
     let root = state.project_root.clone();
     let runs = task::spawn_blocking(move || discovery::discover_runs(&root))
         .await
         .unwrap_or_default();
-    templates::IndexTemplate {
-        runs,
-        active_milestone: String::new(),
-    }
-    .into_response()
+    with_headers(
+        templates::IndexTemplate {
+            runs,
+            active_milestone: String::new(),
+        }
+        .into_response(),
+    )
 }
 
 /// GET /health - 200 OK health check.
-async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, "ok")
+async fn health_check() -> Response {
+    with_headers((StatusCode::OK, "ok").into_response())
 }
 
 /// GET /runs/:id - per-run detail page.
 async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
     // Sanitize run_id - reject path traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
-        return templates::ErrorTemplate {
-            status_code: 400,
-            message: format!("Invalid run ID: {}", run_id),
-        }
-        .into_response();
+        return with_headers(
+            templates::ErrorTemplate {
+                status_code: 400,
+                message: format!("Invalid run ID: {}", run_id),
+            }
+            .into_response(),
+        );
     }
 
     let run_dir = state.project_root.join("runs").join(&run_id);
@@ -97,11 +121,13 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
 
     // Check the run directory exists
     if !run_dir.exists() {
-        return templates::ErrorTemplate {
-            status_code: 404,
-            message: format!("Run not found: {}", run_id),
-        }
-        .into_response();
+        return with_headers(
+            templates::ErrorTemplate {
+                status_code: 404,
+                message: format!("Run not found: {}", run_id),
+            }
+            .into_response(),
+        );
     }
 
     // Read manifest, timeline, and trace in a blocking task
@@ -131,16 +157,18 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
                 .and_then(|w| w.as_str().map(String::from))
         });
 
-    templates::RunDetailTemplate {
-        run_id,
-        workflow,
-        manifest_entries,
-        phase_timeline,
-        trace_events,
-        last_trace_offset: last_offset,
-        is_terminal: run_dir.join("summary.json").exists(),
-    }
-    .into_response()
+    with_headers(
+        templates::RunDetailTemplate {
+            run_id,
+            workflow,
+            manifest_entries,
+            phase_timeline,
+            trace_events,
+            last_trace_offset: last_offset,
+            is_terminal: run_dir.join("summary.json").exists(),
+        }
+        .into_response(),
+    )
 }
 
 /// GET /pending - aggregated pending HITL gates.
@@ -150,31 +178,43 @@ async fn pending_panel(State(state): State<AppState>) -> Response {
         .await
         .unwrap_or_default();
     let display = gate_discovery::to_display(&gates);
-    templates::PendingTemplate { gates: display }.into_response()
+    with_headers(templates::PendingTemplate { gates: display }.into_response())
 }
 
 /// POST /gates/:run_id/:phase/approve - approve a pending gate.
 async fn hitl_approve(
     State(state): State<AppState>,
     Path((run_id, phase)): Path<(String, String)>,
+    headers: axum::http::HeaderMap,
     Form(form): Form<DecisionForm>,
 ) -> Response {
+    // POST guard
+    if let Some(ref config) = state.post_guard_config {
+        if let Err((status, msg)) = check_post_origin(&headers, config) {
+            return with_headers((status, msg).into_response());
+        }
+    }
+
     // Sanitize run_id - reject traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
-        return templates::ErrorTemplate {
-            status_code: 400,
-            message: format!("Invalid run ID: {}", run_id),
-        }
-        .into_response();
+        return with_headers(
+            templates::ErrorTemplate {
+                status_code: 400,
+                message: format!("Invalid run ID: {}", run_id),
+            }
+            .into_response(),
+        );
     }
 
     let run_dir = state.project_root.join("runs").join(&run_id);
     if !run_dir.exists() {
-        return templates::ErrorTemplate {
-            status_code: 404,
-            message: format!("Run not found: {}", run_id),
-        }
-        .into_response();
+        return with_headers(
+            templates::ErrorTemplate {
+                status_code: 404,
+                message: format!("Run not found: {}", run_id),
+            }
+            .into_response(),
+        );
     }
 
     match write_gate_response(
@@ -189,32 +229,40 @@ async fn hitl_approve(
         Ok(()) => {
             // Redirect to pending panel on success
             let location = "/pending";
-            (
-                StatusCode::SEE_OTHER,
-                [("Location", location)],
-                "Redirecting...",
+            with_headers(
+                (
+                    StatusCode::SEE_OTHER,
+                    [("Location", location)],
+                    "Redirecting...",
+                )
+                    .into_response(),
             )
-                .into_response()
         }
         Err(GateError::AlreadyExists) => {
             let location = "/pending";
-            (
-                StatusCode::SEE_OTHER,
-                [("Location", location)],
-                "Already decided",
+            with_headers(
+                (
+                    StatusCode::SEE_OTHER,
+                    [("Location", location)],
+                    "Already decided",
+                )
+                    .into_response(),
             )
-                .into_response()
         }
-        Err(GateError::Locked) => templates::ErrorTemplate {
-            status_code: 423,
-            message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
-        }
-        .into_response(),
-        Err(e) => templates::ErrorTemplate {
-            status_code: 500,
-            message: format!("Failed to write response: {e}"),
-        }
-        .into_response(),
+        Err(GateError::Locked) => with_headers(
+            templates::ErrorTemplate {
+                status_code: 423,
+                message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
+            }
+            .into_response(),
+        ),
+        Err(e) => with_headers(
+            templates::ErrorTemplate {
+                status_code: 500,
+                message: format!("Failed to write response: {e}"),
+            }
+            .into_response(),
+        ),
     }
 }
 
@@ -222,24 +270,36 @@ async fn hitl_approve(
 async fn hitl_reject(
     State(state): State<AppState>,
     Path((run_id, phase)): Path<(String, String)>,
+    headers: axum::http::HeaderMap,
     Form(form): Form<DecisionForm>,
 ) -> Response {
+    // POST guard
+    if let Some(ref config) = state.post_guard_config {
+        if let Err((status, msg)) = check_post_origin(&headers, config) {
+            return with_headers((status, msg).into_response());
+        }
+    }
+
     // Sanitize run_id - reject traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
-        return templates::ErrorTemplate {
-            status_code: 400,
-            message: format!("Invalid run ID: {}", run_id),
-        }
-        .into_response();
+        return with_headers(
+            templates::ErrorTemplate {
+                status_code: 400,
+                message: format!("Invalid run ID: {}", run_id),
+            }
+            .into_response(),
+        );
     }
 
     let run_dir = state.project_root.join("runs").join(&run_id);
     if !run_dir.exists() {
-        return templates::ErrorTemplate {
-            status_code: 404,
-            message: format!("Run not found: {}", run_id),
-        }
-        .into_response();
+        return with_headers(
+            templates::ErrorTemplate {
+                status_code: 404,
+                message: format!("Run not found: {}", run_id),
+            }
+            .into_response(),
+        );
     }
 
     match write_gate_response(
@@ -253,32 +313,40 @@ async fn hitl_reject(
     {
         Ok(()) => {
             let location = "/pending";
-            (
-                StatusCode::SEE_OTHER,
-                [("Location", location)],
-                "Redirecting...",
+            with_headers(
+                (
+                    StatusCode::SEE_OTHER,
+                    [("Location", location)],
+                    "Redirecting...",
+                )
+                    .into_response(),
             )
-                .into_response()
         }
         Err(GateError::AlreadyExists) => {
             let location = "/pending";
-            (
-                StatusCode::SEE_OTHER,
-                [("Location", location)],
-                "Already decided",
+            with_headers(
+                (
+                    StatusCode::SEE_OTHER,
+                    [("Location", location)],
+                    "Already decided",
+                )
+                    .into_response(),
             )
-                .into_response()
         }
-        Err(GateError::Locked) => templates::ErrorTemplate {
-            status_code: 423,
-            message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
-        }
-        .into_response(),
-        Err(e) => templates::ErrorTemplate {
-            status_code: 500,
-            message: format!("Failed to write response: {e}"),
-        }
-        .into_response(),
+        Err(GateError::Locked) => with_headers(
+            templates::ErrorTemplate {
+                status_code: 423,
+                message: format!("Gate '{phase}' on run '{run_id}' is locked by another process"),
+            }
+            .into_response(),
+        ),
+        Err(e) => with_headers(
+            templates::ErrorTemplate {
+                status_code: 500,
+                message: format!("Failed to write response: {e}"),
+            }
+            .into_response(),
+        ),
     }
 }
 
@@ -374,14 +442,14 @@ async fn run_trace_sse(
 ) -> Response {
     // Sanitize run_id
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
-        return (StatusCode::BAD_REQUEST, "Invalid run ID").into_response();
+        return with_headers((StatusCode::BAD_REQUEST, "Invalid run ID").into_response());
     }
 
     let run_dir = state.project_root.join("runs").join(&run_id);
     let trace_path = run_dir.join("trace.jsonl");
 
     if !trace_path.exists() {
-        return (StatusCode::NOT_FOUND, "Trace file not found").into_response();
+        return with_headers((StatusCode::NOT_FOUND, "Trace file not found").into_response());
     }
 
     // Use query param first, then Last-Event-ID, otherwise EOF
@@ -396,7 +464,11 @@ async fn run_trace_sse(
     } else {
         match std::fs::metadata(&trace_path) {
             Ok(m) => m.len(),
-            Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Metadata error").into_response(),
+            Err(_) => {
+                return with_headers(
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Metadata error").into_response(),
+                )
+            }
         }
     };
 
@@ -422,11 +494,13 @@ async fn run_trace_sse(
             );
         };
 
-        return Response::builder()
+        let mut response = Response::builder()
             .header(header::CONTENT_TYPE, "text/event-stream")
             .header(header::CACHE_CONTROL, "no-cache")
             .body(axum::body::Body::from_stream(terminal_stream))
             .unwrap();
+        add_security_headers(&mut response);
+        return response;
     }
 
     // Non-terminal run: start watcher + heartbeat
@@ -454,11 +528,48 @@ async fn run_trace_sse(
 
     let live_stream = futures::stream::select(data_stream, heartbeat);
 
-    Response::builder()
+    let mut response = Response::builder()
         .header(header::CONTENT_TYPE, "text/event-stream")
         .header(header::CACHE_CONTROL, "no-cache")
         .body(axum::body::Body::from_stream(live_stream))
-        .unwrap()
+        .unwrap();
+    add_security_headers(&mut response);
+    response
+}
+
+/// GET /runs/:id/artefact/*path - serve an artefact file from the run directory.
+async fn get_artefact(
+    State(state): State<AppState>,
+    Path((run_id, path)): Path<(String, String)>,
+) -> Response {
+    // Sanitize run_id
+    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+        return with_headers((StatusCode::BAD_REQUEST, "Invalid run ID").into_response());
+    }
+
+    match resolve_artefact(&state.project_root, &run_id, &path) {
+        Ok(artefact_path) => match tokio::fs::read(&artefact_path).await {
+            Ok(body) => {
+                let mime = mime_guess::from_path(&artefact_path).first_or_text_plain();
+                let mut response = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, mime.as_ref())
+                    .header(header::CONTENT_DISPOSITION, "attachment")
+                    .body(axum::body::Body::from(body))
+                    .unwrap();
+                add_security_headers(&mut response);
+                response
+            }
+            Err(_) => with_headers((StatusCode::NOT_FOUND, "Not found").into_response()),
+        },
+        Err(ArtefactError::Traversal) => {
+            with_headers((StatusCode::BAD_REQUEST, "Invalid path").into_response())
+        }
+        Err(ArtefactError::Symlink) => {
+            with_headers((StatusCode::FORBIDDEN, "Symlink not allowed").into_response())
+        }
+        Err(_) => with_headers((StatusCode::NOT_FOUND, "Not found").into_response()),
+    }
 }
 
 // ---------------------------------------------------------------------------
