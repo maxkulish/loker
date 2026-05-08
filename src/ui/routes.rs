@@ -17,10 +17,10 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use tokio::task;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use futures::StreamExt;
+use tokio::sync::mpsc;
+use tokio::task;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::hitl_server::routes::DecisionForm;
 use crate::run_state::atomic_write;
@@ -358,6 +358,7 @@ async fn write_gate_response(
 async fn run_trace_sse(
     State(state): State<AppState>,
     Path(run_id): Path<String>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
     // Sanitize run_id
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
@@ -379,14 +380,24 @@ async fn run_trace_sse(
         .into_response();
     }
 
-    // Get current offset (EOF) as starting point
-    let initial_offset = match std::fs::metadata(&trace_path) {
-        Ok(m) => m.len(),
-        Err(_) => return templates::ErrorTemplate {
-            status_code: 500,
-            message: "Failed to read trace file metadata".to_string(),
+    // Use Last-Event-ID header if present, otherwise use EOF
+    let initial_offset = if let Some(last_id) = headers
+        .get("Last-Event-ID")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        last_id
+    } else {
+        match std::fs::metadata(&trace_path) {
+            Ok(m) => m.len(),
+            Err(_) => {
+                return templates::ErrorTemplate {
+                    status_code: 500,
+                    message: "Failed to read trace file metadata".to_string(),
+                }
+                .into_response()
+            }
         }
-        .into_response(),
     };
 
     let (tx, rx) = mpsc::channel(100);
@@ -399,12 +410,21 @@ async fn run_trace_sse(
         }
     });
 
+    // Create a heartbeat stream (every 15 seconds)
+    let heartbeat = tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(
+        tokio::time::Duration::from_secs(15),
+    ))
+    .map(|_| Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(": heartbeat\n\n")));
+
     // Convert receiver to a stream of bytes
-    let stream = ReceiverStream::new(rx).map(move |line| {
-        let sse_event = crate::ui::sse::format_line_as_sse(&initial_offset.to_string(), &line)
+    let data_stream = ReceiverStream::new(rx).map(|(offset, line)| {
+        let sse_event = crate::ui::sse::format_line_as_sse(&offset.to_string(), &line)
             .unwrap_or_else(|| "data: Error parsing line\n\n".to_string());
         Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(sse_event))
     });
+
+    // Merge heartbeat and data streams
+    let stream = futures::stream::select(data_stream, heartbeat);
 
     Response::builder()
         .header(header::CONTENT_TYPE, "text/event-stream")

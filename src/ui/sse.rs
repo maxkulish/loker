@@ -29,7 +29,10 @@ impl TraceSseEvent {
     /// followed by two newlines.
     pub fn to_sse_format(&self) -> String {
         let data_json = serde_json::to_string(&self.data).unwrap_or_else(|_| "{}".to_string());
-        format!("event: trace_event\nid: {}\ndata: {}\n\n", self.event_id, data_json)
+        format!(
+            "event: trace_event\nid: {}\ndata: {}\n\n",
+            self.event_id, data_json
+        )
     }
 }
 
@@ -61,7 +64,7 @@ impl TraceWatcher {
     /// Returns when the channel is closed or an unrecoverable error occurs.
     pub async fn watch(mut self, tx: mpsc::Sender<(u64, String)>) -> anyhow::Result<()> {
         let (event_tx, mut event_rx) = mpsc::channel(100);
-        
+
         // The watcher needs a sync callback. We use a channel to bridge to async.
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<notify::Event>| {
@@ -79,9 +82,9 @@ impl TraceWatcher {
         // Initial read to catch any events that happened between connection and watch start
         let (initial_lines, initial_offset) = read_from_offset(self.path.as_path(), self.offset);
         self.offset = initial_offset;
-        
+
         // Note: for initial lines, we don't have an accurate per-line offset without more work,
-        // but we can use the starting offset as a base. 
+        // but we can use the starting offset as a base.
         // For simplicity and since we just want a unique ID, we'll use the current state.
         for line in initial_lines {
             if tx.send((self.offset, line)).await.is_err() {
@@ -89,15 +92,15 @@ impl TraceWatcher {
             }
         }
 
-        while let Some(_) = event_rx.recv().await {
+        while event_rx.recv().await.is_some() {
             let (lines, new_offset) = read_from_offset(self.path.as_path(), self.offset);
             let mut current_pos = self.offset;
             for line in lines {
-                let line_bytes = line.as_bytes().len() as u64;
+                let line_len = line.len() as u64;
                 if tx.send((current_pos, line)).await.is_err() {
                     return Ok(());
                 }
-                current_pos += line_bytes + 1; // +1 for newline
+                current_pos += line_len + 1; // +1 for newline
             }
             self.offset = new_offset;
         }
@@ -165,13 +168,11 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(10);
         let watcher = TraceWatcher::new(path.clone(), 0);
 
-        let handle = tokio::spawn(async move {
-            watcher.watch(tx).await
-        });
+        let handle = tokio::spawn(async move { watcher.watch(tx).await });
 
         // Initial line should be received
-        let first = rx.recv().await.expect("Should receive initial line");
-        assert_eq!(first, "line1");
+        let (offset, line) = rx.recv().await.expect("Should receive initial line");
+        assert_eq!(line, "line1");
 
         // Write second line
         fs::OpenOptions::new()
@@ -184,7 +185,7 @@ mod tests {
         // Notify can be asynchronous, so we poll briefly
         let mut received = false;
         for _ in 0..20 {
-            if let Ok(line) = rx.try_recv() {
+            if let Ok((offset, line)) = rx.try_recv() {
                 if line == "line2" {
                     received = true;
                     break;

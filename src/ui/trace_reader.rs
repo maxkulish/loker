@@ -55,8 +55,8 @@ pub fn read_from_offset(trace_path: &Path, offset: u64) -> (Vec<String>, u64) {
 
     let mut buffer = String::new();
     let mut lines = Vec::new();
-    
-    // We avoid reading the whole remainder if it's huge, 
+
+    // We avoid reading the whole remainder if it's huge,
     // but usually it's just a few events.
     if reader.read_to_string(&mut buffer).is_ok() {
         for line in buffer.lines() {
