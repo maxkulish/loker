@@ -1,7 +1,7 @@
 # Design: clo-323 - [T-054] SSE tail-f of trace.jsonl
 
 ## Problem
-As identified in the discovery report, users of the Loker daemon UI currently experience a "blind spot" when monitoring long-running workflows. Because trace events in `trace.jsonl` are viewed statically or via manual page refresh, the a real-time sense of progress is missing, and failures are not noticed immediately. This hinders the developer experience during the most critical phase of a run.
+As identified in the discovery report, users of the Loker daemon UI currently experience a "blind spot" when monitoring long-running workflows. Because trace events in `trace.jsonl` are viewed statically or via manual page refresh, and a real-time sense of progress is missing, and failures are not noticed immediately. This hinders the developer experience during the most critical phase of a run.
 
 ## Goals / Non-goals
 ### Goals

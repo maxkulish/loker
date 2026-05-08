@@ -18,8 +18,15 @@ pub fn tail_trace_file(trace_path: &Path, n: usize) -> Vec<TraceEventDisplay> {
         Ok(t) => t,
         Err(_) => return Vec::new(),
     };
+    parse_trace_lines(&text, n)
+}
 
-    let lines: Vec<&str> = text.lines().collect();
+/// Parse the last N trace events from already-read file content.
+///
+/// Used when the caller has read the file content itself and wants to
+/// avoid a metadata race between reading and computing the byte offset.
+pub fn parse_trace_lines(content: &str, n: usize) -> Vec<TraceEventDisplay> {
+    let lines: Vec<&str> = content.lines().collect();
     let start = if lines.len() > n { lines.len() - n } else { 0 };
 
     lines[start..]

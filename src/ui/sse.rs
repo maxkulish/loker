@@ -63,14 +63,14 @@ impl TraceWatcher {
     /// Start watching the file. Sends new lines through the provided channel.
     /// Returns when the channel is closed or an unrecoverable error occurs.
     pub async fn watch(mut self, tx: mpsc::Sender<(u64, String)>) -> anyhow::Result<()> {
-        let (event_tx, mut event_rx) = mpsc::channel(100);
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
 
         // The watcher needs a sync callback. We use a channel to bridge to async.
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<notify::Event>| {
                 if let Ok(event) = res {
                     if event.kind.is_modify() {
-                        let _ = event_tx.blocking_send(());
+                        let _ = event_tx.send(());
                     }
                 }
             },

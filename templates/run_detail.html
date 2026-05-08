@@ -62,7 +62,7 @@
 {# Trace events #}
 <h3 class="section-title">Trace Events <span id="trace-status" style="font-size: 0.7rem; opacity: 0.6; margin-left: 0.5rem;"></span> (last {{ trace_events.len() }})</h3>
 {% if trace_events.is_empty() %}
-<p id="trace-events-container" class="empty-state" style="text-align:left;padding:1rem 0" data-last-offset="{{ last_trace_offset }}">No trace events.</p>
+<div id="trace-events-container" class="empty-state" style="text-align:left;padding:1rem 0" data-last-offset="{{ last_trace_offset }}">No trace events.</div>
 {% else %}
 <div id="trace-events-container" data-last-offset="{{ last_trace_offset }}">
 {% for event in trace_events %}

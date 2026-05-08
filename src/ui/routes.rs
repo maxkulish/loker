@@ -112,8 +112,10 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
             let entries = manifest::read_manifest_entries(&manifest_path);
             let timeline = manifest::build_phase_timeline(&run_dir_clone);
             let trace_path = run_dir_clone.join("trace.jsonl");
-            let traces = trace_reader::tail_trace_file(&trace_path, max_events);
-            let offset = std::fs::metadata(&trace_path).map(|m| m.len()).unwrap_or(0);
+            let content = std::fs::read_to_string(&trace_path).unwrap_or_default();
+            // Compute last-rendered offset from the content we actually read
+            let offset = content.rfind('\n').map(|p| p as u64 + 1).unwrap_or(0);
+            let traces = trace_reader::parse_trace_lines(&content, max_events);
             (entries, timeline, traces, offset)
         })
         .await
@@ -398,10 +400,39 @@ async fn run_trace_sse(
         }
     };
 
+    // Check if run is terminal (summary.json exists)
+    let is_terminal = run_dir.join("summary.json").exists();
+
+    if is_terminal {
+        // For terminal runs: read any pending data, emit it, then emit end and close.
+        // No watcher or heartbeat needed — the file won't grow.
+        let (pending_lines, _offset) =
+            crate::ui::trace_reader::read_from_offset(&trace_path, initial_offset);
+
+        let terminal_stream = async_stream::stream! {
+            for (pos, line) in pending_lines {
+                if let Some(sse) = crate::ui::sse::format_line_as_sse(&pos.to_string(), &line) {
+                    yield Ok::<axum::body::Bytes, std::io::Error>(
+                        axum::body::Bytes::from(sse),
+                    );
+                }
+            }
+            yield Ok::<axum::body::Bytes, std::io::Error>(
+                axum::body::Bytes::from("event: end\ndata: \n\n"),
+            );
+        };
+
+        return Response::builder()
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .body(axum::body::Body::from_stream(terminal_stream))
+            .unwrap();
+    }
+
+    // Non-terminal run: start watcher + heartbeat
     let (tx, rx) = mpsc::channel(100);
     let watcher = crate::ui::sse::TraceWatcher::new(trace_path.clone(), initial_offset);
 
-    // Spawn the watcher in the background
     tokio::spawn(async move {
         if let Err(e) = watcher.watch(tx).await {
             tracing::error!("Trace watcher failed for run {}: {}", run_id, e);
@@ -421,27 +452,12 @@ async fn run_trace_sse(
         Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(sse_event))
     });
 
-    // Check if run is terminal (summary.json exists)
-    let is_terminal = run_dir.join("summary.json").exists();
-
-    let mut stream = futures::stream::select(data_stream, heartbeat);
-
-    // If terminal, we emit an 'end' event and then close the stream.
-    // We wrap the stream to handle this logic.
-    let terminal_stream = async_stream::stream! {
-        while let Some(item) = stream.next().await {
-            yield item;
-        }
-        if is_terminal {
-            yield Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from("event: end\ndata: \n\n"));
-        }
-    };
+    let live_stream = futures::stream::select(data_stream, heartbeat);
 
     Response::builder()
         .header(header::CONTENT_TYPE, "text/event-stream")
         .header(header::CACHE_CONTROL, "no-cache")
-        .header(header::CONNECTION, "keep-alive")
-        .body(axum::body::Body::from_stream(terminal_stream))
+        .body(axum::body::Body::from_stream(live_stream))
         .unwrap()
 }
 
@@ -727,10 +743,6 @@ mod tests {
         assert_eq!(
             response.headers().get(header::CACHE_CONTROL).unwrap(),
             "no-cache"
-        );
-        assert_eq!(
-            response.headers().get(header::CONNECTION).unwrap(),
-            "keep-alive"
         );
     }
 

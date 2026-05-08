@@ -243,7 +243,7 @@ expression: "&snapshot_html.as_ref()"
 
 <h3 class="section-title">Trace Events <span id="trace-status" style="font-size: 0.7rem; opacity: 0.6; margin-left: 0.5rem;"></span> (last 5)</h3>
 
-<div id="trace-events-container" data-last-offset="384">
+<div id="trace-events-container" data-last-offset="308">
 
 <div class="trace-event"><strong><TIMESTAMP></strong> [step] event 0</div>
 
