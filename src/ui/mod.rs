@@ -7,6 +7,7 @@ pub mod discovery;
 pub mod gate_discovery;
 pub mod manifest;
 pub mod routes;
+pub mod sse;
 pub mod serve;
 pub mod templates;
 pub mod trace_reader;
