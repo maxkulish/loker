@@ -2,7 +2,12 @@
 //!
 //! Provides types and utilities for formatting trace events as Server-Sent Events.
 
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use tokio::sync::mpsc;
+
+use crate::ui::trace_reader::read_from_offset;
 
 /// A trace event as it appears in `trace.jsonl`.
 /// We use `serde_json::Value` for the data to preserve the full event structure,
@@ -18,6 +23,7 @@ impl TraceSseEvent {
     ///
     /// The format is:
     /// event: trace_event
+    /// id: <offset>
     /// data: <json_payload>
     ///
     /// followed by two newlines.
@@ -40,10 +46,65 @@ pub fn format_line_as_sse(event_id: &str, line: &str) -> Option<String> {
     Some(event.to_sse_format())
 }
 
+/// Watches a trace file for updates and streams new lines.
+pub struct TraceWatcher {
+    path: PathBuf,
+    offset: u64,
+}
+
+impl TraceWatcher {
+    pub fn new(path: PathBuf, offset: u64) -> Self {
+        Self { path, offset }
+    }
+
+    /// Start watching the file. Sends new lines through the provided channel.
+    /// Returns when the channel is closed or an unrecoverable error occurs.
+    pub async fn watch(mut self, tx: mpsc::Sender<String>) -> anyhow::Result<()> {
+        let (event_tx, mut event_rx) = mpsc::channel(100);
+        
+        // The watcher needs a sync callback. We use a channel to bridge to async.
+        let mut watcher = RecommendedWatcher::new(
+            move |res: notify::Result<notify::Event>| {
+                if let Ok(event) = res {
+                    if event.kind.is_modify() {
+                        let _ = event_tx.blocking_send(());
+                    }
+                }
+            },
+            Config::default(),
+        )?;
+
+        watcher.watch(&self.path, RecursiveMode::NonRecursive)?;
+
+        // Initial read to catch any events that happened between connection and watch start
+        let (initial_lines, initial_offset) = read_from_offset(self.path.as_path(), self.offset);
+        self.offset = initial_offset;
+        for line in initial_lines {
+            if tx.send(line).await.is_err() {
+                return Ok(());
+            }
+        }
+
+        while let Some(_) = event_rx.recv().await {
+            let (lines, new_offset) = read_from_offset(self.path.as_path(), self.offset);
+            self.offset = new_offset;
+            for line in lines {
+                if tx.send(line).await.is_err() {
+                    return Ok(());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::fs;
+    use std::io::Write;
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn test_sse_event_formatting() {
@@ -86,5 +147,46 @@ mod tests {
         let line = "   \n  ";
         let result = format_line_as_sse("abc", line);
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_notify_watcher_triggers_event() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("trace.jsonl");
+        fs::write(&path, b"line1\n").unwrap();
+
+        let (tx, mut rx) = mpsc::channel(10);
+        let watcher = TraceWatcher::new(path.clone(), 0);
+
+        let handle = tokio::spawn(async move {
+            watcher.watch(tx).await
+        });
+
+        // Initial line should be received
+        let first = rx.recv().await.expect("Should receive initial line");
+        assert_eq!(first, "line1");
+
+        // Write second line
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(b"line2\n")
+            .unwrap();
+
+        // Notify can be asynchronous, so we poll briefly
+        let mut received = false;
+        for _ in 0..20 {
+            if let Ok(line) = rx.try_recv() {
+                if line == "line2" {
+                    received = true;
+                    break;
+                }
+            }
+            sleep(Duration::from_millis(100)).await;
+        }
+        assert!(received, "Should have received line2 from watcher");
+
+        handle.abort();
     }
 }

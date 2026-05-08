@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-08T06:32:48.352Z'
-  updated_at: '2026-05-08T07:01:55.578Z'
+  updated_at: '2026-05-08T07:03:53.243Z'
 phases:
   discovery:
     status: complete
@@ -54,6 +54,7 @@ phases:
     status: pending
     commits:
       - 192fa62
+      - fa1351d
   pr:
     status: pending
   complete:
@@ -125,5 +126,9 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST1 landed: implemented SSE event types and formatting. Commit 192fa62'
+  - timestamp: '2026-05-08T07:03:53.243Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: implemented offset-based trace reading. Commit fa1351d'
 task_title: '[T-054] SSE tail-f of trace.jsonl'
 task_url: https://linear.app/cloud-ai/issue/CLO-323/t-054-sse-tail-f-of-tracejsonl
