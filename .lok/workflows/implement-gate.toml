@@ -77,7 +77,7 @@ echo "$DIFF_STAT"
 # Step 2: Codex pre-PR review
 [[steps]]
 name = "codex_review"
-timeout = 600000
+timeout = 1200000
 retries = 2
 continue_on_error = false
 depends_on = ["health_check", "read_milestone", "collect_inputs"]
@@ -100,7 +100,7 @@ Inputs:
 - Branch: $BRANCH
 - Design: see docs/designs/${TASK}-*.md (read it first)
 - Plan: see docs/plans/${TASK}-*.md (read it first)
-- Diff: \`git diff main...HEAD\`
+- Diff: run 'git diff main...HEAD'
 
 Check correctness, completeness, regressions, code quality, security, schema/API compatibility, and scope creep.
 
@@ -111,7 +111,7 @@ approve | approve_with_changes | rework
 EOF
 )
 
-OUTPUT=$(timeout 570 codex exec -m "$PRIMARY_MODEL" -s read-only "$PROMPT" 2>/tmp/lok-codex-stderr.log)
+OUTPUT=$(timeout 900 codex exec -m "$PRIMARY_MODEL" -s read-only "$PROMPT" 2>/tmp/lok-codex-stderr.log)
 
 if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
   STDERR=$(head -10 /tmp/lok-codex-stderr.log 2>/dev/null || echo "no stderr")
@@ -172,7 +172,7 @@ Inputs:
 - Branch: $BRANCH
 - Design: read docs/designs/${TASK}-*.md
 - Plan: read docs/plans/${TASK}-*.md
-- Diff: \`git diff main...HEAD\`
+- Diff: run 'git diff main...HEAD'
 
 Check design fidelity, correctness, API ergonomics, test coverage, Rust idioms, unintended public surface, scope creep.
 
@@ -183,12 +183,12 @@ approve | approve_with_changes | rework
 EOF
 )
 
-OUTPUT=$(timeout 300 gemini --model "$PRIMARY_MODEL" -y --sandbox \
+OUTPUT=$(timeout 300 gemini --skip-trust --model "$PRIMARY_MODEL" -y --sandbox \
   --include-directories docs,src,tests \
   -p "$PROMPT" -o text 2>/tmp/lok-gemini-impl-stderr.log)
 
 if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
-  OUTPUT=$(timeout 300 gemini --model "$FALLBACK_MODEL" -y --sandbox \
+  OUTPUT=$(timeout 300 gemini --skip-trust --model "$FALLBACK_MODEL" -y --sandbox \
     --include-directories docs,src,tests \
     -p "$PROMPT" -o text 2>/tmp/lok-gemini-impl-stderr.log)
 
