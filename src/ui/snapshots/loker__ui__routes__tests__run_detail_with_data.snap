@@ -241,8 +241,9 @@ expression: "&snapshot_html.as_ref()"
 
 
 
-<h3 class="section-title">Trace Events (last 5)</h3>
+<h3 class="section-title">Trace Events <span id="trace-status" style="font-size: 0.7rem; opacity: 0.6; margin-left: 0.5rem;"></span> (last 5)</h3>
 
+<div id="trace-events-container" data-last-offset="308">
 
 <div class="trace-event"><strong><TIMESTAMP></strong> [step] event 0</div>
 
@@ -254,6 +255,76 @@ expression: "&snapshot_html.as_ref()"
 
 <div class="trace-event"><strong><TIMESTAMP></strong> [step] event 4</div>
 
+</div>
+
+
+
+<script>
+(function() {
+    const runId = "detail-run-001";
+    const container = document.getElementById("trace-events-container");
+    const statusEl = document.getElementById("trace-status");
+    
+    if (!container) return;
+
+    const offset = container.getAttribute("data-last-offset") || "0";
+    const es = new EventSource(`/runs/${runId}/trace/sse?offset=${offset}`);
+
+    es.onopen = () => {
+        statusEl.innerText = "● live";
+        statusEl.style.color = "green";
+    };
+
+    es.onerror = (err) => {
+        statusEl.innerText = "○ reconnecting...";
+        statusEl.style.color = "orange";
+    };
+
+    es.addEventListener("end", () => {
+        statusEl.innerText = "● ended";
+        statusEl.style.color = "gray";
+        es.close();
+    });
+
+    es.addEventListener("trace_event", (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            const div = document.createElement("div");
+            div.className = "trace-event";
+            
+            const ts = data.timestamp || data.time || "";
+            const et = data.event_type || data.type || "event";
+            let sum = data.summary || data.message;
+            
+            if (!sum) {
+                sum = JSON.stringify(data);
+                if (sum.length > 120) sum = sum.substring(0, 120) + "...";
+            }
+
+            if (ts) {
+                const tsStrong = document.createElement("strong");
+                tsStrong.textContent = ts;
+                div.appendChild(tsStrong);
+                div.appendChild(document.createTextNode(" "));
+            }
+            div.appendChild(document.createTextNode(`[${et}] ${sum}`));
+            
+            // If it was the empty state message, clear it first
+            if (container.innerText.includes("No trace events")) {
+                container.textContent = "";
+            }
+            container.appendChild(div);
+            
+            // Auto-scroll to bottom if we are near the end
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+                window.scrollTo(0, document.body.offsetHeight);
+            }
+        } catch (err) {
+            console.error("SSE parse error:", err);
+        }
+    });
+})();
+</script>
 
 
 </main>

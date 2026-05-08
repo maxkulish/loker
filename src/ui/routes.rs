@@ -1,23 +1,26 @@
 //! Daemon route handlers for `loker ui --serve`.
 //!
 //! Provides `ui_routes()` which builds the daemon's axum Router with:
-//! - `GET /`          — HTML sessions index page
-//! - `GET /health`    — 200 OK health check
-//! - `GET /runs/:id`  — per-run detail (manifest, timeline, trace)
-//! - `GET /pending`   — aggregated pending HITL gates
-//! - `POST /gates/:run_id/:phase/approve` — approve a gate
-//! - `POST /gates/:run_id/:phase/reject`  — reject a gate
+//! - `GET /`          - HTML sessions index page
+//! - `GET /health`    - 200 OK health check
+//! - `GET /runs/:id`  - per-run detail (manifest, timeline, trace)
+//! - `GET /pending`   - aggregated pending HITL gates
+//! - `POST /gates/:run_id/:phase/approve` - approve a gate
+//! - `POST /gates/:run_id/:phase/reject`  - reject a gate
 
 use std::path::PathBuf;
 
 use axum::{
-    extract::{Form, Path, State},
-    http::StatusCode,
+    extract::{Form, Path, Query, State},
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
+use futures::StreamExt;
+use tokio::sync::mpsc;
 use tokio::task;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::hitl_server::routes::DecisionForm;
 use crate::run_state::atomic_write;
@@ -49,6 +52,7 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
         .route("/", get(index_page))
         .route("/health", get(health_check))
         .route("/runs/:id", get(run_detail))
+        .route("/runs/:id/trace/sse", get(run_trace_sse))
         .route("/pending", get(pending_panel))
         .route("/gates/:run_id/:phase/approve", post(hitl_approve))
         .route("/gates/:run_id/:phase/reject", post(hitl_reject))
@@ -59,7 +63,7 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
 // Handlers
 // ---------------------------------------------------------------------------
 
-/// GET / — HTML sessions index page.
+/// GET / - HTML sessions index page.
 async fn index_page(State(state): State<AppState>) -> Response {
     let root = state.project_root.clone();
     let runs = task::spawn_blocking(move || discovery::discover_runs(&root))
@@ -72,14 +76,14 @@ async fn index_page(State(state): State<AppState>) -> Response {
     .into_response()
 }
 
-/// GET /health — 200 OK health check.
+/// GET /health - 200 OK health check.
 async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, "ok")
 }
 
-/// GET /runs/:id — per-run detail page.
+/// GET /runs/:id - per-run detail page.
 async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
-    // Sanitize run_id — reject path traversal and empty IDs.
+    // Sanitize run_id - reject path traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
             status_code: 400,
@@ -102,16 +106,20 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
 
     // Read manifest, timeline, and trace in a blocking task
     let run_dir_clone = run_dir.clone();
-    let (manifest_entries, phase_timeline, trace_events) = task::spawn_blocking(move || {
-        let manifest_path = run_dir_clone.join("manifest.json");
-        let entries = manifest::read_manifest_entries(&manifest_path);
-        let timeline = manifest::build_phase_timeline(&run_dir_clone);
-        let trace_path = run_dir_clone.join("trace.jsonl");
-        let traces = trace_reader::tail_trace_file(&trace_path, max_events);
-        (entries, timeline, traces)
-    })
-    .await
-    .unwrap_or_default();
+    let (manifest_entries, phase_timeline, trace_events, last_offset) =
+        task::spawn_blocking(move || {
+            let manifest_path = run_dir_clone.join("manifest.json");
+            let entries = manifest::read_manifest_entries(&manifest_path);
+            let timeline = manifest::build_phase_timeline(&run_dir_clone);
+            let trace_path = run_dir_clone.join("trace.jsonl");
+            let content = std::fs::read_to_string(&trace_path).unwrap_or_default();
+            // Compute last-rendered offset from the content we actually read
+            let offset = content.rfind('\n').map(|p| p as u64 + 1).unwrap_or(0);
+            let traces = trace_reader::parse_trace_lines(&content, max_events);
+            (entries, timeline, traces, offset)
+        })
+        .await
+        .unwrap_or_default();
 
     // Read workflow name from manifest (best-effort)
     let manifest_path = run_dir.join("manifest.json");
@@ -129,11 +137,13 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
         manifest_entries,
         phase_timeline,
         trace_events,
+        last_trace_offset: last_offset,
+        is_terminal: run_dir.join("summary.json").exists(),
     }
     .into_response()
 }
 
-/// GET /pending — aggregated pending HITL gates.
+/// GET /pending - aggregated pending HITL gates.
 async fn pending_panel(State(state): State<AppState>) -> Response {
     let root = state.project_root.clone();
     let gates = task::spawn_blocking(move || gate_discovery::discover_pending_gates(&root))
@@ -143,13 +153,13 @@ async fn pending_panel(State(state): State<AppState>) -> Response {
     templates::PendingTemplate { gates: display }.into_response()
 }
 
-/// POST /gates/:run_id/:phase/approve — approve a pending gate.
+/// POST /gates/:run_id/:phase/approve - approve a pending gate.
 async fn hitl_approve(
     State(state): State<AppState>,
     Path((run_id, phase)): Path<(String, String)>,
     Form(form): Form<DecisionForm>,
 ) -> Response {
-    // Sanitize run_id — reject traversal and empty IDs.
+    // Sanitize run_id - reject traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
             status_code: 400,
@@ -182,7 +192,7 @@ async fn hitl_approve(
             (
                 StatusCode::SEE_OTHER,
                 [("Location", location)],
-                "Redirecting…",
+                "Redirecting...",
             )
                 .into_response()
         }
@@ -208,13 +218,13 @@ async fn hitl_approve(
     }
 }
 
-/// POST /gates/:run_id/:phase/reject — reject a pending gate.
+/// POST /gates/:run_id/:phase/reject - reject a pending gate.
 async fn hitl_reject(
     State(state): State<AppState>,
     Path((run_id, phase)): Path<(String, String)>,
     Form(form): Form<DecisionForm>,
 ) -> Response {
-    // Sanitize run_id — reject traversal and empty IDs.
+    // Sanitize run_id - reject traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
             status_code: 400,
@@ -246,7 +256,7 @@ async fn hitl_reject(
             (
                 StatusCode::SEE_OTHER,
                 [("Location", location)],
-                "Redirecting…",
+                "Redirecting...",
             )
                 .into_response()
         }
@@ -350,6 +360,107 @@ async fn write_gate_response(
     .map_err(|e| GateError::Io(e.to_string()))?
 }
 
+#[derive(serde::Deserialize)]
+struct SseQuery {
+    offset: Option<u64>,
+}
+
+/// GET /runs/:id/trace/sse - stream live trace events.
+async fn run_trace_sse(
+    State(state): State<AppState>,
+    Path(run_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<SseQuery>,
+) -> Response {
+    // Sanitize run_id
+    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+        return (StatusCode::BAD_REQUEST, "Invalid run ID").into_response();
+    }
+
+    let run_dir = state.project_root.join("runs").join(&run_id);
+    let trace_path = run_dir.join("trace.jsonl");
+
+    if !trace_path.exists() {
+        return (StatusCode::NOT_FOUND, "Trace file not found").into_response();
+    }
+
+    // Use query param first, then Last-Event-ID, otherwise EOF
+    let initial_offset = if let Some(off) = query.offset {
+        off
+    } else if let Some(last_id) = headers
+        .get("Last-Event-ID")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        last_id
+    } else {
+        match std::fs::metadata(&trace_path) {
+            Ok(m) => m.len(),
+            Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Metadata error").into_response(),
+        }
+    };
+
+    // Check if run is terminal (summary.json exists)
+    let is_terminal = run_dir.join("summary.json").exists();
+
+    if is_terminal {
+        // For terminal runs: read any pending data, emit it, then emit end and close.
+        // No watcher or heartbeat needed — the file won't grow.
+        let (pending_lines, _offset) =
+            crate::ui::trace_reader::read_from_offset(&trace_path, initial_offset);
+
+        let terminal_stream = async_stream::stream! {
+            for (pos, line) in pending_lines {
+                if let Some(sse) = crate::ui::sse::format_line_as_sse(&pos.to_string(), &line) {
+                    yield Ok::<axum::body::Bytes, std::io::Error>(
+                        axum::body::Bytes::from(sse),
+                    );
+                }
+            }
+            yield Ok::<axum::body::Bytes, std::io::Error>(
+                axum::body::Bytes::from("event: end\ndata: \n\n"),
+            );
+        };
+
+        return Response::builder()
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .body(axum::body::Body::from_stream(terminal_stream))
+            .unwrap();
+    }
+
+    // Non-terminal run: start watcher + heartbeat
+    let (tx, rx) = mpsc::channel(100);
+    let watcher = crate::ui::sse::TraceWatcher::new(trace_path.clone(), initial_offset);
+
+    tokio::spawn(async move {
+        if let Err(e) = watcher.watch(tx).await {
+            tracing::error!("Trace watcher failed for run {}: {}", run_id, e);
+        }
+    });
+
+    // Create a heartbeat stream (every 15 seconds)
+    let heartbeat = tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(
+        tokio::time::Duration::from_secs(15),
+    ))
+    .map(|_| Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(": heartbeat\n\n")));
+
+    // Convert receiver to a stream of bytes
+    let data_stream = ReceiverStream::new(rx).map(|(offset, line)| {
+        let sse_event = crate::ui::sse::format_line_as_sse(&offset.to_string(), &line)
+            .unwrap_or_else(|| "data: Error parsing line\n\n".to_string());
+        Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(sse_event))
+    });
+
+    let live_stream = futures::stream::select(data_stream, heartbeat);
+
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .body(axum::body::Body::from_stream(live_stream))
+        .unwrap()
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -366,7 +477,7 @@ mod tests {
     use tower::ServiceExt;
 
     // -----------------------------------------------------------------------
-    // GET / — index page
+    // GET / - index page
     // -----------------------------------------------------------------------
 
     #[tokio::test]
@@ -410,7 +521,7 @@ mod tests {
         assert!(html.contains("design"), "HTML should contain phase info");
         assert!(html.contains("completed"), "HTML should contain status");
 
-        // Snapshot test — stable fixture data (strip dynamic timestamps)
+        // Snapshot test - stable fixture data (strip dynamic timestamps)
         let ts_re = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d:+Z.-]+").unwrap();
         let snapshot_html = ts_re.replace_all(&html, "<TIMESTAMP>");
         assert_snapshot!("index_page_with_runs", &snapshot_html.as_ref());
@@ -433,7 +544,7 @@ mod tests {
         let html = String::from_utf8(body.to_vec()).unwrap();
         assert!(html.contains("No runs yet"), "HTML should show empty state");
 
-        // Snapshot test — empty state is fully deterministic
+        // Snapshot test - empty state is fully deterministic
         assert_snapshot!("index_page_empty", &html);
     }
 
@@ -459,7 +570,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // GET /runs/:id — detail page
+    // GET /runs/:id - detail page
     // -----------------------------------------------------------------------
 
     #[tokio::test]
@@ -524,7 +635,7 @@ mod tests {
         assert!(html.contains("event 0"), "Should show trace events");
         assert!(html.contains("event 4"), "Should show trace events");
 
-        // Snapshot test — fixture data (strip dynamic timestamps)
+        // Snapshot test - fixture data (strip dynamic timestamps)
         let ts_re = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d:+Z.-]+").unwrap();
         let snapshot_html = ts_re.replace_all(&html, "<TIMESTAMP>");
         assert_snapshot!("run_detail_with_data", &snapshot_html.as_ref());
@@ -557,7 +668,7 @@ mod tests {
         let run_dir = tmp.path().join("runs").join("safe-run");
         std::fs::create_dir_all(&run_dir).unwrap();
 
-        // Request a non-existent run — should get 404 from handler
+        // Request a non-existent run - should get 404 from handler
         let response = app
             .clone()
             .oneshot(
@@ -572,11 +683,108 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // GET /pending — pending gates panel
+    // GET /runs/:id/trace/sse - SSE stream
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn pending_panel_renders_gates() {
+    async fn run_trace_sse_returns_correct_headers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_id = "sse-run-001";
+        let run_dir = tmp.path().join("runs").join(run_id);
+        fs::create_dir_all(&run_dir).unwrap();
+        fs::write(run_dir.join("trace.jsonl"), b"{} \n").unwrap();
+
+        let app = ui_routes(tmp.path().to_path_buf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/runs/{}/trace/sse", run_id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn run_trace_sse_streams_events() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_id = "sse-run-002";
+        let run_dir = tmp.path().join("runs").join(run_id);
+        fs::create_dir_all(&run_dir).unwrap();
+        let trace_path = run_dir.join("trace.jsonl");
+
+        // Start with an existing file to test trailing from the end
+        fs::write(&trace_path, b"initial line\n").unwrap();
+
+        let app = ui_routes(tmp.path().to_path_buf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/runs/{}/trace/sse", run_id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Verify SSE response headers
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-cache"
+        );
+    }
+
+    #[tokio::test]
+    async fn run_trace_sse_resumes_from_offset() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_id = "sse-run-003";
+        let run_dir = tmp.path().join("runs").join(run_id);
+        fs::create_dir_all(&run_dir).unwrap();
+        let trace_path = run_dir.join("trace.jsonl");
+
+        let content = "line1\nline2\nline3\n";
+        fs::write(&trace_path, content.as_bytes()).unwrap();
+
+        let app = ui_routes(tmp.path().to_path_buf());
+
+        // Request from offset 6 ("line1\n" is 6 bytes).
+        // When offset is provided, TraceWatcher does an initial read from that
+        // offset, then watches for changes.
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/runs/{}/trace/sse?offset=6", run_id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /pending
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn pending_panel_with_gates() {
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = tmp.path().join("runs").join("pending-run-001");
         fs::create_dir_all(&run_dir).unwrap();
@@ -627,7 +835,7 @@ mod tests {
         assert!(html.contains("approve"), "Should have approve form");
         assert!(html.contains("reject"), "Should have reject form");
 
-        // Snapshot test — fixture data, deterministic
+        // Snapshot test - fixture data, deterministic
         assert_snapshot!("pending_panel_with_gates", &html);
     }
 
