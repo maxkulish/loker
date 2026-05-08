@@ -81,28 +81,31 @@ impl TraceWatcher {
 
         // Initial read to catch any events that happened between connection and watch start
         let (initial_lines, initial_offset) = read_from_offset(self.path.as_path(), self.offset);
-        self.offset = initial_offset;
-
-        // Note: for initial lines, we don't have an accurate per-line offset without more work,
-        // but we can use the starting offset as a base.
-        // For simplicity and since we just want a unique ID, we'll use the current state.
-        for line in initial_lines {
-            if tx.send((self.offset, line)).await.is_err() {
+        for (pos, line) in initial_lines {
+            if tx.send((pos, line)).await.is_err() {
                 return Ok(());
             }
         }
+        self.offset = initial_offset;
 
-        while event_rx.recv().await.is_some() {
-            let (lines, new_offset) = read_from_offset(self.path.as_path(), self.offset);
-            let mut current_pos = self.offset;
-            for line in lines {
-                let line_len = line.len() as u64;
-                if tx.send((current_pos, line)).await.is_err() {
+        loop {
+            tokio::select! {
+                maybe_event = event_rx.recv() => {
+                    if maybe_event.is_none() {
+                        break;
+                    }
+                    let (lines, new_offset) = read_from_offset(self.path.as_path(), self.offset);
+                    for (pos, line) in lines {
+                        if tx.send((pos, line)).await.is_err() {
+                            return Ok(());
+                        }
+                    }
+                    self.offset = new_offset;
+                }
+                _ = tx.closed() => {
                     return Ok(());
                 }
-                current_pos += line_len + 1; // +1 for newline
             }
-            self.offset = new_offset;
         }
         Ok(())
     }
@@ -173,6 +176,7 @@ mod tests {
         // Initial line should be received
         let (offset, line) = rx.recv().await.expect("Should receive initial line");
         assert_eq!(line, "line1");
+        assert_eq!(offset, 0);
 
         // Write second line
         fs::OpenOptions::new()
@@ -187,6 +191,7 @@ mod tests {
         for _ in 0..20 {
             if let Ok((offset, line)) = rx.try_recv() {
                 if line == "line2" {
+                    assert!(offset > 0);
                     received = true;
                     break;
                 }

@@ -64,6 +64,7 @@ askama = "0.12"
 notify = "8.2.0"
 tokio-stream = "0.1.18"
 tracing = "0.1.44"
+async-stream = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

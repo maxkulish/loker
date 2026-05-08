@@ -26,6 +26,8 @@ mod types {
         pub manifest_entries: Vec<ManifestEntry>,
         pub phase_timeline: Vec<PhaseStep>,
         pub trace_events: Vec<TraceEventDisplay>,
+        pub last_trace_offset: u64,
+        pub is_terminal: bool,
     }
 
     #[derive(Template)]

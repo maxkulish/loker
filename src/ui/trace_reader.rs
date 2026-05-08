@@ -31,7 +31,7 @@ pub fn tail_trace_file(trace_path: &Path, n: usize) -> Vec<TraceEventDisplay> {
 /// Read new lines from a trace.jsonl file starting at a given offset.
 ///
 /// Returns the new lines and the updated offset.
-pub fn read_from_offset(trace_path: &Path, offset: u64) -> (Vec<String>, u64) {
+pub fn read_from_offset(trace_path: &Path, offset: u64) -> (Vec<(u64, String)>, u64) {
     let file = match fs::File::open(trace_path) {
         Ok(f) => f,
         Err(_) => return (Vec::new(), offset),
@@ -53,20 +53,40 @@ pub fn read_from_offset(trace_path: &Path, offset: u64) -> (Vec<String>, u64) {
         return (Vec::new(), offset);
     }
 
-    let mut buffer = String::new();
-    let mut lines = Vec::new();
-
-    // We avoid reading the whole remainder if it's huge,
-    // but usually it's just a few events.
-    if reader.read_to_string(&mut buffer).is_ok() {
-        for line in buffer.lines() {
-            if !line.trim().is_empty() {
-                lines.push(line.to_string());
-            }
-        }
+    let mut buffer = Vec::new();
+    if reader.read_to_end(&mut buffer).is_err() {
+        return (Vec::new(), offset);
     }
 
-    (lines, len)
+    if buffer.is_empty() {
+        return (Vec::new(), offset);
+    }
+
+    // Find the last newline to avoid capturing a partial line
+    if let Some(last_newline_pos) = buffer.iter().rposition(|&b| b == b'\n') {
+        let complete_part = &buffer[..=last_newline_pos];
+        let mut lines = Vec::new();
+        let mut current_pos = offset;
+
+        let mut start = 0;
+        while start < complete_part.len() {
+            if let Some(end) = complete_part[start..].iter().position(|&b| b == b'\n') {
+                let line_bytes = &complete_part[start..start + end];
+                let line_str = String::from_utf8_lossy(line_bytes).to_string();
+                if !line_str.trim().is_empty() {
+                    lines.push((current_pos, line_str));
+                }
+                current_pos += (end + 1) as u64;
+                start += end + 1;
+            } else {
+                break;
+            }
+        }
+
+        return (lines, current_pos);
+    }
+
+    (Vec::new(), offset)
 }
 
 fn parse_trace_line(line: &str) -> Option<TraceEventDisplay> {
@@ -192,13 +212,15 @@ mod tests {
 
         // Read from 0
         let (lines1, offset1) = read_from_offset(&path, 0);
-        assert_eq!(lines1, vec!["line1", "line2", "line3"]);
+        let lines1_content: Vec<String> = lines1.into_iter().map(|(_, s)| s).collect();
+        assert_eq!(lines1_content, vec!["line1", "line2", "line3"]);
         assert_eq!(offset1, content.len() as u64);
 
         // Read from mid-line (should still happen, but we'll just get the rest)
         // "line1\n" is 6 bytes.
         let (lines2, offset2) = read_from_offset(&path, 6);
-        assert_eq!(lines2, vec!["line2", "line3"]);
+        let lines2_content: Vec<String> = lines2.into_iter().map(|(_, s)| s).collect();
+        assert_eq!(lines2_content, vec!["line2", "line3"]);
         assert_eq!(offset2, content.len() as u64);
 
         // Read from EOF

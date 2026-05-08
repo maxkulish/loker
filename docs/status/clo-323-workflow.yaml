@@ -21,7 +21,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-08T06:32:48.352Z'
-  updated_at: '2026-05-08T07:23:15.490Z'
+  updated_at: '2026-05-08T07:34:27.605Z'
 phases:
   discovery:
     status: complete
@@ -51,12 +51,13 @@ phases:
     plan_file: docs/plans/clo-323-sse-tail-f.md
     approved: true
   implement:
-    status: pending
+    status: validating
     commits:
       - 192fa62
       - fa1351d
       - 767d9f1
       - bda7a77
+      - 74f9bad
   pr:
     status: pending
   complete:
@@ -144,5 +145,13 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST4 landed: implemented GET /runs/:id/trace/sse Axum handler. Commit bda7a77'
+  - timestamp: '2026-05-08T07:26:37.155Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST6 landed: implemented frontend EventSource integration in templates/run_detail.html. Commit 74f9bad'
+  - timestamp: '2026-05-08T07:34:27.605Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 6 commits including final polish.
 task_title: '[T-054] SSE tail-f of trace.jsonl'
 task_url: https://linear.app/cloud-ai/issue/CLO-323/t-054-sse-tail-f-of-tracejsonl

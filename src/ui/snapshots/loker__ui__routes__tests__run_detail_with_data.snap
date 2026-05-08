@@ -1,6 +1,5 @@
 ---
 source: src/ui/routes.rs
-assertion_line: 614
 expression: "&snapshot_html.as_ref()"
 ---
 <!DOCTYPE html>
@@ -244,7 +243,7 @@ expression: "&snapshot_html.as_ref()"
 
 <h3 class="section-title">Trace Events <span id="trace-status" style="font-size: 0.7rem; opacity: 0.6; margin-left: 0.5rem;"></span> (last 5)</h3>
 
-<div id="trace-events-container">
+<div id="trace-events-container" data-last-offset="384">
 
 <div class="trace-event"><strong><TIMESTAMP></strong> [step] event 0</div>
 
@@ -259,6 +258,7 @@ expression: "&snapshot_html.as_ref()"
 </div>
 
 
+
 <script>
 (function() {
     const runId = "detail-run-001";
@@ -267,7 +267,8 @@ expression: "&snapshot_html.as_ref()"
     
     if (!container) return;
 
-    const es = new EventSource(`/runs/${runId}/trace/sse`);
+    const offset = container.getAttribute("data-last-offset") || "0";
+    const es = new EventSource(`/runs/${runId}/trace/sse?offset=${offset}`);
 
     es.onopen = () => {
         statusEl.innerText = "● live";
@@ -278,6 +279,12 @@ expression: "&snapshot_html.as_ref()"
         statusEl.innerText = "○ reconnecting...";
         statusEl.style.color = "orange";
     };
+
+    es.addEventListener("end", () => {
+        statusEl.innerText = "● ended";
+        statusEl.style.color = "gray";
+        es.close();
+    });
 
     es.addEventListener("trace_event", (e) => {
         try {
@@ -294,7 +301,13 @@ expression: "&snapshot_html.as_ref()"
                 if (sum.length > 120) sum = sum.substring(0, 120) + "...";
             }
 
-            div.innerHTML = `${ts ? `<strong>${ts}</strong> ` : ""}[${et}] ${sum}`;
+            if (ts) {
+                const tsStrong = document.createElement("strong");
+                tsStrong.textContent = ts;
+                div.appendChild(tsStrong);
+                div.appendChild(document.createTextNode(" "));
+            }
+            div.appendChild(document.createTextNode(`[${et}] ${sum}`));
             
             // If it was the empty state message, clear it first
             if (container.innerText.includes("No trace events")) {
@@ -312,6 +325,7 @@ expression: "&snapshot_html.as_ref()"
     });
 })();
 </script>
+
 
 </main>
 </body>

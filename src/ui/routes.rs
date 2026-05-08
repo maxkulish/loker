@@ -1,17 +1,17 @@
 //! Daemon route handlers for `loker ui --serve`.
 //!
 //! Provides `ui_routes()` which builds the daemon's axum Router with:
-//! - `GET /`          — HTML sessions index page
-//! - `GET /health`    — 200 OK health check
-//! - `GET /runs/:id`  — per-run detail (manifest, timeline, trace)
-//! - `GET /pending`   — aggregated pending HITL gates
-//! - `POST /gates/:run_id/:phase/approve` — approve a gate
-//! - `POST /gates/:run_id/:phase/reject`  — reject a gate
+//! - `GET /`          - HTML sessions index page
+//! - `GET /health`    - 200 OK health check
+//! - `GET /runs/:id`  - per-run detail (manifest, timeline, trace)
+//! - `GET /pending`   - aggregated pending HITL gates
+//! - `POST /gates/:run_id/:phase/approve` - approve a gate
+//! - `POST /gates/:run_id/:phase/reject`  - reject a gate
 
 use std::path::PathBuf;
 
 use axum::{
-    extract::{Form, Path, State},
+    extract::{Form, Path, Query, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -63,7 +63,7 @@ pub fn ui_routes(project_root: PathBuf) -> Router {
 // Handlers
 // ---------------------------------------------------------------------------
 
-/// GET / — HTML sessions index page.
+/// GET / - HTML sessions index page.
 async fn index_page(State(state): State<AppState>) -> Response {
     let root = state.project_root.clone();
     let runs = task::spawn_blocking(move || discovery::discover_runs(&root))
@@ -76,14 +76,14 @@ async fn index_page(State(state): State<AppState>) -> Response {
     .into_response()
 }
 
-/// GET /health — 200 OK health check.
+/// GET /health - 200 OK health check.
 async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, "ok")
 }
 
-/// GET /runs/:id — per-run detail page.
+/// GET /runs/:id - per-run detail page.
 async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
-    // Sanitize run_id — reject path traversal and empty IDs.
+    // Sanitize run_id - reject path traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
             status_code: 400,
@@ -106,16 +106,18 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
 
     // Read manifest, timeline, and trace in a blocking task
     let run_dir_clone = run_dir.clone();
-    let (manifest_entries, phase_timeline, trace_events) = task::spawn_blocking(move || {
-        let manifest_path = run_dir_clone.join("manifest.json");
-        let entries = manifest::read_manifest_entries(&manifest_path);
-        let timeline = manifest::build_phase_timeline(&run_dir_clone);
-        let trace_path = run_dir_clone.join("trace.jsonl");
-        let traces = trace_reader::tail_trace_file(&trace_path, max_events);
-        (entries, timeline, traces)
-    })
-    .await
-    .unwrap_or_default();
+    let (manifest_entries, phase_timeline, trace_events, last_offset) =
+        task::spawn_blocking(move || {
+            let manifest_path = run_dir_clone.join("manifest.json");
+            let entries = manifest::read_manifest_entries(&manifest_path);
+            let timeline = manifest::build_phase_timeline(&run_dir_clone);
+            let trace_path = run_dir_clone.join("trace.jsonl");
+            let traces = trace_reader::tail_trace_file(&trace_path, max_events);
+            let offset = std::fs::metadata(&trace_path).map(|m| m.len()).unwrap_or(0);
+            (entries, timeline, traces, offset)
+        })
+        .await
+        .unwrap_or_default();
 
     // Read workflow name from manifest (best-effort)
     let manifest_path = run_dir.join("manifest.json");
@@ -133,11 +135,13 @@ async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -
         manifest_entries,
         phase_timeline,
         trace_events,
+        last_trace_offset: last_offset,
+        is_terminal: run_dir.join("summary.json").exists(),
     }
     .into_response()
 }
 
-/// GET /pending — aggregated pending HITL gates.
+/// GET /pending - aggregated pending HITL gates.
 async fn pending_panel(State(state): State<AppState>) -> Response {
     let root = state.project_root.clone();
     let gates = task::spawn_blocking(move || gate_discovery::discover_pending_gates(&root))
@@ -147,13 +151,13 @@ async fn pending_panel(State(state): State<AppState>) -> Response {
     templates::PendingTemplate { gates: display }.into_response()
 }
 
-/// POST /gates/:run_id/:phase/approve — approve a pending gate.
+/// POST /gates/:run_id/:phase/approve - approve a pending gate.
 async fn hitl_approve(
     State(state): State<AppState>,
     Path((run_id, phase)): Path<(String, String)>,
     Form(form): Form<DecisionForm>,
 ) -> Response {
-    // Sanitize run_id — reject traversal and empty IDs.
+    // Sanitize run_id - reject traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
             status_code: 400,
@@ -186,7 +190,7 @@ async fn hitl_approve(
             (
                 StatusCode::SEE_OTHER,
                 [("Location", location)],
-                "Redirecting…",
+                "Redirecting...",
             )
                 .into_response()
         }
@@ -212,13 +216,13 @@ async fn hitl_approve(
     }
 }
 
-/// POST /gates/:run_id/:phase/reject — reject a pending gate.
+/// POST /gates/:run_id/:phase/reject - reject a pending gate.
 async fn hitl_reject(
     State(state): State<AppState>,
     Path((run_id, phase)): Path<(String, String)>,
     Form(form): Form<DecisionForm>,
 ) -> Response {
-    // Sanitize run_id — reject traversal and empty IDs.
+    // Sanitize run_id - reject traversal and empty IDs.
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
         return templates::ErrorTemplate {
             status_code: 400,
@@ -250,7 +254,7 @@ async fn hitl_reject(
             (
                 StatusCode::SEE_OTHER,
                 [("Location", location)],
-                "Redirecting…",
+                "Redirecting...",
             )
                 .into_response()
         }
@@ -354,34 +358,34 @@ async fn write_gate_response(
     .map_err(|e| GateError::Io(e.to_string()))?
 }
 
-/// GET /runs/:id/trace/sse — stream live trace events.
+#[derive(serde::Deserialize)]
+struct SseQuery {
+    offset: Option<u64>,
+}
+
+/// GET /runs/:id/trace/sse - stream live trace events.
 async fn run_trace_sse(
     State(state): State<AppState>,
     Path(run_id): Path<String>,
     headers: axum::http::HeaderMap,
+    Query(query): Query<SseQuery>,
 ) -> Response {
     // Sanitize run_id
     if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
-        return templates::ErrorTemplate {
-            status_code: 400,
-            message: format!("Invalid run ID: {}", run_id),
-        }
-        .into_response();
+        return (StatusCode::BAD_REQUEST, "Invalid run ID").into_response();
     }
 
     let run_dir = state.project_root.join("runs").join(&run_id);
     let trace_path = run_dir.join("trace.jsonl");
 
     if !trace_path.exists() {
-        return templates::ErrorTemplate {
-            status_code: 404,
-            message: format!("Trace file not found for run: {}", run_id),
-        }
-        .into_response();
+        return (StatusCode::NOT_FOUND, "Trace file not found").into_response();
     }
 
-    // Use Last-Event-ID header if present, otherwise use EOF
-    let initial_offset = if let Some(last_id) = headers
+    // Use query param first, then Last-Event-ID, otherwise EOF
+    let initial_offset = if let Some(off) = query.offset {
+        off
+    } else if let Some(last_id) = headers
         .get("Last-Event-ID")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
@@ -390,18 +394,12 @@ async fn run_trace_sse(
     } else {
         match std::fs::metadata(&trace_path) {
             Ok(m) => m.len(),
-            Err(_) => {
-                return templates::ErrorTemplate {
-                    status_code: 500,
-                    message: "Failed to read trace file metadata".to_string(),
-                }
-                .into_response()
-            }
+            Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Metadata error").into_response(),
         }
     };
 
     let (tx, rx) = mpsc::channel(100);
-    let watcher = crate::ui::sse::TraceWatcher::new(trace_path, initial_offset);
+    let watcher = crate::ui::sse::TraceWatcher::new(trace_path.clone(), initial_offset);
 
     // Spawn the watcher in the background
     tokio::spawn(async move {
@@ -423,14 +421,27 @@ async fn run_trace_sse(
         Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from(sse_event))
     });
 
-    // Merge heartbeat and data streams
-    let stream = futures::stream::select(data_stream, heartbeat);
+    // Check if run is terminal (summary.json exists)
+    let is_terminal = run_dir.join("summary.json").exists();
+
+    let mut stream = futures::stream::select(data_stream, heartbeat);
+
+    // If terminal, we emit an 'end' event and then close the stream.
+    // We wrap the stream to handle this logic.
+    let terminal_stream = async_stream::stream! {
+        while let Some(item) = stream.next().await {
+            yield item;
+        }
+        if is_terminal {
+            yield Ok::<axum::body::Bytes, std::io::Error>(axum::body::Bytes::from("event: end\ndata: \n\n"));
+        }
+    };
 
     Response::builder()
         .header(header::CONTENT_TYPE, "text/event-stream")
         .header(header::CACHE_CONTROL, "no-cache")
         .header(header::CONNECTION, "keep-alive")
-        .body(axum::body::Body::from_stream(stream))
+        .body(axum::body::Body::from_stream(terminal_stream))
         .unwrap()
 }
 
@@ -450,7 +461,7 @@ mod tests {
     use tower::ServiceExt;
 
     // -----------------------------------------------------------------------
-    // GET / — index page
+    // GET / - index page
     // -----------------------------------------------------------------------
 
     #[tokio::test]
@@ -494,7 +505,7 @@ mod tests {
         assert!(html.contains("design"), "HTML should contain phase info");
         assert!(html.contains("completed"), "HTML should contain status");
 
-        // Snapshot test — stable fixture data (strip dynamic timestamps)
+        // Snapshot test - stable fixture data (strip dynamic timestamps)
         let ts_re = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d:+Z.-]+").unwrap();
         let snapshot_html = ts_re.replace_all(&html, "<TIMESTAMP>");
         assert_snapshot!("index_page_with_runs", &snapshot_html.as_ref());
@@ -517,7 +528,7 @@ mod tests {
         let html = String::from_utf8(body.to_vec()).unwrap();
         assert!(html.contains("No runs yet"), "HTML should show empty state");
 
-        // Snapshot test — empty state is fully deterministic
+        // Snapshot test - empty state is fully deterministic
         assert_snapshot!("index_page_empty", &html);
     }
 
@@ -543,7 +554,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // GET /runs/:id — detail page
+    // GET /runs/:id - detail page
     // -----------------------------------------------------------------------
 
     #[tokio::test]
@@ -608,7 +619,7 @@ mod tests {
         assert!(html.contains("event 0"), "Should show trace events");
         assert!(html.contains("event 4"), "Should show trace events");
 
-        // Snapshot test — fixture data (strip dynamic timestamps)
+        // Snapshot test - fixture data (strip dynamic timestamps)
         let ts_re = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d:+Z.-]+").unwrap();
         let snapshot_html = ts_re.replace_all(&html, "<TIMESTAMP>");
         assert_snapshot!("run_detail_with_data", &snapshot_html.as_ref());
@@ -641,7 +652,7 @@ mod tests {
         let run_dir = tmp.path().join("runs").join("safe-run");
         std::fs::create_dir_all(&run_dir).unwrap();
 
-        // Request a non-existent run — should get 404 from handler
+        // Request a non-existent run - should get 404 from handler
         let response = app
             .clone()
             .oneshot(
@@ -656,11 +667,112 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // GET /pending — pending gates panel
+    // GET /runs/:id/trace/sse - SSE stream
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn pending_panel_renders_gates() {
+    async fn run_trace_sse_returns_correct_headers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_id = "sse-run-001";
+        let run_dir = tmp.path().join("runs").join(run_id);
+        fs::create_dir_all(&run_dir).unwrap();
+        fs::write(run_dir.join("trace.jsonl"), b"{} \n").unwrap();
+
+        let app = ui_routes(tmp.path().to_path_buf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/runs/{}/trace/sse", run_id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn run_trace_sse_streams_events() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_id = "sse-run-002";
+        let run_dir = tmp.path().join("runs").join(run_id);
+        fs::create_dir_all(&run_dir).unwrap();
+        let trace_path = run_dir.join("trace.jsonl");
+
+        // Start with an existing file to test trailing from the end
+        fs::write(&trace_path, b"initial line\n").unwrap();
+
+        let app = ui_routes(tmp.path().to_path_buf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/runs/{}/trace/sse", run_id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Verify SSE response headers
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-cache"
+        );
+        assert_eq!(
+            response.headers().get(header::CONNECTION).unwrap(),
+            "keep-alive"
+        );
+    }
+
+    #[tokio::test]
+    async fn run_trace_sse_resumes_from_offset() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_id = "sse-run-003";
+        let run_dir = tmp.path().join("runs").join(run_id);
+        fs::create_dir_all(&run_dir).unwrap();
+        let trace_path = run_dir.join("trace.jsonl");
+
+        let content = "line1\nline2\nline3\n";
+        fs::write(&trace_path, content.as_bytes()).unwrap();
+
+        let app = ui_routes(tmp.path().to_path_buf());
+
+        // Request from offset 6 ("line1\n" is 6 bytes).
+        // When offset is provided, TraceWatcher does an initial read from that
+        // offset, then watches for changes.
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/runs/{}/trace/sse?offset=6", run_id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /pending
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn pending_panel_with_gates() {
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = tmp.path().join("runs").join("pending-run-001");
         fs::create_dir_all(&run_dir).unwrap();
@@ -711,7 +823,7 @@ mod tests {
         assert!(html.contains("approve"), "Should have approve form");
         assert!(html.contains("reject"), "Should have reject form");
 
-        // Snapshot test — fixture data, deterministic
+        // Snapshot test - fixture data, deterministic
         assert_snapshot!("pending_panel_with_gates", &html);
     }
 

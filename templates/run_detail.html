@@ -62,15 +62,16 @@
 {# Trace events #}
 <h3 class="section-title">Trace Events <span id="trace-status" style="font-size: 0.7rem; opacity: 0.6; margin-left: 0.5rem;"></span> (last {{ trace_events.len() }})</h3>
 {% if trace_events.is_empty() %}
-<p id="trace-events-container" class="empty-state" style="text-align:left;padding:1rem 0">No trace events.</p>
+<p id="trace-events-container" class="empty-state" style="text-align:left;padding:1rem 0" data-last-offset="{{ last_trace_offset }}">No trace events.</p>
 {% else %}
-<div id="trace-events-container">
+<div id="trace-events-container" data-last-offset="{{ last_trace_offset }}">
 {% for event in trace_events %}
 <div class="trace-event">{% if !event.timestamp.is_empty() %}<strong>{{ event.timestamp }}</strong> {% endif %}[{{ event.event_type }}] {{ event.summary }}</div>
 {% endfor %}
 </div>
 {% endif %}
 
+{% if !is_terminal %}
 <script>
 (function() {
     const runId = "{{ run_id }}";
@@ -79,7 +80,8 @@
     
     if (!container) return;
 
-    const es = new EventSource(`/runs/${runId}/trace/sse`);
+    const offset = container.getAttribute("data-last-offset") || "0";
+    const es = new EventSource(`/runs/${runId}/trace/sse?offset=${offset}`);
 
     es.onopen = () => {
         statusEl.innerText = "● live";
@@ -90,6 +92,12 @@
         statusEl.innerText = "○ reconnecting...";
         statusEl.style.color = "orange";
     };
+
+    es.addEventListener("end", () => {
+        statusEl.innerText = "● ended";
+        statusEl.style.color = "gray";
+        es.close();
+    });
 
     es.addEventListener("trace_event", (e) => {
         try {
@@ -106,7 +114,13 @@
                 if (sum.length > 120) sum = sum.substring(0, 120) + "...";
             }
 
-            div.innerHTML = `${ts ? `<strong>${ts}</strong> ` : ""}[${et}] ${sum}`;
+            if (ts) {
+                const tsStrong = document.createElement("strong");
+                tsStrong.textContent = ts;
+                div.appendChild(tsStrong);
+                div.appendChild(document.createTextNode(" "));
+            }
+            div.appendChild(document.createTextNode(`[${et}] ${sum}`));
             
             // If it was the empty state message, clear it first
             if (container.innerText.includes("No trace events")) {
@@ -124,4 +138,5 @@
     });
 })();
 </script>
+{% endif %}
 {% endblock %}
