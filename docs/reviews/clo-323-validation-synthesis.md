@@ -32,5 +32,18 @@ approve_with_changes
 - **F8 [LOW] Unused `offset` binding in tests in `src/ui/sse.rs:178,184`** — only triggers under `-D warnings --all-targets`, which the project's gate does not run. Trivially `_offset` rename if/when CI tightens.
 - **Codex / Gemini "review failed"** — both failures are bash heredoc-quoting bugs in the wrapper scripts, not signal about the code under review. Worth fixing the `.pi/` invocation scripts (escape backticks inside the `$(cat <<EOF...EOF)` block) so future synthesis isn't single-reviewer.
 
-## Recommendation
-PROCEED_WITH_FIXES. The branch is structurally sound — `make check` is green, all 42 UI tests pass, and every Must Fix item is a localized change of <10 lines confined to `templates/run_detail.html`, `src/ui/sse.rs`, `src/ui/trace_reader.rs`, and `src/ui/routes.rs`. The bounded fix iteration is: (1) replace `innerHTML` with `createElement`/`textContent` in the live renderer, (2) add `tokio::select!` on `tx.closed()` to the watch loop, (3) make offset advancement newline-anchored with a partial-line buffer, (4) pass last-rendered offset from template to SSE handler, (5) emit a terminal `event: end` and close client-side when runs are complete. Separately, fix the bash heredoc bugs in `.pi/` codex/gemini invocation wrappers so synthesis isn't reduced to a single reviewer next round.
+## Re-validation
+
+All five Must Fix Before PR items were already implemented in the branch commits (74f9bad, bda7a77, 767d9f1, fa1351d, 192fa62) and confirmed present:
+
+- **F1 (XSS)**: DOM nodes constructed with `createElement` + `textContent`; no `innerHTML` with untrusted data.
+- **F2 (watcher leak)**: `tokio::select!` races `tx.closed()` against `event_rx.recv()` — watchers tear down on disconnect even for idle files.
+- **F3 (offset desync)**: `read_from_offset` scans to last `\n` via `rposition`, advances offset only to that boundary.
+- **F4 (render→connect race)**: Template emits `data-last-offset`; SSE URL includes `?offset=` to fill the gap.
+- **F5 (EventSource reconnect)**: Template guards EventSource on `is_terminal`; server emits `event: end` for terminal runs; client calls `es.close()` on receipt.
+
+Additional cleanup applied: replaced the one remaining `innerHTML = ""` with `textContent = ""` for clearing the empty-state placeholder.
+
+`make check` is green (fmt + clippy + test, all passing).
+
+**Re-validation verdict**: approve

@@ -311,7 +311,7 @@ expression: "&snapshot_html.as_ref()"
             
             // If it was the empty state message, clear it first
             if (container.innerText.includes("No trace events")) {
-                container.innerHTML = "";
+                container.textContent = "";
             }
             container.appendChild(div);
             
