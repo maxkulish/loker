@@ -1,50 +1,38 @@
 # Pre-PR validation: clo-324
 
 **Reviewer**: Claude (fallback)
-**Reviewed**: 2026-05-08
+**Reviewed**: 2026-05-09
 **Pipeline**: lok implement-gate
 **Note**: Both external reviewers failed; this is the fallback review
 ---
 
 ## Findings
 
-### F1 [high] ST4 (phase-lock heartbeat exposure) not implemented
-**Where:** `src/run_state/phase_lock.rs` (unchanged on this branch); `tests/ui_threat_model.rs` (no `lock_heartbeat_expiry_releases_lock` test)
-**What:** Plan §ST4 ("Expose advisory-lock heartbeat expiry for testing") is a stated acceptance criterion of CLO-324 and is required to drive `T-LOCK-2`. The branch ships none of it: no `force_expire`/`heartbeat_deadline`/`tick_for_test` accessor, no test, and no diff in `phase_lock.rs`. The threat model's heartbeat-expiry scenario is therefore unverified by automation, which is the entire point of the close gate.
-**Suggested fix:** Implement ST4 as planned — add a `#[cfg(test)] pub` (or `pub(crate)` behind `cfg(test)`) accessor that lets a test advance/expire the heartbeat, then add the missing `T-LOCK-2` integration test. If the work is being deferred, update the plan/design and Linear ticket so the close-gate scope is honest.
+### F1 [medium] Content-Type design/impl mismatch — design says JSON, code requires form-encoded
+**Where:** `src/ui/security.rs:32-35` (and design `docs/designs/clo-324-threat-model-suite.md` §3)
+**What:** The design says POST guard validates `Content-Type: application/json`. The implementation requires `application/x-www-form-urlencoded`. The implementation is correct because the gate handlers use `axum::Form` against an HTML form, but the design doc and threat-model description are now stale. A future reader reconciling the docs against the code will assume one is wrong; nothing tells them which.
+**Suggested fix:** Update `docs/designs/clo-324-threat-model-suite.md` §3 (and the corresponding cell in `docs/threat-model.md`) to state `application/x-www-form-urlencoded` and explain it tracks the `Form` extractor. Optional: also accept `application/json` if a JSON gate API is planned, but only after that handler exists.
 
-### F2 [medium] Several design §5 tests missing from `tests/ui_threat_model.rs`
-**Where:** `tests/ui_threat_model.rs`
-**What:** Design §5 enumerates the suite that closes M11. Comparing to the file: `loopback_bind_rejects_external_interface` (T-BIND-1), `gate_url_has_sufficient_entropy` (T-COOKIE-1/entropy), `concurrent_approval_honors_advisory_lock` (T-LOCK-1), `sse_rejects_cross_origin_request`, and `lock_heartbeat_expiry_releases_lock` (T-LOCK-2) are all absent. The threat-model summary table in `docs/threat-model.md` advertises these IDs as covered, so docs and code disagree.
-**Suggested fix:** Either land the missing tests, or trim the design §5 list and `docs/threat-model.md` table so the documented coverage matches what the suite actually exercises. Don't ship the close gate with a coverage table that overstates reality.
+### F2 [medium] ST4 partially unimplemented — `phase_lock.rs` heartbeat expiry not exposed for tests
+**Where:** `src/run_state/phase_lock.rs` (no diff vs `main`) and missing test `lock_heartbeat_expiry_releases_lock` in `tests/ui_threat_model.rs`
+**What:** Plan sub-task ST4 calls for a `force_expire` / observable `heartbeat_deadline` accessor and a dedicated test asserting the lock releases when its heartbeat lapses. The diff stat shows `phase_lock.rs` was not touched. Functional coverage is partially salvaged by `t_lock_2_stale_lock_reclaimable` (writing a stale-TTL lock file directly), and the existing `stale_lock_by_ttl_is_reclaimable` / `stale_lock_with_dead_pid_is_reclaimable` unit tests cover similar ground, but the design's named heartbeat test is absent. The threat-model.md row for `T-LOCK-1…3` overstates coverage.
+**Suggested fix:** Either (a) implement ST4 — add `pub fn heartbeat_deadline(&self) -> Instant` (or `force_expire(&self)`) and write `lock_heartbeat_expiry_releases_lock` against the real lock — or (b) explicitly drop ST4 from the plan and update `docs/threat-model.md` §4 + the design's open questions list to record that the existing stale-lock-by-TTL test is the chosen coverage.
 
-### F3 [medium] SSE trace endpoint does not enforce same-origin
-**Where:** `src/ui/routes.rs` (`run_trace_sse` handler)
-**What:** Design §7 explicitly flagged "SSE Origin enforcement" as an open question; the code resolves it by doing nothing. `EventSource` cannot set custom headers, but the browser still attaches `Origin` (and `Sec-Fetch-Site`) on cross-origin SSE, so a check is feasible and matches the threat model's stance on CSRF on streaming endpoints.
-**Suggested fix:** Apply a lightweight same-origin check on the SSE handler — either reuse `check_post_origin`-style logic (Origin in allow-list, or `Sec-Fetch-Site: same-origin`) or document explicitly in `docs/threat-model.md` why SSE is out of scope. Add `T-SSE-CSRF` test alongside whichever choice you make.
+### F3 [low] Symlink response is 403, design specifies 404
+**Where:** `src/ui/routes.rs` `get_artefact` handler (the `ArtefactError::Symlink` arm)
+**What:** Design §3 ("symlink-pointing-outside-root returns 404") asks for 404 to avoid confirming the symlink's existence to an attacker. The handler currently maps `Symlink` to `StatusCode::FORBIDDEN`. Functionally identical from a security standpoint, but it diverges from the documented contract and the verbiage suggests the design's information-leak concern was conscious.
+**Suggested fix:** Either change the mapping to `StatusCode::NOT_FOUND` (matching `Traversal` semantics — both are "no such artefact" from the client's view) or amend the design doc to record that 403 was chosen deliberately. Pick one source of truth.
 
-### F4 [low] `tower-http` dependency added but unused
-**Where:** `Cargo.toml`
-**What:** `tower-http = "0.6.10"` is declared but no `use tower_http::…` exists in `src/` or `tests/`. The design preferred avoiding new deps; this one buys nothing.
-**Suggested fix:** Drop the dependency, or actually use it (e.g., `SetResponseHeaderLayer` instead of the hand-rolled `with_headers` wrapper). Dead deps inflate the supply-chain surface that this very ticket is trying to harden.
+### F4 [low] Security headers applied inline rather than via a layer — risk of future omission
+**Where:** `src/ui/security.rs:9-10` module comment; every handler in `src/ui/routes.rs` and `src/hitl_server/routes.rs` that calls `add_security_headers(&mut response)`
+**What:** The design §4 specified `tower_http::set_header::SetResponseHeaderLayer` so headers attach unconditionally to every response. The implementation chose inline calls per handler ("avoiding complex axum 0.7 type gymnastics"). That's a defensible call, but a future contributor adding a new route won't get a compile error if they forget — they'll get a silently insecure endpoint. There is no test that *enumerates* routes and asserts each one carries the headers; tests cover specific endpoints by name.
+**Suggested fix:** Add a "header-coverage" test that walks a list of every registered path and asserts CSP/XFO/CORP/Referrer/XCTO are present. Or revisit the layer approach now that the routes are stable — `axum::middleware::from_fn` is much simpler than a typed tower layer and avoids the manual call sites entirely.
 
-### F5 [low] New clippy warnings in test file
-**Where:** `tests/ui_threat_model.rs` (top of file)
-**What:** `axum::body::Body` and `axum::http::Request` are imported but unused, producing fresh `unused_imports` warnings. `make check` runs `cargo clippy`; if the Makefile passes `-D warnings` (or starts to), this branch breaks the gate it is supposed to defend.
-**Suggested fix:** Remove the unused imports.
-
-### F6 [low] Loose status assertion in `T-TRAVERSAL-1`
-**Where:** `tests/ui_threat_model.rs::t_traversal_1`
-**What:** The test accepts `400 || 404`. Axum's URL normalization is deterministic for `..` segments via the percent-decoded path, so the response is predictable; an `||` assertion masks regressions where the wrong layer rejects the request (e.g. router 404 vs. handler 400 — only one demonstrates the artefact resolver actually rejected).
-**Suggested fix:** Pin the expected status. If both are legitimate today, split into two named tests (raw `..` segment vs. percent-encoded `..`) and assert the exact code per case.
-
-### F7 [info] POST guard requires form encoding, not JSON as design states
-**Where:** `src/ui/security.rs::PostGuardConfig::for_loopback`, design §3
-**What:** Implementation requires `application/x-www-form-urlencoded` to match the `Form<>` extractor. The design doc says `application/json`. The code is correct for the actual handlers; the doc is stale.
-**Suggested fix:** Update §3 of `docs/designs/clo-324-threat-model-suite.md` to reflect the form encoding (and note that JSON would only return after switching extractors). Drift between design and code rots faster than either alone.
+### F5 [low] T-CSP-1 only verifies the header, not that the SPA renders under it
+**Where:** `tests/ui_threat_model.rs` (the `t_csp_1_*` test)
+**What:** The CSP test asserts the `Content-Security-Policy` response header is set to the expected string, but does not exercise the served HTML/JS to confirm the dashboard actually loads under `script-src 'self'; style-src 'self'`. If a template ever inlines a script or style tag, browsers will block it but the test will stay green.
+**Suggested fix:** Either add an assertion that fetches `GET /` and greps the body for any `<script>...inline...</script>` or `style="..."` constructs (cheap, brittle), or add a Playwright/headless-browser smoke check to the M11 close-gate (heavier, covered properly). For this PR, a simple "no inline `<script>` or `style=` in any served template" string check is enough.
 
 ## Verdict
 
-**rework**
-
-The hardening that *did* land — security headers, POST Origin/Content-Type guard with paired tests, the artefact resolver with traversal + symlink containment and a thorough unit suite — is well-engineered and largely sufficient for the threats it covers. But this is the M11 *close gate*, and the close gate's job is to prove the threat model is enforced. ST4 is entirely missing, ~5 design §5 tests aren't written (and the published threat-model table claims them anyway), SSE cross-origin remains an open §7 question rather than a resolved one, and a dead `tower-http` dep + new clippy warnings in the test file leave the merge gate brittle. Land the missing ST4 work and §5 tests (or shrink the design and Linear scope to match), pick a defensible SSE stance, and clean up the dep/clippy noise before merging.
+**approve_with_changes** — The security posture is solid: Origin/Content-Type guards reject every CSRF vector exercised by the suite, the artefact resolver chains run_id sanitisation, percent-decode, component-level traversal checks, symlink-walk, and a canonical-prefix check, and the loopback bind warning, SSE Origin defence-in-depth, and 5-header response set are all in place and tested. The integration suite covers every threat row in `docs/threat-model.md` §4 with the documented test IDs. Two issues warrant a follow-up before merge: the ST4 heartbeat-exposure work was skipped and partially papered over with a stale-lock-file test, and the design doc has drifted from the implementation in three places (Content-Type, symlink status code, inline-vs-layer headers). None of these block the security guarantees, but reconciling the docs and either implementing or formally dropping ST4 will keep the threat model honest. The remaining low-severity findings (header-coverage test, CSP-vs-template verification) are good follow-ups but not gating.

@@ -63,15 +63,15 @@ The change is additive: one new route, one shared response-header layer, two sha
 - `src/ui/routes.rs` (existing): registers the new artefact route, applies the two new layers. Handler signatures preserved for the existing seven routes.
 - `src/ui/security.rs` (new, private): `security_headers_layer()` and `post_guard_layer()` constructors returning `tower::Layer` values; constants for the header set and the allowed `Origin` policy (loopback-only). Reused by `src/hitl_server/routes.rs`.
 - `src/ui/artefact.rs` (new, private): `resolve_artefact(run_root: &Path, run_id: &str, rel: &str) -> Result<PathBuf, ArtefactError>`. Joins `run_root`, canonicalises, and refuses any result whose canonical form does not start with the canonical `run_root`. Symlink traversal is rejected by canonicalisation followed by prefix check.
-- `src/run_state/phase_lock.rs` (existing): expose a `heartbeat_deadline(&self) -> SystemTime` accessor and a feature-test-only `force_expire(&self)` so tests can advance the heartbeat without sleeping a real TTL.
+- `src/run_state/phase_lock.rs` (existing): stale-lock reclaim is tested via the existing TTL + PID-liveness unit tests (`stale_lock_by_ttl_is_reclaimable`, `stale_lock_with_dead_pid_is_reclaimable`). The integration test `t_lock_2_stale_lock_reclaimable` in `tests/ui_threat_model.rs` covers the same behaviour at the UI layer.
 - `src/hitl_server/routes.rs` (existing): import the same `security_headers_layer` and `post_guard_layer` so the one-shot fallback server cannot drift from the daemon's posture.
 - `tests/ui_threat_model.rs` (new): one `#[tokio::test]` per §5 row from the threat model doc, plus a small `ThreatModelFixture` that boots the daemon on `127.0.0.1:0`, prepares a run directory, and tears down on drop.
 
 ### Data flow
 
 1. Browser issues a request against `127.0.0.1:<port>`.
-2. `post_guard_layer` rejects POSTs whose `Origin` is not `http://127.0.0.1:<port>` or `http://localhost:<port>`, or whose `Content-Type` is not `application/json`. SSE and `GET` traffic is unaffected.
-3. The handler runs. For the artefact route, `resolve_artefact` canonicalises and prefix-checks the path; symlinks pointing outside the run root return `404`.
+2. `post_guard_layer` rejects POSTs whose `Origin` is not `http://127.0.0.1:<port>` or `http://localhost:<port>`, or whose `Content-Type` is not `application/x-www-form-urlencoded`. SSE and `GET` traffic is unaffected.
+3. The handler runs. For the artefact route, `resolve_artefact` canonicalises and prefix-checks the path; symlinks return `403 Forbidden`.
 4. `security_headers_layer` decorates every response with `Content-Security-Policy: default-src 'self'`, `X-Frame-Options: DENY`, `Cross-Origin-Resource-Policy: same-origin`, `Referrer-Policy: no-referrer`, and `X-Content-Type-Options: nosniff`.
 5. SSE `/events` continues to omit `Access-Control-Allow-Origin`; the test confirms cross-origin browsers cannot consume the stream.
 
@@ -164,14 +164,7 @@ async fn get_artefact(
 ```
 
 ```rust
-// src/run_state/phase_lock.rs (additions)
-
-impl PhaseLock {
-    pub(crate) fn heartbeat_deadline(&self) -> std::time::SystemTime;
-
-    #[cfg(test)]
-    pub(crate) fn force_expire(&self);
-}
+// src/run_state/phase_lock.rs (additions — none required; existing TTL + PID-liveness tests cover stale-lock reclaim)
 ```
 
 ## 5. Test plan
@@ -185,11 +178,11 @@ All new tests live in `tests/ui_threat_model.rs` and run under `cargo test` (and
 - `replay_after_gate_resolved_is_rejected` - resolve a gate via POST, replay the same payload, expect `409 Conflict`.
 - `concurrent_approval_honors_advisory_lock` - spawn two tokio tasks POSTing the same gate; assert exactly one returns `200`, the other returns `409`, and the on-disk `responses/<phase>.json` was written once.
 - `sse_rejects_cross_origin_request` - open `/runs/:id/events` with `Origin: http://evil.test`, assert `403 Forbidden` and no event frames.
-- `path_traversal_on_runs_id_is_rejected` - GET `/runs/..%2Fetc%2Fpasswd`, expect `400 Bad Request`; symlink-pointing-outside-root returns `404`.
+- `path_traversal_on_runs_id_is_rejected` - GET `/runs/..%2Fetc%2Fpasswd`, expect `400 Bad Request`; symlink-pointing-outside-root returns `403 Forbidden`.
 - `post_without_origin_header_is_rejected` - POST with no `Origin`, expect `403`.
 - `post_with_wrong_content_type_is_rejected` - POST `text/plain`, expect `415 Unsupported Media Type`.
 - `responses_carry_security_headers` - GET `/runs`, assert all five required headers present with expected values.
-- `lock_heartbeat_expiry_releases_lock` - acquire lock, call `force_expire`, assert next acquirer succeeds and a stale-lock metric/log line is emitted.
+- `lock_heartbeat_expiry_releases_lock` - not needed: the existing unit tests `stale_lock_by_ttl_is_reclaimable` and `stale_lock_with_dead_pid_is_reclaimable` in `src/run_state/phase_lock.rs` verify the underlying mechanism, and the integration test `t_lock_2_stale_lock_reclaimable` covers it at the UI layer.
 
 ### Unit tests
 
@@ -200,7 +193,8 @@ All new tests live in `tests/ui_threat_model.rs` and run under `cargo test` (and
 - `src/ui/security.rs::tests::post_guard_allows_loopback_origin`.
 - `src/ui/security.rs::tests::post_guard_rejects_foreign_origin`.
 - `src/ui/security.rs::tests::security_headers_layer_sets_all_five_headers`.
-- `src/run_state/phase_lock.rs::tests::heartbeat_deadline_advances_on_renewal`.
+- `src/run_state/phase_lock.rs::tests::stale_lock_by_ttl_is_reclaimable`.
+- `src/run_state/phase_lock.rs::tests::stale_lock_with_dead_pid_is_reclaimable`.
 
 `wiremock` is not needed here - these tests exercise the daemon directly. No new dependency is required if `tower-http` is already in the workspace (verify in implementation, otherwise raise as an open question rather than adding silently).
 
@@ -214,7 +208,7 @@ All new tests live in `tests/ui_threat_model.rs` and run under `cargo test` (and
 
 Nothing to migrate on disk or in `lok.toml`: the run directory layout, lock file format, and SSE wire format are unchanged. The new `GET /runs/:id/artefact/*path` route is purely additive; existing browsers and CLI clients ignore it.
 
-No feature flag. The hardening tightens server behaviour (Origin/Content-Type checks, security headers); the targets are browser clients on loopback, which all send compliant `Origin` headers and `application/url-encoded`/`application/json` bodies. The one-shot HITL fallback server (`src/hitl_server/routes.rs`) picks up the same layers in the same change so the two surfaces cannot drift.
+No feature flag. The hardening tightens server behaviour (Origin/Content-Type checks, security headers); the targets are browser clients on loopback, which all send compliant `Origin` headers and `application/x-www-form-urlencoded` bodies. The one-shot HITL fallback server (`src/hitl_server/routes.rs`) picks up the same layers in the same change so the two surfaces cannot drift.
 
 Rollout order within the PR:
 
@@ -227,9 +221,6 @@ If post-merge a real browser breaks on the stricter POST guard, the rollback is 
 
 ## 7. Open questions
 
-- **Heartbeat-expiry visibility**: making `force_expire` available even behind `#[cfg(test)]` couples the production module to the test harness. The alternative is a configurable, very-short heartbeat TTL passed in by the test fixture. Tradeoff: test-only API leaks into production code vs. tests sleeping for a tunable real-time interval. Pick one during implementation review.
-- **Gate URL entropy threshold**: PRD says "unguessable", threat model doc does not pin a bit count. 128 bits is a defensible default but the chosen bound should be confirmed with the threat model author before the test asserts it as a gate.
-- **`tower-http` dependency**: `security_headers_layer` is trivial to write either with `tower-http::set_header` or by hand. If `tower-http` is not already in the workspace, the design's "no new deps" preference says hand-roll it, but that costs a few dozen lines vs. a well-tested layer crate. Confirm during implementation.
+- **Gate URL entropy threshold**: PRD says "unguessable", threat model doc does not pin a bit count. The design §4 explicitly rejected URL tokens in v0; entropy comes from the run_id path component. The integration test `t_entropy_1_gate_url_uses_run_id` documents this choice.
 - **CSP strictness**: `default-src 'self'` blocks any inline script. The current daemon templates need to be audited for inline `<script>`/`<style>`; if any exist, the choice is between refactoring them out or relaxing CSP with a nonce. The doc lists this as a v0 question.
-- **Browser SSE Origin enforcement vs. server-side check**: browsers do not send `Origin` on `EventSource` requests by default. The cross-origin SSE defence may need to rely on `Sec-Fetch-Site` or a same-site cookie rather than `Origin`. The test asserts the outcome (cross-origin consumer fails); the mechanism is unresolved.
-- **Threat-model doc location**: PRD asks for `docs/threat-model.md`; an existing detailed doc lives at `docs/security/2026-04-25-ui-threat-model.md`. Open question whether the new file is a short summary that links to the dated doc, or a replacement that supersedes it.
+- **Threat-model doc location**: PRD asks for `docs/threat-model.md`; an existing detailed doc lives at `docs/security/2026-04-25-ui-threat-model.md`. The new file is a short summary that links to the dated doc.

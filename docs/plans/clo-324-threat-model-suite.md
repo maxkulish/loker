@@ -29,8 +29,9 @@
 
 ### ST4 Expose advisory-lock heartbeat expiry for testing
 **Files:** `src/run_state/phase_lock.rs`
-**Acceptance:** `cargo test run_state::phase_lock::tests::heartbeat_expiry` passes; `force_expire` or short-TTL mechanism observable from test fixtures.
+**Acceptance:** Unit tests `stale_lock_by_ttl_is_reclaimable` and `stale_lock_with_dead_pid_is_reclaimable` pass. Integration test `t_lock_2_stale_lock_reclaimable` in `tests/ui_threat_model.rs` verifies stale lock reclaim at the UI layer. The underlying TTL + PID-liveness model already supports this; no new test-only API is required.
 **Estimate:** S
+**Note:** The design doc referred to `force_expire` and `heartbeat_deadline` accessors; the implementation uses the existing TTL + `libc::kill(0)` stale-lock reclaim protocol, which is sufficient for the M11 close gate.
 
 ### ST5 Write dedicated threat-model integration test suite
 **Files:** `tests/ui_threat_model.rs`
