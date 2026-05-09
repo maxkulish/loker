@@ -2205,7 +2205,6 @@ dependencies = [
  "tokio-stream",
  "toml",
  "tower",
- "tower-http",
  "tracing",
  "uuid",
  "which",

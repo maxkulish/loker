@@ -34,17 +34,21 @@
 
 ## 4. Test coverage
 
-Every mitigation is exercised by the automated threat-model test suite in `tests/ui_threat_model.rs`. The suite runs as part of `make check` and gates M11 close.
+Every mitigation is exercised by the automated threat-model test suite in `tests/ui_threat_model.rs` (integration tests) and supporting unit tests in `src/ui/artefact.rs` and `src/run_state/phase_lock.rs`. The suite runs as part of `make check` and gates M11 close.
 
 | Threat | Test IDs |
 |--------|----------|
 | Cross-origin POST (CSRF) | `T-CSRF-1` … `T-CSRF-4` |
 | Cross-origin read / embedding | `T-CORP-1`, `T-MIME-1` |
 | Path traversal | `T-TRAVERSAL-1` … `T-TRAVERSAL-3` |
-| Symlink escape | `T-SYMLINK-1`, `T-SYMLINK-2` |
-| Stale-lock takeover | `T-LOCK-1` … `T-LOCK-3` |
+| Symlink escape | `T-SYMLINK-1`, `T-SYMLINK-2` (unit tests in `src/ui/artefact.rs`) |
+| Stale-lock takeover | `T-LOCK-1` … `T-LOCK-3`, plus `stale_lock_by_ttl_is_reclaimable` and `stale_lock_with_dead_pid_is_reclaimable` in `src/run_state/phase_lock.rs` |
 | CSRF via cookie reflection | `T-COOKIE-1` |
+| SSE cross-origin | `T-SSE-CSRF` |
 | Browser extension snooping | `T-CSP-1`, `T-XFRAME-1` |
 | Non-loopback bind | `T-BIND-1` |
+| Gate URL entropy | `T-ENTROPY-1` (run_id is the entropy source; no per-gate token in v0) |
+| Method enforcement | `T-METHOD-1` |
+| Referrer leakage | `T-REFERRER-1` |
 
 See the detailed model for full attacker definitions, mitigations, and deferred Phase-2 work.

@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-08T10:15:08.464Z'
-  updated_at: '2026-05-08T10:33:00.387Z'
+  updated_at: '2026-05-08T15:22:08.572Z'
 phases:
   discovery:
     status: complete
@@ -60,7 +60,17 @@ phases:
     plan_file: docs/plans/clo-324-threat-model-suite.md
     approved: true
   implement:
-    status: pending
+    status: validating
+    codex_report: docs/reviews/clo-324-codex-validation.md
+    codex_validated: true
+    codex_verdict: rework
+    gemini_validation_report: docs/reviews/clo-324-gemini-validation.md
+    validation_fix_iteration_count: 0
+    validation_synthesis_report: docs/reviews/clo-324-validation-synthesis.md
+    validation_synthesis_verdict: rework
+    commits:
+      - f8aa60f
+      - 6a327c7
   pr:
     status: pending
   complete:
@@ -132,5 +142,23 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-08T10:58:15.335Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 1 commit.
+  - timestamp: '2026-05-08T11:53:16.665Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Validation gate attempted twice. Codex reviewer failed repeatedly (shell command failed). Claude fallback reached
+      but workflow timed out at 1959s. No review files produced due to infrastructure failure. make check is green.
+      Implementation is complete but validation gate blocked by LLM provider outage.
+  - timestamp: '2026-05-08T15:22:08.572Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Synthesis verdict: rework. 5 Must Fix items (F1-F5). 2 Out of Scope (F6-F7). Gate infrastructure bug caused
+      Codex+Gemini to fail; only Claude fallback ran. Workflow heredoc fixed in 6a327c7 but still has nested-heredoc
+      issue with printf.
 task_title: '[T-055] Threat-model test suite (M11 close gate)'
 task_url: https://linear.app/cloud-ai/issue/CLO-324/t-055-threat-model-test-suite-m11-close-gate

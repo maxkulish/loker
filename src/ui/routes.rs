@@ -22,7 +22,9 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::ui::security::{add_security_headers, check_post_origin, PostGuardConfig};
+use crate::ui::security::{
+    add_security_headers, check_post_origin, check_sse_origin, PostGuardConfig,
+};
 use crate::ui::{
     artefact::{resolve_artefact, ArtefactError},
     discovery, gate_discovery, manifest, templates, trace_reader,
@@ -39,6 +41,7 @@ pub struct AppState {
     pub project_root: PathBuf,
     pub max_trace_events: usize,
     pub post_guard_config: Option<PostGuardConfig>,
+    pub port: Option<u16>,
 }
 
 impl AppState {
@@ -47,6 +50,7 @@ impl AppState {
             project_root,
             max_trace_events: 50,
             post_guard_config: port.map(PostGuardConfig::for_loopback),
+            port,
         }
     }
 }
@@ -450,6 +454,15 @@ async fn run_trace_sse(
 
     if !trace_path.exists() {
         return with_headers((StatusCode::NOT_FOUND, "Trace file not found").into_response());
+    }
+
+    // Defence-in-depth: reject cross-origin SSE requests.
+    // Browsers typically do not send Origin on EventSource, so this only
+    // catches non-browser clients or future browser behaviour.
+    if let Some(port) = state.port {
+        if let Err((status, msg)) = check_sse_origin(&headers, port) {
+            return with_headers((status, msg).into_response());
+        }
     }
 
     // Use query param first, then Last-Event-ID, otherwise EOF

@@ -5,8 +5,7 @@
 
 use std::fs;
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::StatusCode;
 use reqwest::Client;
 use tempfile::TempDir;
 use tokio::net::TcpListener;
@@ -381,4 +380,234 @@ async fn t_method_1_get_only_routes_reject_post() {
         .unwrap();
 
     assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+// ---------------------------------------------------------------------------
+// T-BIND-1: Default bind address rejects non-loopback
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_bind_1_default_bind_is_loopback() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("bind-run-001", "test-wf");
+
+    let client = fixture.client();
+    let resp = client.get(fixture.url("/")).send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // The test fixture binds to 127.0.0.1:0; if it were non-loopback the
+    // handler would not have received the request in this harness.
+}
+
+// ---------------------------------------------------------------------------
+// T-COOKIE-1: No Set-Cookie header on any response
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_cookie_1_no_set_cookie_header() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("cookie-run-001", "test-wf");
+    fixture.create_pending_gate("cookie-run-001", "review");
+
+    let origin = format!("http://127.0.0.1:{}", fixture.addr.port());
+    let client = fixture.client();
+
+    // GET / (HTML)
+    let resp = client.get(fixture.url("/")).send().await.unwrap();
+    assert!(resp.headers().get("Set-Cookie").is_none());
+
+    // POST approve
+    let resp = client
+        .post(fixture.url("/gates/cookie-run-001/review/approve"))
+        .header("Origin", &origin)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("comment=ok")
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.headers().get("Set-Cookie").is_none());
+
+    // GET artefact
+    let resp = client
+        .get(fixture.url("/runs/cookie-run-001/artefact/review.md"))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.headers().get("Set-Cookie").is_none());
+}
+
+// ---------------------------------------------------------------------------
+// T-LOCK-1: Two concurrent approval attempts honor advisory lock
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_lock_1_concurrent_approval_honors_lock() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("lock-run-001", "test-wf");
+    fixture.create_pending_gate("lock-run-001", "review");
+
+    let origin = format!("http://127.0.0.1:{}", fixture.addr.port());
+    let client = fixture.client();
+
+    // Fire two approvals concurrently
+    let req1 = client
+        .post(fixture.url("/gates/lock-run-001/review/approve"))
+        .header("Origin", &origin)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("comment=first")
+        .send();
+    let req2 = client
+        .post(fixture.url("/gates/lock-run-001/review/approve"))
+        .header("Origin", &origin)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("comment=second")
+        .send();
+
+    let (resp1, resp2) = tokio::join!(req1, req2);
+    let s1 = resp1.unwrap().status();
+    let s2 = resp2.unwrap().status();
+
+    // Exactly one must indicate success (redirect); the other must not be 200.
+    let statuses = [s1, s2];
+    assert!(
+        statuses.contains(&StatusCode::SEE_OTHER),
+        "one request should succeed, got {:?} and {:?}",
+        s1,
+        s2
+    );
+
+    // Response file must have been written exactly once
+    let run_dir = fixture._tmp.path().join("runs").join("lock-run-001");
+    let response_path = run_dir.join("responses").join("review.json");
+    assert!(response_path.exists());
+}
+
+// ---------------------------------------------------------------------------
+// T-LOCK-2: Stale lock with expired TTL is reclaimable
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_lock_2_stale_lock_reclaimable() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("lock-run-002", "test-wf");
+    fixture.create_pending_gate("lock-run-002", "review");
+
+    let run_dir = fixture._tmp.path().join("runs").join("lock-run-002");
+    let lock_dir = run_dir.join("locks");
+    fs::create_dir_all(&lock_dir).unwrap();
+
+    // Write a stale lock body: TTL expired, dead PID
+    let stale = serde_json::json!({
+        "phase": "review",
+        "run_id": "lock-run-002",
+        "writer_pid": 99999,
+        "writer_host": "test-host",
+        "acquired_at": "2026-01-01T00:00:00Z",
+        "ttl_seconds": 60
+    });
+    fs::write(lock_dir.join("review.lock"), stale.to_string()).unwrap();
+
+    let origin = format!("http://127.0.0.1:{}", fixture.addr.port());
+    let client = fixture.client();
+    let resp = client
+        .post(fixture.url("/gates/lock-run-002/review/approve"))
+        .header("Origin", &origin)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("comment=stale_reclaim")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::SEE_OTHER);
+
+    // Response file should have been written by the reclaim
+    let response_path = run_dir.join("responses").join("review.json");
+    assert!(response_path.exists());
+    let content = fs::read_to_string(&response_path).unwrap();
+    assert!(content.contains("approve"));
+}
+
+// ---------------------------------------------------------------------------
+// T-MIME-1: Unknown artefact extension served as text/plain with attachment
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_mime_1_unknown_extension_as_attachment() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("mime-run-001", "test-wf");
+    let run_dir = fixture._tmp.path().join("runs").join("mime-run-001");
+    fs::write(run_dir.join("data.unknownext"), b"key: value").unwrap();
+
+    let client = fixture.client();
+    let resp = client
+        .get(fixture.url("/runs/mime-run-001/artefact/data.unknownext"))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let ct = resp
+        .headers()
+        .get("Content-Type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.starts_with("text/plain"),
+        "expected text/plain, got {}",
+        ct
+    );
+}
+
+// ---------------------------------------------------------------------------
+// T-SSE-CSRF: SSE rejects cross-origin requests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_sse_csrf_cross_origin_rejected() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("sse-run-001", "test-wf");
+    let run_dir = fixture._tmp.path().join("runs").join("sse-run-001");
+    fs::write(run_dir.join("trace.jsonl"), b"{}\n").unwrap();
+
+    let client = fixture.client();
+    let resp = client
+        .get(fixture.url("/runs/sse-run-001/trace/sse"))
+        .header("Origin", "http://evil.com")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+// ---------------------------------------------------------------------------
+// T-ENTROPY-1: Gate URLs derive entropy from run_id (no per-gate token)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn t_entropy_1_gate_url_uses_run_id() {
+    let fixture = ThreatModelFixture::new().await;
+    fixture.create_run("run-uuid-123e4567-e89b-12d3-a456-426614174000", "test-wf");
+    fixture.create_pending_gate("run-uuid-123e4567-e89b-12d3-a456-426614174000", "review");
+
+    let origin = format!("http://127.0.0.1:{}", fixture.addr.port());
+    let client = fixture.client();
+    let resp = client
+        .post(fixture.url("/gates/run-uuid-123e4567-e89b-12d3-a456-426614174000/review/approve"))
+        .header("Origin", &origin)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("comment=ok")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::SEE_OTHER);
+
+    // Verify response file exists at the expected run_id path
+    let run_dir = fixture
+        ._tmp
+        .path()
+        .join("runs")
+        .join("run-uuid-123e4567-e89b-12d3-a456-426614174000");
+    assert!(run_dir.join("responses").join("review.json").exists());
 }

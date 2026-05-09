@@ -98,6 +98,33 @@ pub fn check_post_origin(
     Ok(())
 }
 
+/// Defence-in-depth check for SSE cross-origin requests.
+///
+/// EventSource does not send `Origin` in most browsers, so this check
+/// only catches non-browser clients or future browsers that adopt the
+/// behaviour. It rejects:
+/// - Requests with an `Origin` header that is not loopback/same-origin.
+/// - Requests with `Sec-Fetch-Site: cross-site`.
+///
+/// Returns `Ok(())` when the request is allowed.
+pub fn check_sse_origin(headers: &HeaderMap, port: u16) -> Result<(), (StatusCode, &'static str)> {
+    if let Some(origin) = headers.get("Origin") {
+        let allowed: Vec<HeaderValue> = vec![
+            HeaderValue::from_str(&format!("http://127.0.0.1:{}", port)).unwrap(),
+            HeaderValue::from_str(&format!("http://localhost:{}", port)).unwrap(),
+        ];
+        if !allowed.iter().any(|a| a == origin) {
+            return Err((StatusCode::FORBIDDEN, "Invalid Origin header"));
+        }
+    }
+    if let Some(site) = headers.get("Sec-Fetch-Site") {
+        if site.to_str().unwrap_or("") == "cross-site" {
+            return Err((StatusCode::FORBIDDEN, "Cross-site request rejected"));
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
