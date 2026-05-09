@@ -1,6 +1,6 @@
 [package]
 name = "loker"
-version = "20260507.0.0"
+version = "20260509.0.0"
 edition = "2021"
 rust-version = "1.80"
 description = "LLM orchestration: cross-family aggregation, escalating retry, verify hooks"
