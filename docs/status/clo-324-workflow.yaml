@@ -20,10 +20,10 @@ linear:
   priority: High
   branch_actual: feat/clo-324-threat-model-suite
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-08T10:15:08.464Z'
-  updated_at: '2026-05-09T11:57:16.011Z'
+  updated_at: '2026-05-09T12:29:10.000Z'
 phases:
   discovery:
     status: complete
@@ -75,12 +75,20 @@ phases:
       - 37ee9d8
       - b020ad4
   pr:
-    status: in_progress
+    status: complete
     pr_number: 68
     pr_url: https://github.com/maxkulish/loker/pull/68
     ci_passed: true
+    reviews_addressed: true
+    approved: true
+    merge_commit: 32650b1
+    merged_at: '2026-05-09T12:29:10Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 32650b1
+    merged_at: '2026-05-09T12:29:10Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-08T10:15:08.464Z'
     action: workflow_started
@@ -188,5 +196,17 @@ history:
     action: ci_passed
     phase: pr
     details: All required checks passing
+  - timestamp: '2026-05-09T12:29:10.000Z'
+    action: pr_merged
+    phase: pr
+    details: 'PR #68 merged. Merge commit 32650b1.'
+  - timestamp: '2026-05-09T12:29:10.000Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-09T12:29:10.000Z'
+    action: workflow_complete
+    phase: complete
+    details: 'Task CLO-324 fully completed. PR #68 merged in 32650b1. M11 close gate cleared - v0 shipped.'
 task_title: '[T-055] Threat-model test suite (M11 close gate)'
 task_url: https://linear.app/cloud-ai/issue/CLO-324/t-055-threat-model-test-suite-m11-close-gate

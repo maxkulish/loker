@@ -1,9 +1,6 @@
 # CLAUDE.md - loker
 
-Active milestone: **M7/M8 - Slice B (deployment + CLI surface)**. M1-M6 shipped.
-
-Next pick: CLO-309 (Phase 9, T-040) - `loker run <workflow> [--spec] [--var] [--rerun phase=]`.
-Parallel-OK: CLO-307 (T-038, docker-compose), CLO-308 (T-039, doctor TZ check), CLO-312 (T-043, `loker trace`), CLO-317 (T-048, HumanVerifier scaffold).
+Status: **v0 shipped** (tag `v20260509.0.0`, 2026-05-09). M1-M11 complete; Slices A+B+C closed. No active milestone - awaiting v1 scope.
 
 ## Read first
 
