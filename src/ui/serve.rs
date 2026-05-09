@@ -14,9 +14,9 @@ use crate::ui::routes;
 /// Prints the listening address to stderr (daemon convention — stdout may be
 /// piped; status messages go to stderr).
 pub async fn serve(bind: &str, project_root: PathBuf) -> Result<()> {
-    let app = routes::ui_routes(project_root);
     let listener = TcpListener::bind(bind).await?;
     let addr = listener.local_addr()?;
+    let app = routes::ui_routes_with_port(project_root, Some(addr.port()));
 
     if !addr.ip().is_loopback() {
         eprintln!(
@@ -70,13 +70,14 @@ async fn shutdown_signal() {
 pub async fn spawn_test_daemon(
     project_root: PathBuf,
 ) -> (tokio::task::JoinHandle<()>, std::net::SocketAddr) {
-    let app = routes::ui_routes(project_root);
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("failed to bind test daemon");
     let addr = listener
         .local_addr()
         .expect("failed to get test daemon addr");
+
+    let app = routes::ui_routes_with_port(project_root, Some(addr.port()));
 
     let handle = tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app)
