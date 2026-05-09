@@ -11,7 +11,7 @@
 
 use axum::{
     http::{HeaderMap, HeaderValue, StatusCode},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 
 /// Configuration for POST guard checks.
@@ -56,6 +56,13 @@ pub fn add_security_headers(response: &mut Response) {
         "X-Content-Type-Options",
         HeaderValue::from_static("nosniff"),
     );
+}
+
+/// Wrap a response with security headers.
+pub(crate) fn with_headers(response: impl IntoResponse) -> Response {
+    let mut r = response.into_response();
+    add_security_headers(&mut r);
+    r
 }
 
 /// Check POST request headers against the guard config.

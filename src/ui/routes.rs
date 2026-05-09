@@ -23,7 +23,7 @@ use tokio::task;
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::ui::security::{
-    add_security_headers, check_post_origin, check_sse_origin, PostGuardConfig,
+    add_security_headers, check_post_origin, check_sse_origin, with_headers, PostGuardConfig,
 };
 use crate::ui::{
     artefact::{resolve_artefact, ArtefactError},
@@ -80,13 +80,6 @@ pub fn ui_routes_with_port(project_root: PathBuf, port: Option<u16>) -> Router {
 // Handlers
 // ---------------------------------------------------------------------------
 
-/// Wrap a response with security headers.
-fn with_headers(response: impl IntoResponse) -> Response {
-    let mut r = response.into_response();
-    add_security_headers(&mut r);
-    r
-}
-
 /// GET / - HTML sessions index page.
 async fn index_page(State(state): State<AppState>) -> Response {
     let root = state.project_root.clone();
@@ -107,10 +100,18 @@ async fn health_check() -> Response {
     with_headers((StatusCode::OK, "ok").into_response())
 }
 
+/// Validate a run_id string. Returns `true` if valid (no traversal chars).
+pub(crate) fn validate_run_id(run_id: &str) -> bool {
+    !run_id.is_empty()
+        && !run_id.contains("..")
+        && !run_id.contains('/')
+        && !run_id.contains('\\')
+        && !run_id.contains('\0')
+}
+
 /// GET /runs/:id - per-run detail page.
 async fn run_detail(State(state): State<AppState>, Path(run_id): Path<String>) -> Response {
-    // Sanitize run_id - reject path traversal and empty IDs.
-    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+    if !validate_run_id(&run_id) {
         return with_headers(
             templates::ErrorTemplate {
                 status_code: 400,
@@ -199,8 +200,7 @@ async fn hitl_approve(
         }
     }
 
-    // Sanitize run_id - reject traversal and empty IDs.
-    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+    if !validate_run_id(&run_id) {
         return with_headers(
             templates::ErrorTemplate {
                 status_code: 400,
@@ -284,8 +284,7 @@ async fn hitl_reject(
         }
     }
 
-    // Sanitize run_id - reject traversal and empty IDs.
-    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+    if !validate_run_id(&run_id) {
         return with_headers(
             templates::ErrorTemplate {
                 status_code: 400,
@@ -444,8 +443,7 @@ async fn run_trace_sse(
     headers: axum::http::HeaderMap,
     Query(query): Query<SseQuery>,
 ) -> Response {
-    // Sanitize run_id
-    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+    if !validate_run_id(&run_id) {
         return with_headers((StatusCode::BAD_REQUEST, "Invalid run ID").into_response());
     }
 
@@ -555,8 +553,7 @@ async fn get_artefact(
     State(state): State<AppState>,
     Path((run_id, path)): Path<(String, String)>,
 ) -> Response {
-    // Sanitize run_id
-    if run_id.is_empty() || run_id.contains("..") || run_id.contains('/') || run_id.contains('\\') {
+    if !validate_run_id(&run_id) {
         return with_headers((StatusCode::BAD_REQUEST, "Invalid run ID").into_response());
     }
 

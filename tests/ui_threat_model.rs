@@ -17,7 +17,13 @@ use tokio::net::TcpListener;
 struct ThreatModelFixture {
     _tmp: TempDir,
     addr: std::net::SocketAddr,
-    _handle: tokio::task::JoinHandle<()>,
+    handle: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for ThreatModelFixture {
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
 }
 
 impl ThreatModelFixture {
@@ -45,7 +51,7 @@ impl ThreatModelFixture {
         ThreatModelFixture {
             _tmp: tmp,
             addr,
-            _handle: handle,
+            handle,
         }
     }
 
@@ -202,7 +208,7 @@ async fn t_traversal_1_artefact_dotdot_is_rejected() {
 
     assert!(
         resp.status() == StatusCode::BAD_REQUEST || resp.status() == StatusCode::NOT_FOUND,
-        "Expected 400 or 404 for traversal, got {:?}",
+        "Expected 400 (handler rejects traversal) or 404 (HTTP stack normalises .. segments before routing); got {:?}",
         resp.status()
     );
 }
@@ -291,7 +297,7 @@ async fn t_csp_1_all_responses_carry_csp() {
 }
 
 // ---------------------------------------------------------------------------
-// T-LOCK-3: Replay after gate resolved returns 409
+// T-LOCK-3: Replay after gate resolved returns idempotent redirect
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -303,7 +309,7 @@ async fn t_lock_3_replay_after_gate_resolved_is_rejected() {
     let origin = format!("http://127.0.0.1:{}", fixture.addr.port());
     let client = fixture.client();
 
-    // First approval
+    // First approval — should succeed (writes response, redirects)
     let resp1 = client
         .post(fixture.url("/gates/lock-run-003/review/approve"))
         .header("Origin", &origin)
@@ -314,7 +320,7 @@ async fn t_lock_3_replay_after_gate_resolved_is_rejected() {
         .unwrap();
     assert_eq!(resp1.status(), StatusCode::SEE_OTHER);
 
-    // Second approval should still redirect (race guard)
+    // Second approval — idempotent redirect (no write, no error)
     let resp2 = client
         .post(fixture.url("/gates/lock-run-003/review/approve"))
         .header("Origin", &origin)
@@ -472,6 +478,12 @@ async fn t_lock_1_concurrent_approval_honors_lock() {
     assert!(
         statuses.contains(&StatusCode::SEE_OTHER),
         "one request should succeed, got {:?} and {:?}",
+        s1,
+        s2
+    );
+    assert!(
+        !statuses.iter().all(|&s| s == StatusCode::SEE_OTHER),
+        "both requests should not succeed, got {:?} and {:?}",
         s1,
         s2
     );

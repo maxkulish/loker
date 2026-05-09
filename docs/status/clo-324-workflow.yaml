@@ -23,7 +23,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-08T10:15:08.464Z'
-  updated_at: '2026-05-09T06:27:11.237Z'
+  updated_at: '2026-05-09T11:57:16.011Z'
 phases:
   discovery:
     status: complete
@@ -78,6 +78,7 @@ phases:
     status: in_progress
     pr_number: 68
     pr_url: https://github.com/maxkulish/loker/pull/68
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -183,5 +184,9 @@ history:
     action: pr_created
     phase: pr
     details: 'PR #68 opened: https://github.com/maxkulish/loker/pull/68'
+  - timestamp: '2026-05-09T11:57:16.011Z'
+    action: ci_passed
+    phase: pr
+    details: All required checks passing
 task_title: '[T-055] Threat-model test suite (M11 close gate)'
 task_url: https://linear.app/cloud-ai/issue/CLO-324/t-055-threat-model-test-suite-m11-close-gate

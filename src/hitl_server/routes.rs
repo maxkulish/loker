@@ -7,7 +7,7 @@ use std::sync::Arc;
 use axum::{
     extract::{Form, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{Html, Response},
     routing::{get, post},
     Router,
 };
@@ -19,7 +19,7 @@ use crate::run_state::atomic_write;
 use crate::run_state::phase_lock::{PhaseLock, PhaseLockError};
 use crate::strategy::verify::{HumanDecision, HumanResponse};
 
-use crate::ui::security::{add_security_headers, check_post_origin, PostGuardConfig};
+use crate::ui::security::{check_post_origin, with_headers, PostGuardConfig};
 
 #[derive(Deserialize)]
 pub struct DecisionForm {
@@ -73,16 +73,8 @@ pub async fn render_gate_view(config: &GateConfig) -> Result<Html<String>, Statu
 
 async fn gate_context(State(state): State<AppState>) -> Response {
     match render_gate_view(&state.config).await {
-        Ok(html) => {
-            let mut response = html.into_response();
-            add_security_headers(&mut response);
-            response
-        }
-        Err(status) => {
-            let mut response = status.into_response();
-            add_security_headers(&mut response);
-            response
-        }
+        Ok(html) => with_headers(html),
+        Err(status) => with_headers(status),
     }
 }
 
@@ -94,9 +86,7 @@ async fn approve(
     // POST guard
     if let Some(ref config) = state.post_guard_config {
         if let Err((status, msg)) = check_post_origin(&headers, config) {
-            let mut response = (status, msg).into_response();
-            add_security_headers(&mut response);
-            return response;
+            return with_headers((status, msg));
         }
     }
 
@@ -117,9 +107,7 @@ async fn approve(
             Err(ResponseWriteError::AlreadyExists) => StatusCode::CONFLICT,
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-    let mut response = status.into_response();
-    add_security_headers(&mut response);
-    response
+    with_headers(status)
 }
 
 async fn reject(
@@ -130,9 +118,7 @@ async fn reject(
     // POST guard
     if let Some(ref config) = state.post_guard_config {
         if let Err((status, msg)) = check_post_origin(&headers, config) {
-            let mut response = (status, msg).into_response();
-            add_security_headers(&mut response);
-            return response;
+            return with_headers((status, msg));
         }
     }
 
@@ -153,9 +139,7 @@ async fn reject(
             Err(ResponseWriteError::AlreadyExists) => StatusCode::CONFLICT,
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-    let mut response = status.into_response();
-    add_security_headers(&mut response);
-    response
+    with_headers(status)
 }
 
 // ---------------------------------------------------------------------------

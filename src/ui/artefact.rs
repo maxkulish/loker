@@ -4,6 +4,7 @@
 //! relative path, then validates that the resolved file stays inside the
 //! run directory and is not reached via a symlink.
 
+use percent_encoding::percent_decode_str;
 use std::path::{Path, PathBuf};
 
 /// Errors from artefact path resolution.
@@ -46,7 +47,7 @@ pub fn resolve_artefact(
     let run_root = project_root.join("runs").join(run_id);
 
     // Percent-decode the entire relative path first, then split on '/'
-    let decoded_rel = percent_decode(rel);
+    let decoded_rel = percent_decode_str(rel).decode_utf8_lossy().into_owned();
     let components: Vec<&str> = decoded_rel.split('/').collect();
     let mut validated = Vec::with_capacity(components.len());
     for comp in &components {
@@ -95,40 +96,15 @@ pub fn resolve_artefact(
         return Err(ArtefactError::Traversal);
     }
 
-    if !canonical.exists() {
-        return Err(ArtefactError::NotFound);
+    // Ensure the resolved path is a file (not a directory)
+    match std::fs::metadata(&canonical) {
+        Ok(meta) if !meta.is_file() => return Err(ArtefactError::NotFound),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(ArtefactError::NotFound),
+        Err(e) => return Err(ArtefactError::Io(e)),
+        _ => {}
     }
 
     Ok(canonical)
-}
-
-/// Simple percent-decoder for the artefact path segment.
-fn percent_decode(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '%' {
-            let h1 = chars.next();
-            let h2 = chars.next();
-            if let (Some(a), Some(b)) = (h1, h2) {
-                if let Ok(byte) = u8::from_str_radix(&format!("{}{}", a, b), 16) {
-                    result.push(byte as char);
-                    continue;
-                }
-            }
-            // Malformed percent encoding — pass through literally
-            result.push(c);
-            if let Some(a) = h1 {
-                result.push(a);
-            }
-            if let Some(b) = h2 {
-                result.push(b);
-            }
-        } else {
-            result.push(c);
-        }
-    }
-    result
 }
 
 /// Check whether `path` is a symlink.
