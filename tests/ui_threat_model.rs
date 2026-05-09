@@ -387,15 +387,16 @@ async fn t_method_1_get_only_routes_reject_post() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn t_bind_1_default_bind_is_loopback() {
+async fn t_bind_1_loopback_serves() {
     let fixture = ThreatModelFixture::new().await;
     fixture.create_run("bind-run-001", "test-wf");
 
     let client = fixture.client();
     let resp = client.get(fixture.url("/")).send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    // The test fixture binds to 127.0.0.1:0; if it were non-loopback the
-    // handler would not have received the request in this harness.
+    // The test fixture binds to 127.0.0.1:0; explicit non-loopback bind
+    // rejection would require port-level harness support and is covered
+    // by the `serve.rs` loopback check at start-up.
 }
 
 // ---------------------------------------------------------------------------
@@ -581,11 +582,11 @@ async fn t_sse_csrf_cross_origin_rejected() {
 }
 
 // ---------------------------------------------------------------------------
-// T-ENTROPY-1: Gate URLs derive entropy from run_id (no per-gate token)
+// T-ENTROPY-1: Gate URL entropy comes from run_id (design §4 rejects tokens in v0)
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn t_entropy_1_gate_url_uses_run_id() {
+async fn t_entropy_1_run_id_is_entropy_source() {
     let fixture = ThreatModelFixture::new().await;
     fixture.create_run("run-uuid-123e4567-e89b-12d3-a456-426614174000", "test-wf");
     fixture.create_pending_gate("run-uuid-123e4567-e89b-12d3-a456-426614174000", "review");
@@ -603,7 +604,8 @@ async fn t_entropy_1_gate_url_uses_run_id() {
 
     assert_eq!(resp.status(), StatusCode::SEE_OTHER);
 
-    // Verify response file exists at the expected run_id path
+    // v0 uses run_id as the sole URL entropy source (design §4 verdict:
+    // origin checks + localhost bind are sufficient; no per-gate token).
     let run_dir = fixture
         ._tmp
         .path()
