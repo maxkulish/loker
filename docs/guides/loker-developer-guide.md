@@ -126,16 +126,24 @@ the gateway running (see §8.1).
 
 ---
 
-## 4. Configure: `lok.toml`
+## 4. Configure: `loker.toml`
 
-loker reads `lok.toml` from the working directory (or a path passed via
+loker reads `loker.toml` from the working directory (or a path passed via
 `-c/--config`). Initialise one with:
 
 ```bash
-loker init                 # writes a starter lok.toml
+loker init                 # writes a starter loker.toml
 ```
 
-The full canonical config (from this repo's own `lok.toml`):
+> **Coexistence with lok.** loker uses its own namespace so it can run
+> alongside lok in the same repo. If `loker.toml` is absent loker falls
+> back to `lok.toml` (and `.loker/workflows/` falls back to
+> `.lok/workflows/`). Repos that already use lok can opt into loker by
+> creating `loker.toml` and `.loker/workflows/` without touching their
+> existing lok config.
+
+The full canonical config (from this repo's own `lok.toml`, written
+under the legacy name for now):
 
 ```toml
 [defaults]
@@ -224,8 +232,9 @@ templating. Choose one based on what you need.
 
 Workflows live in:
 
-- `.lok/workflows/<name>.toml` — primary lookup path; addressable by
-  name (`loker run my-workflow`).
+- `.loker/workflows/<name>.toml` — primary lookup path; addressable by
+  name (`loker run my-workflow`). `.lok/workflows/` is read as a
+  fallback for repos forked from lok.
 - Anywhere else — pass the path explicitly (`loker run ./flow.toml`).
 
 ### 5.1. Step-based: small DAG of shell + LLM calls

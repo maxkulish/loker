@@ -3504,17 +3504,26 @@ pub async fn find_workflow_in(name: &str, dir: &Path) -> Result<WorkflowSource> 
     // Strip .toml for embedded lookup
     let workflow_name = name.trim_end_matches(".toml");
 
-    // Check project-local .lok/workflows/ under the supplied base dir.
-    let local_path = dir.join(".lok/workflows").join(&filename);
-    if tokio::fs::metadata(&local_path).await.is_ok() {
-        return Ok(WorkflowSource::File(local_path));
+    // Check project-local .loker/workflows/ (preferred), then .lok/workflows/
+    // (legacy fallback for repos forked from lok).
+    let local_loker = dir.join(".loker/workflows").join(&filename);
+    if tokio::fs::metadata(&local_loker).await.is_ok() {
+        return Ok(WorkflowSource::File(local_loker));
+    }
+    let local_lok = dir.join(".lok/workflows").join(&filename);
+    if tokio::fs::metadata(&local_lok).await.is_ok() {
+        return Ok(WorkflowSource::File(local_lok));
     }
 
-    // Check global ~/.config/lok/workflows/
+    // Check global ~/.config/loker/workflows/, then ~/.config/lok/workflows/.
     if let Some(home) = dirs::home_dir() {
-        let global_path = home.join(".config/lok/workflows").join(&filename);
-        if tokio::fs::metadata(&global_path).await.is_ok() {
-            return Ok(WorkflowSource::File(global_path));
+        let global_loker = home.join(".config/loker/workflows").join(&filename);
+        if tokio::fs::metadata(&global_loker).await.is_ok() {
+            return Ok(WorkflowSource::File(global_loker));
+        }
+        let global_lok = home.join(".config/lok/workflows").join(&filename);
+        if tokio::fs::metadata(&global_lok).await.is_ok() {
+            return Ok(WorkflowSource::File(global_lok));
         }
     }
 
@@ -3527,9 +3536,12 @@ pub async fn find_workflow_in(name: &str, dir: &Path) -> Result<WorkflowSource> 
     }
 
     anyhow::bail!(
-        "Workflow '{}' not found. Searched:\n  - {}/.lok/workflows/{}\n  - ~/.config/lok/workflows/{}\n  - embedded workflows",
+        "Workflow '{}' not found. Searched:\n  - {}/.loker/workflows/{}\n  - {}/.lok/workflows/{} (legacy)\n  - ~/.config/loker/workflows/{}\n  - ~/.config/lok/workflows/{} (legacy)\n  - embedded workflows",
         name,
         dir.display(),
+        filename,
+        dir.display(),
+        filename,
         filename,
         filename
     )
@@ -3557,31 +3569,42 @@ pub async fn list_workflows() -> Result<Vec<ListedWorkflow>> {
     let mut workflows = Vec::new();
     let mut seen_names = std::collections::HashSet::new();
 
-    // Check project-local (highest priority)
-    let local_dir = PathBuf::from(".lok/workflows");
-    if tokio::fs::metadata(&local_dir).await.is_ok() {
-        for (_path, wf) in load_workflows_from_dir(&local_dir).await? {
-            seen_names.insert(wf.name.clone());
-            workflows.push(ListedWorkflow {
-                name: wf.name,
-                description: wf.description,
-                source: WorkflowListSource::Local,
-            });
-        }
-    }
-
-    // Check global (medium priority)
-    if let Some(home) = dirs::home_dir() {
-        let global_dir = home.join(".config/lok/workflows");
-        if tokio::fs::metadata(&global_dir).await.is_ok() {
-            for (_path, wf) in load_workflows_from_dir(&global_dir).await? {
+    // Check project-local (highest priority): .loker/workflows/ first,
+    // then .lok/workflows/ (legacy fallback).
+    for local_dir in [
+        PathBuf::from(".loker/workflows"),
+        PathBuf::from(".lok/workflows"),
+    ] {
+        if tokio::fs::metadata(&local_dir).await.is_ok() {
+            for (_path, wf) in load_workflows_from_dir(&local_dir).await? {
                 if !seen_names.contains(&wf.name) {
                     seen_names.insert(wf.name.clone());
                     workflows.push(ListedWorkflow {
                         name: wf.name,
                         description: wf.description,
-                        source: WorkflowListSource::Global,
+                        source: WorkflowListSource::Local,
                     });
+                }
+            }
+        }
+    }
+
+    // Check global (medium priority): ~/.config/loker/, then ~/.config/lok/.
+    if let Some(home) = dirs::home_dir() {
+        for global_dir in [
+            home.join(".config/loker/workflows"),
+            home.join(".config/lok/workflows"),
+        ] {
+            if tokio::fs::metadata(&global_dir).await.is_ok() {
+                for (_path, wf) in load_workflows_from_dir(&global_dir).await? {
+                    if !seen_names.contains(&wf.name) {
+                        seen_names.insert(wf.name.clone());
+                        workflows.push(ListedWorkflow {
+                            name: wf.name,
+                            description: wf.description,
+                            source: WorkflowListSource::Global,
+                        });
+                    }
                 }
             }
         }

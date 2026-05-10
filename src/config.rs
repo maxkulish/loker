@@ -425,15 +425,26 @@ pub fn load_config_from_paths(
         return Ok(cfg);
     }
 
-    // Layer 2: user config (~/.config/lok/lok.toml)
+    // Layer 2: user config. Prefer ~/.config/loker/loker.toml; fall back to
+    // ~/.config/lok/lok.toml (legacy from lok-fork repos).
     if let Some(home) = home_dir {
-        let user_config_path = home.join(".config/lok/lok.toml");
-        merge_toml_file(&mut base, &user_config_path)?;
+        let user_loker = home.join(".config/loker/loker.toml");
+        let user_lok = home.join(".config/lok/lok.toml");
+        if user_loker.exists() {
+            merge_toml_file(&mut base, &user_loker)?;
+        } else {
+            merge_toml_file(&mut base, &user_lok)?;
+        }
     }
 
-    // Layer 3: project config (./lok.toml)
-    let project_config_path = cwd.join("lok.toml");
-    merge_toml_file(&mut base, &project_config_path)?;
+    // Layer 3: project config. Prefer ./loker.toml; fall back to ./lok.toml.
+    let project_loker = cwd.join("loker.toml");
+    let project_lok = cwd.join("lok.toml");
+    if project_loker.exists() {
+        merge_toml_file(&mut base, &project_loker)?;
+    } else {
+        merge_toml_file(&mut base, &project_lok)?;
+    }
 
     // Deserialize merged TOML into Config (deny_unknown_fields applied here)
     let cfg: Config = base
@@ -455,12 +466,12 @@ pub fn init_config() -> Result<()> {
     let config = Config::default();
     let content = toml::to_string_pretty(&config)?;
 
-    if Path::new("lok.toml").exists() {
-        anyhow::bail!("lok.toml already exists");
+    if Path::new("loker.toml").exists() {
+        anyhow::bail!("loker.toml already exists");
     }
 
-    fs::write("lok.toml", content)?;
-    println!("Created lok.toml");
+    fs::write("loker.toml", content)?;
+    println!("Created loker.toml");
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 //! Phase-based workflow grammar parser (FR-29, FR-30, FR-31).
 //!
-//! Parses `.lok/workflows/*.toml` into a typed [`Workflow`] AST. Each
+//! Parses `.loker/workflows/*.toml` (or legacy `.lok/workflows/*.toml`) into
+//! a typed [`Workflow`] AST. Each
 //! workflow consists of a sequence of *phases*, each with a strategy,
 //! backends, prompt template, inputs, output, and optional contract block.
 //!

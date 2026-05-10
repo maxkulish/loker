@@ -81,11 +81,12 @@ fn parse_rerun_phase(s: &str) -> Result<String, String> {
     Ok(phase_name.to_string())
 }
 
-/// Walk ancestors from the given starting path looking for `lok.toml`.
+/// Walk ancestors from the given starting path looking for `loker.toml`
+/// (preferred) or `lok.toml` (legacy fallback for repos forked from lok).
 fn find_project_root_from(start: &std::path::Path) -> Option<std::path::PathBuf> {
     let mut cwd = start.to_path_buf();
     loop {
-        if cwd.join("lok.toml").exists() {
+        if cwd.join("loker.toml").exists() || cwd.join("lok.toml").exists() {
             return Some(cwd);
         }
         if !cwd.pop() {
@@ -94,7 +95,7 @@ fn find_project_root_from(start: &std::path::Path) -> Option<std::path::PathBuf>
     }
 }
 
-/// Walk ancestors from CWD looking for `lok.toml` to find the project root.
+/// Walk ancestors from CWD looking for the project root.
 fn find_project_root() -> Option<std::path::PathBuf> {
     find_project_root_from(&std::env::current_dir().ok()?)
 }
@@ -683,11 +684,17 @@ async fn main() -> Result<()> {
             .await?;
         }
         Commands::Init {} => {
-            // Only create lok.toml if it doesn't exist
-            if !Path::new("lok.toml").exists() {
-                config::init_config()?;
+            // loker.toml is the canonical name; honour an existing lok.toml
+            // (legacy from forks of lok) without overwriting.
+            if Path::new("loker.toml").exists() {
+                println!("{} loker.toml already exists", "✓".green());
+            } else if Path::new("lok.toml").exists() {
+                println!(
+                    "{} lok.toml already exists (legacy name; rename to loker.toml when convenient)",
+                    "✓".green()
+                );
             } else {
-                println!("{} lok.toml already exists", "✓".green());
+                config::init_config()?;
             }
         }
         Commands::Report {
@@ -1185,7 +1192,9 @@ async fn main() -> Result<()> {
                 anyhow::bail!("use --serve to start the daemon; see loker ui --help");
             }
             let project_root = find_project_root().ok_or_else(|| {
-                anyhow::anyhow!("no lok.toml found; run from a loker project directory")
+                anyhow::anyhow!(
+                    "no loker.toml or lok.toml found; run from a loker project directory"
+                )
             })?;
             ui::serve::serve(&bind, project_root).await?;
         }
@@ -1755,8 +1764,9 @@ async fn list_workflows() -> Result<()> {
         println!("{}", "No workflows found.".yellow());
         println!();
         println!("Create workflows in:");
-        println!("  - .lok/workflows/           (project-local)");
-        println!("  - ~/.config/lok/workflows/  (global)");
+        println!("  - .loker/workflows/           (project-local)");
+        println!("  - ~/.config/loker/workflows/  (global)");
+        println!("  (legacy: .lok/workflows/, ~/.config/lok/workflows/ still read)");
         return Ok(());
     }
 
