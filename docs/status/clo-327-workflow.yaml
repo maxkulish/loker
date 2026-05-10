@@ -20,10 +20,10 @@ linear:
   priority: '2'
   branch_actual: feat/clo-327-wire-phase-based-runner
 workflow:
-  current_phase: design
+  current_phase: plan
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T13:57:45.496Z'
+  updated_at: '2026-05-10T14:11:25.059Z'
 phases:
   discovery:
     status: complete
@@ -38,7 +38,7 @@ phases:
     prd_file: docs/prds/clo-327-wire-phase-based-runner.md
     problem_framed: true
   design:
-    status: in_progress
+    status: complete
     design_doc: docs/designs/clo-327-wire-phase-based-runner.md
     discovery_context_used: true
     draft_ready: true
@@ -54,8 +54,11 @@ phases:
     review_synthesis: docs/reviews/clo-327-design-synthesis.md
     review_verdict: approve_with_changes
     human_review_completed: true
+    finalized: true
   plan:
-    status: pending
+    status: complete
+    plan_file: docs/plans/clo-327-wire-phase-based-runner.md
+    approved: true
   implement:
     status: pending
   pr:
@@ -109,5 +112,21 @@ history:
     details: >-
       Plannotator annotate session timed out with no annotations (headless environment). Human review gate passed
       without feedback.
+  - timestamp: '2026-05-10T13:58:41.020Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase. 5 review suggestions applied, verdict approve_with_changes.
+  - timestamp: '2026-05-10T13:58:43.314Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-10T14:11:11.755Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 5 sub-tasks (ST1-ST5) at docs/plans/clo-327-wire-phase-based-runner.md
+  - timestamp: '2026-05-10T14:11:25.059Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 5 sub-tasks queued: ST1 detection, ST2 builder, ST3 runner, ST4 dispatch, ST5 integration.'
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
