@@ -7025,6 +7025,7 @@ prompt = "p"
     }
 }
 
+pub mod phase_bridge;
 pub mod explain;
 pub mod grammar;
 pub mod template;
