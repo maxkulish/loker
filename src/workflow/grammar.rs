@@ -988,4 +988,48 @@ output = "run.md"
         let resolved = Workflow::resolve_backends(&wf.phases[4]).unwrap();
         assert_eq!(resolved[0], BackendRef::Ollama("glm-5.1".into()));
     }
+
+    // -- Phase detection tests (CLO-327) --
+
+    #[test]
+    fn phase_detection_detects_phases_only() {
+        let toml = r#"
+name = "phase-only"
+[[phases]]
+name = "design"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "Design"
+inputs = ["spec"]
+output = "design.md"
+"#;
+        let result = toml.parse::<Workflow>();
+        assert!(result.is_ok(), "phases-only TOML should parse as grammar::Workflow");
+        let wf = result.unwrap();
+        assert_eq!(wf.phases.len(), 1);
+        assert_eq!(wf.name, "phase-only");
+    }
+
+    #[test]
+    fn phase_detection_detects_steps_only() {
+        let toml = r#"
+name = "steps-only"
+[[steps]]
+name = "build"
+backend = "claude/"
+prompt = "Build the code"
+"#;
+        let result = toml.parse::<Workflow>();
+        assert!(result.is_err(), "steps-only TOML should fail grammar::Workflow parse");
+    }
+
+    #[test]
+    fn phase_detection_no_phases_no_steps() {
+        let toml = r#"
+name = "empty"
+description = "A workflow with neither phases nor steps"
+"#;
+        let result = toml.parse::<Workflow>();
+        assert!(result.is_err(), "TOML without phases should fail grammar::Workflow parse");
+    }
 }

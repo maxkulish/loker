@@ -20,10 +20,10 @@ linear:
   priority: '2'
   branch_actual: feat/clo-327-wire-phase-based-runner
 workflow:
-  current_phase: plan
+  current_phase: implement
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T14:11:25.059Z'
+  updated_at: '2026-05-10T14:12:33.749Z'
 phases:
   discovery:
     status: complete
@@ -128,5 +128,9 @@ history:
     action: plan_approved
     phase: plan
     details: 'Plan approved. 5 sub-tasks queued: ST1 detection, ST2 builder, ST3 runner, ST4 dispatch, ST5 integration.'
+  - timestamp: '2026-05-10T14:12:33.749Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run

@@ -3474,6 +3474,18 @@ pub async fn load_workflow_from_source(source: WorkflowSource) -> Result<Workflo
     load_workflow_from_source_with_depth(source, 0).await
 }
 
+/// Read the raw source text from a workflow source (file or embedded).
+pub async fn read_workflow_source_text(source: &WorkflowSource) -> Result<String> {
+    match source {
+        WorkflowSource::File(path) => {
+            tokio::fs::read_to_string(path)
+                .await
+                .with_context(|| format!("Failed to read workflow file: {}", path.display()))
+        }
+        WorkflowSource::Embedded { content, .. } => Ok(content.to_string()),
+    }
+}
+
 /// Find workflow by name, checking project-local, global, and embedded workflows.
 pub async fn find_workflow(name: &str) -> Result<WorkflowSource> {
     find_workflow_in(name, Path::new(".")).await

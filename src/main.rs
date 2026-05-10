@@ -1422,6 +1422,26 @@ async fn run_workflow(
     config: &config::Config,
 ) -> Result<()> {
     let source = workflow::find_workflow(name).await?;
+
+    // --- Phase-based dispatch (ST1 detection gate) ---
+    // Attempt to parse as grammar::Workflow (phase-based). If the text contains
+    // [[phases]] the grammar parser will succeed; otherwise it returns an error
+    // and we fall through to the step-based path.
+    let source_text = workflow::read_workflow_source_text(&source).await?;
+    if let Ok(grammar_wf) = source_text.parse::<workflow::grammar::Workflow>() {
+        println!(
+            "{} Phase-based workflow '{}' detected ({} phases)",
+            "◆".cyan(),
+            grammar_wf.name,
+            grammar_wf.phases.len()
+        );
+        println!(
+            "{} Phase execution not yet wired — falling back to step-based runner",
+            "⚠".yellow()
+        );
+        // TODO: dispatch to run_phase_workflow() — wired in CLO-327 ST4+ST5
+    }
+
     let wf = workflow::load_workflow_from_source(source).await?;
     wf.validate_with_capabilities(crate::backend::capabilities_for_name)?;
 
