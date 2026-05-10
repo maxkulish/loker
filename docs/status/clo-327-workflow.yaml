@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T17:47:13.249Z'
+  updated_at: '2026-05-10T18:06:01.841Z'
 phases:
   discovery:
     status: complete
@@ -60,11 +60,12 @@ phases:
     plan_file: docs/plans/clo-327-wire-phase-based-runner.md
     approved: true
   implement:
-    status: pending
+    status: validating
     commits:
       - 963cf08
       - fe48f2b
       - 50efd00
+      - 9dda610
   pr:
     status: pending
   complete:
@@ -148,5 +149,13 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST3 landed: Phase workflow runner with template pre-rendering. Commit 50efd00. 6 tests green.'
+  - timestamp: '2026-05-10T18:05:45.743Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: Wire phase-based dispatch into run_workflow(). Commit 9dda610. 1196 all tests green.'
+  - timestamp: '2026-05-10T18:06:01.841Z'
+    action: implementation_complete
+    phase: implement
+    details: 'All sub-tasks landed (ST1-ST4). make check green. 4 commits: 963cf08, fe48f2b, 50efd00, 9dda610.'
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run

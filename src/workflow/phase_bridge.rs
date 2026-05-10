@@ -36,14 +36,29 @@ fn backend_scheme(raw: &str) -> &str {
 /// - `Strategy::ParallelFanOut`     → `StrategyName::Parallel`
 /// - `Strategy::EscalatingRetry`    → `StrategyName::EscalatingRetry`
 ///
-/// The prompt template is pre-rendered so the strategy's MiniJinja engine
-/// receives plain text (no phase-syntax `{{ }}` placeholders).
+/// # Template rendering (dual-engine architecture)
+///
+/// This function pre-renders the prompt template using `workflow::template::Template`
+/// (regex-based, handles `{{ spec }}`, `{{ phase.NAME.output }}`, `{{ var.X }}`)
+/// BEFORE the strategy executes. The pre-rendered text is stored in
+/// `PhaseConfig.prompt_template`. When the strategy's MiniJinja engine later renders
+/// it, no `{{ }}` remain, so the render is effectively a no-op.
+///
+/// This dual-pass architecture is intentional: the two engines handle disjoint
+/// syntax (workflow Template ≠ MiniJinja). The pre-render resolves workflow-level
+/// placeholders; the strategy engine handles MiniJinja constructs like
+/// `{{ steps.NAME.output }}`, filters, and control flow.
+///
+/// # Errors
+///
+/// Returns an error if the prompt template fails to render (e.g. undefined variable
+/// reference), enforcing strict-mode failure per the design.
 pub fn build_phase_config(
     phase: &crate::workflow::grammar::Phase,
     phase_outputs: &HashMap<String, (String, PathBuf)>, // name → (content, path)
     spec_content: Option<&str>,
     vars: &HashMap<String, String>,
-) -> PhaseConfig {
+) -> Result<PhaseConfig> {
     let (strategy_name, aggregator_name, rungs) = match &phase.strategy {
         Strategy::Single => {
             let backend = phase.backends.first().cloned().unwrap_or_default();
@@ -113,9 +128,9 @@ pub fn build_phase_config(
         tmpl_ctx = tmpl_ctx.with_var(k, v.clone());
     }
     let rendered_prompt = Template::render(&phase.prompt_template, &tmpl_ctx)
-        .unwrap_or_else(|_| phase.prompt_template.clone());
+        .with_context(|| format!("Template render failed for phase '{}'", phase.name))?;
 
-    PhaseConfig {
+    Ok(PhaseConfig {
         phase: phase.name.clone(),
         strategy: strategy_name,
         aggregator: aggregator_name,
@@ -129,7 +144,7 @@ pub fn build_phase_config(
         min_responses,
         rungs,
         pass_failure_context: false,
-    }
+    })
 }
 
 /// Resolve backend strings from a grammar phase to concrete `Arc<dyn Backend>`.
@@ -184,6 +199,14 @@ pub async fn run_phase_workflow(
     _rerun_phases: &[String],
     run_dir_path: &Path,
 ) -> Result<Vec<PathBuf>> {
+    if !_rerun_phases.is_empty() {
+        println!(
+            "{} --rerun phase={} is a no-op for phase-based workflows (CLO-327 follow-up)",
+            "↻".yellow(),
+            _rerun_phases.join(", "),
+        );
+    }
+
     let mut phase_outputs: HashMap<String, (String, PathBuf)> = HashMap::new();
     let mut artifact_paths: Vec<PathBuf> = Vec::new();
     let run_id = uuid::Uuid::new_v4();
@@ -204,14 +227,16 @@ pub async fn run_phase_workflow(
             &phase_outputs,
             spec_content.as_deref(),
             &template_vars,
-        );
+        )
+        .with_context(|| format!("Failed to build config for phase '{}'", phase.name))?;
 
         // Resolve backends
         let backends = resolve_phase_backends(phase, &config)
             .with_context(|| format!("Failed to resolve backends for phase '{}'", phase.name))?;
 
-        // Determine the phase's run directory
-        let phase_dir = run_dir_path.join("attempts").join(&phase.name);
+        // Phase-level run directory — PhaseRunner will create
+        // attempts/<phase>/<n>/ under this root.
+        let phase_dir = run_dir_path.to_path_buf();
 
         // Build PhaseContext with a template context that includes spec and vars
         // (phase outputs are already baked into the pre-rendered prompt).
@@ -284,7 +309,7 @@ name = "test"
 name = "design"
 strategy = { single = {} }
 backends = ["claude/"]
-prompt_template = "Design {{ spec }}"
+prompt_template = "Design the system"
 inputs = ["spec"]
 output = "design.md"
 "#;
@@ -333,7 +358,7 @@ output = "code.md"
     #[test]
     fn build_phase_config_single_strategy() {
         let phase = sample_single_phase();
-        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars());
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
         assert_eq!(cfg.phase, "design");
         assert_eq!(cfg.strategy, StrategyName::Single);
         assert_eq!(cfg.aggregator, AggregatorName::First);
@@ -346,7 +371,7 @@ output = "code.md"
     #[test]
     fn build_phase_config_parallel_strategy() {
         let phase = sample_parallel_phase();
-        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars());
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
         assert_eq!(cfg.strategy, StrategyName::Parallel);
         assert_eq!(cfg.min_responses, 2);
         assert_eq!(cfg.rungs.len(), 2);
@@ -355,7 +380,7 @@ output = "code.md"
     #[test]
     fn build_phase_config_escalating_strategy() {
         let phase = sample_escalating_phase();
-        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars());
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
         assert_eq!(cfg.strategy, StrategyName::EscalatingRetry);
         assert_eq!(cfg.rungs.len(), 2);
     }
@@ -363,13 +388,25 @@ output = "code.md"
     #[test]
     fn build_phase_config_resolves_backends() {
         let phase = sample_single_phase();
-        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars());
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
         assert_eq!(cfg.backend, Some("claude/".to_string()));
     }
 
     #[test]
     fn build_phase_config_pre_renders_template_with_spec() {
-        let phase = sample_single_phase();
+        // Create a phase with {{ spec }} placeholder
+        let spec_phase_toml = r#"
+name = "test"
+[[phases]]
+name = "design"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "Design {{ spec }}"
+inputs = ["spec"]
+output = "design.md"
+"#;
+        let wf: Workflow = spec_phase_toml.parse().unwrap();
+        let phase = wf.phases.into_iter().next().unwrap();
         let mut vars = HashMap::new();
         vars.insert("name".to_string(), "test-workflow".to_string());
         let cfg = build_phase_config(
@@ -377,7 +414,8 @@ output = "code.md"
             &empty_phase_outputs(),
             Some("Build the system"),
             &vars,
-        );
+        )
+        .unwrap();
         // The template "Design {{ spec }}" should become "Design Build the system"
         assert!(
             cfg.prompt_template.contains("Build the system"),
@@ -422,7 +460,7 @@ output = "review.md"
         let wf: Workflow = review_toml.parse().unwrap();
         let review_phase = wf.phases.into_iter().nth(1).unwrap();
 
-        let cfg = build_phase_config(&review_phase, &phase_outputs, None, &empty_vars());
+        let cfg = build_phase_config(&review_phase, &phase_outputs, None, &empty_vars()).unwrap();
         assert!(
             cfg.prompt_template.contains("Design output content"),
             "Expected phase output chaining, got: {}",
