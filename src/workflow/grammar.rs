@@ -1004,7 +1004,10 @@ inputs = ["spec"]
 output = "design.md"
 "#;
         let result = toml.parse::<Workflow>();
-        assert!(result.is_ok(), "phases-only TOML should parse as grammar::Workflow");
+        assert!(
+            result.is_ok(),
+            "phases-only TOML should parse as grammar::Workflow"
+        );
         let wf = result.unwrap();
         assert_eq!(wf.phases.len(), 1);
         assert_eq!(wf.name, "phase-only");
@@ -1020,7 +1023,10 @@ backend = "claude/"
 prompt = "Build the code"
 "#;
         let result = toml.parse::<Workflow>();
-        assert!(result.is_err(), "steps-only TOML should fail grammar::Workflow parse");
+        assert!(
+            result.is_err(),
+            "steps-only TOML should fail grammar::Workflow parse"
+        );
     }
 
     #[test]
@@ -1030,6 +1036,9 @@ name = "empty"
 description = "A workflow with neither phases nor steps"
 "#;
         let result = toml.parse::<Workflow>();
-        assert!(result.is_err(), "TOML without phases should fail grammar::Workflow parse");
+        assert!(
+            result.is_err(),
+            "TOML without phases should fail grammar::Workflow parse"
+        );
     }
 }

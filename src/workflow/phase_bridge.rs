@@ -13,14 +13,13 @@ use std::sync::Arc;
 use crate::backend::{create_backend, get_retry_policy};
 use crate::manifest::{Kind, Producer};
 use crate::phase_runner::{
-    AggregatorName, PhaseConfig, PhaseInputs, PhaseRunner, PhaseRung, StrategyName,
-    VerifyHookName,
+    AggregatorName, PhaseConfig, PhaseInputs, PhaseRung, PhaseRunner, StrategyName, VerifyHookName,
 };
-use crate::run_state::RunDir;
 use crate::strategy::{PhaseContext, Prompt, Tier};
 use crate::workflow::grammar::Strategy;
 use crate::workflow::template::{PhaseOutput, Template, TemplateContext};
 use anyhow::{Context, Result};
+use colored::Colorize;
 
 /// Extract the backend scheme name from a grammar backend string.
 ///
@@ -68,11 +67,7 @@ pub fn build_phase_config(
                 .iter()
                 .map(|b| PhaseRung::new(Tier::Medium, b))
                 .collect();
-            (
-                StrategyName::EscalatingRetry,
-                AggregatorName::First,
-                rungs,
-            )
+            (StrategyName::EscalatingRetry, AggregatorName::First, rungs)
         }
     };
 
@@ -151,7 +146,12 @@ pub fn resolve_phase_backends(
                 anyhow::anyhow!(
                     "Backend '{}' not configured (available: {})",
                     scheme,
-                    config.backends.keys().cloned().collect::<Vec<_>>().join(", ")
+                    config
+                        .backends
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 )
             })?;
             let retry_policy = get_retry_policy(backend_cfg, &config.defaults);
@@ -163,8 +163,12 @@ pub fn resolve_phase_backends(
 
 /// Read the output artefact produced by a phase run.
 fn read_phase_output(outcome: &crate::phase_runner::PhaseOutcome) -> Result<String> {
-    std::fs::read_to_string(&outcome.artefact_path)
-        .with_context(|| format!("Failed to read phase output: {}", outcome.artefact_path.display()))
+    std::fs::read_to_string(&outcome.artefact_path).with_context(|| {
+        format!(
+            "Failed to read phase output: {}",
+            outcome.artefact_path.display()
+        )
+    })
 }
 
 /// Run a phase-based workflow, executing phases sequentially and chaining
@@ -178,10 +182,8 @@ pub async fn run_phase_workflow(
     spec_content: Option<String>,
     template_vars: HashMap<String, String>,
     _rerun_phases: &[String],
-    run_dir: &RunDir,
+    run_dir_path: &Path,
 ) -> Result<Vec<PathBuf>> {
-    use colored::Colorize;
-
     let mut phase_outputs: HashMap<String, (String, PathBuf)> = HashMap::new();
     let mut artifact_paths: Vec<PathBuf> = Vec::new();
     let run_id = uuid::Uuid::new_v4();
@@ -209,7 +211,7 @@ pub async fn run_phase_workflow(
             .with_context(|| format!("Failed to resolve backends for phase '{}'", phase.name))?;
 
         // Determine the phase's run directory
-        let phase_dir = run_dir.path().join("attempts").join(&phase.name);
+        let phase_dir = run_dir_path.join("attempts").join(&phase.name);
 
         // Build PhaseContext with a template context that includes spec and vars
         // (phase outputs are already baked into the pre-rendered prompt).
@@ -393,7 +395,10 @@ output = "code.md"
         let mut phase_outputs = HashMap::new();
         phase_outputs.insert(
             "design".to_string(),
-            ("Design output content".to_string(), PathBuf::from("design.md")),
+            (
+                "Design output content".to_string(),
+                PathBuf::from("design.md"),
+            ),
         );
         // Parse a multi-phase workflow with both the source and dependent phases
         let review_toml = r#"

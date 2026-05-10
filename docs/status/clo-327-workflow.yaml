@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T14:26:03.140Z'
+  updated_at: '2026-05-10T17:47:13.249Z'
 phases:
   discovery:
     status: complete
@@ -63,6 +63,8 @@ phases:
     status: pending
     commits:
       - 963cf08
+      - fe48f2b
+      - 50efd00
   pr:
     status: pending
   complete:
@@ -138,5 +140,13 @@ history:
     action: subtask_complete
     phase: implement
     details: 'ST1 landed: Phase detection — make source text available for dual-parsing. Commit 963cf08'
+  - timestamp: '2026-05-10T17:19:20.484Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: PhaseConfig builder. Commit fe48f2b. 5 tests green.'
+  - timestamp: '2026-05-10T17:47:13.249Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: Phase workflow runner with template pre-rendering. Commit 50efd00. 6 tests green.'
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
