@@ -20,15 +20,40 @@ linear:
   priority: '2'
   branch_actual: feat/clo-327-wire-phase-based-runner
 workflow:
-  current_phase: discovery
+  current_phase: design
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T13:27:10.117Z'
+  updated_at: '2026-05-10T13:57:45.496Z'
 phases:
   discovery:
-    status: pending
+    status: complete
+    approach_chosen: detect-and-dispatch (Approach A)
+    approaches_identified: 3
+    approved: true
+    baseline_score: 4
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-327.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-327-wire-phase-based-runner.md
+    problem_framed: true
   design:
-    status: pending
+    status: in_progress
+    design_doc: docs/designs/clo-327-wire-phase-based-runner.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - Reuse existing TemplateEngine (remove new TemplateEngine proposal)
+      - Fix API signature consistency (Arc<Config> vs &Config)
+      - Fix backend resolution timing description
+      - Clarify --rerun behavior
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-327-design-gemini.md
+    review_synthesis: docs/reviews/clo-327-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
   plan:
     status: pending
   implement:
@@ -60,5 +85,29 @@ history:
     action: branch_created
     phase: discovery
     details: Branch feat/clo-327-wire-phase-based-runner created from main (4f0c8b3)
+  - timestamp: '2026-05-10T13:33:47.510Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: detect-and-dispatch (Approach A). Baseline 4/10. 3 approaches considered.'
+  - timestamp: '2026-05-10T13:33:57.143Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-10T13:38:20.398Z'
+    action: design_draft_ready
+    phase: design
+    details: Draft generated manually at docs/designs/clo-327-wire-phase-based-runner.md (7 sections, 13444 bytes)
+  - timestamp: '2026-05-10T13:52:12.353Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 5 suggestions received (all addressed), 0 flagged. Gemini review produced,
+      Claude timed out.
+  - timestamp: '2026-05-10T13:57:45.496Z'
+    action: design_human_review_complete
+    phase: design
+    details: >-
+      Plannotator annotate session timed out with no annotations (headless environment). Human review gate passed
+      without feedback.
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
