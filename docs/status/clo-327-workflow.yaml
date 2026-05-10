@@ -1,0 +1,64 @@
+task_id: clo-327
+task_type: development
+classification_reason: >-
+  Title starts with "Wire" (not in spec/ops keywords), no [spec]/[ops] labels or **Type:** markers, features mechanical
+  ACs requiring both design and implementation work
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-327-wire-phase-based-runner-into-loker-run
+  priority: '2'
+  branch_actual: feat/clo-327-wire-phase-based-runner
+workflow:
+  current_phase: discovery
+  status: active
+  created_at: '2026-05-10T13:25:34.417Z'
+  updated_at: '2026-05-10T13:27:10.117Z'
+phases:
+  discovery:
+    status: pending
+  design:
+    status: pending
+  plan:
+    status: pending
+  implement:
+    status: pending
+  pr:
+    status: pending
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-10T13:25:34.417Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-327 as development
+  - timestamp: '2026-05-10T13:25:58.181Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: title starts with "Wire" (not in spec/ops keywords), no [spec]/[ops] labels or
+      **Type:** markers, features mechanical ACs requiring both design and implementation work
+  - timestamp: '2026-05-10T13:26:17.770Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo. Skipping project sync.
+  - timestamp: '2026-05-10T13:26:19.876Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-10T13:27:10.117Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-327-wire-phase-based-runner created from main (4f0c8b3)
+task_title: Wire phase-based runner into `loker run`
+task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
