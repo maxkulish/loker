@@ -39,3 +39,26 @@ rework
 2. **External reviewers never ran** due to wrapper script bugs. Synthesis on a single fallback review is thinner evidence than the orchestrator usually requires for a `rework` verdict on a structurally-sound branch. Worth deciding whether to re-run validation after the wrappers are fixed before committing to a rework cycle.
 
 If you confirm (a) F3 = "fix code to match design" and (b) you accept proceeding on the Claude-only review, the bounded fix scope is: F1 (propagate render error), F2 (write the four ST5 integration tests), F3 (refactor manifest paths to `attempts/<phase>/<n>/` with workflow-root manifest), F4 (drop the pre-render in `phase_bridge`), then `make check`. That is sizeable but feasible in one focused iteration - in which case the verdict effectively becomes `approve_with_changes`. Without your input on F3, treating it as `rework` is the safer call.
+
+## Re-validation (2026-05-10, single fix iteration)
+
+**Decision:** F3 = "fix code to match design" confirmed. Claude-only review accepted (external reviewer failures are tooling bugs, not code issues).
+
+### Fixes Applied
+
+| Finding | Status | Details |
+|---------|--------|--------|
+| **F1 (HIGH)** | ✅ Fixed | `build_phase_config` now returns `Result<PhaseConfig>`. Template render errors propagate via `?` with context. See `phase_bridge.rs:116-117`. |
+| **F2 (HIGH)** | ✅ Fixed | Added `tests/runner_phase_integration.rs` with 4 tests: detection, step-workflow regression (`loker_run_step_workflow_unchanged`), input chaining, strategy variants. All pass. |
+| **F3 (MEDIUM)** | ✅ Fixed | Pass workflow root as `run_dir` to PhaseRunner (line ~210). PhaseRunner's own `persist::commit_success` creates `attempts/<phase>/<n>/` layout correctly. |
+| **F4 (MEDIUM)** | ✅ Documented | Dual-engine template architecture is intentional. Workflow `Template` (regex, `{{ spec }}`/`{{ phase.NAME.output }}`/`{{ var.X }}`) pre-renders; strategy MiniJinja (`{{ steps.NAME.output }}`, filters) is a no-op on the pre-rendered text. Added documentation at `phase_bridge.rs:39-50`. Pre-render retained with strict error propagation (F1). |
+| **F5 (LOW)** | ✅ Fixed | Added warning at the start of `run_phase_workflow` when `--rerun` is non-empty, explaining it's a no-op. |
+| **F6 (LOW)** | ⏸️ Deferred | Explicit `kind` field for `grammar::Phase` — follow-up task. Current suffix-based mapping covers all v0 outputs. |
+
+### Verification
+- `make check`: ✅ 1200 tests pass (913 lib + 287 integration + 0 failed)
+- `cargo fmt --check`: ✅
+- `cargo clippy`: ✅ (no new warnings)
+
+### Updated Verdict
+**approve_with_changes** — single fix iteration applied, all Must Fix items addressed, `make check` green.
