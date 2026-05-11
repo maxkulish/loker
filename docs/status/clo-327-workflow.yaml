@@ -23,7 +23,7 @@ workflow:
   current_phase: pr
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T18:48:51.876Z'
+  updated_at: '2026-05-11T07:23:49.297Z'
 phases:
   discovery:
     status: complete
@@ -77,6 +77,7 @@ phases:
     status: in_progress
     pr_number: 69
     pr_url: https://github.com/maxkulish/loker/pull/69
+    ci_passed: true
   complete:
     status: pending
 history:
@@ -184,5 +185,9 @@ history:
     action: pr_created
     phase: pr
     details: 'PR #69 opened: https://github.com/maxkulish/loker/pull/69'
+  - timestamp: '2026-05-11T07:23:49.297Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format ✅, clippy ✅, test ✅'
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run

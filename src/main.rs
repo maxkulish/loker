@@ -1467,6 +1467,7 @@ async fn run_workflow(
 
         let run_dir = RunDir::create(&cwd, name)
             .with_context(|| format!("failed to create run directory for '{}'", name))?;
+        let run_id = uuid::Uuid::new_v4();
 
         match workflow::phase_bridge::run_phase_workflow(
             Arc::new(config.clone()),
@@ -1476,6 +1477,7 @@ async fn run_workflow(
             template_vars,
             rerun_phases,
             run_dir.path(),
+            run_id,
         )
         .await
         {
