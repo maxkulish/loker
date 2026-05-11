@@ -51,8 +51,8 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: lok
-            asset_name: lok-linux-x86_64
+            artifact_name: loker
+            asset_name: loker-linux-x86_64
 
     steps:
       - name: Checkout code
@@ -103,7 +103,7 @@ jobs:
           mkdir -p release
           for dir in artifacts/*/; do
             artifact_name=$(basename "$dir")
-            mv "$dir/lok" "release/$artifact_name"
+            mv "$dir/loker" "release/$artifact_name"
           done
           ls -la release/
 

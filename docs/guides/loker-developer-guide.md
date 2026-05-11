@@ -1,15 +1,15 @@
 # loker developer guide
 
-A self-contained reference for building flows with **loker** v0
-(`v20260509.0.0`). Drop the absolute path of this file into a fresh
+A self-contained reference for building flows with **loker**
+(`v20260511.0.2`). Drop the absolute path of this file into a fresh
 agent session ("read this guide and build a flow that does X") and the
-session should have everything it needs to write a working `lok.toml`,
-a workflow TOML, and run it end-to-end.
+session should have everything it needs to write a working
+`loker.toml`, a workflow TOML, and run it end-to-end.
 
 > Repo root: this guide assumes loker is cloned at the path you point
 > the agent at, and `loker` is on `PATH` (`make install` or
 > `cargo install --path .`). When in doubt, run `loker --version` —
-> v0 reports `loker 20260509.0.0`.
+> the current release reports `loker 20260511.0.2`.
 
 ---
 
@@ -98,7 +98,7 @@ cargo install --path .     # same thing, explicit
 make release               # maintainer path: auto-version + tag + push + install to /usr/local/bin
 
 # Verify
-loker --version            # → loker 20260509.0.0
+loker --version            # → loker 20260511.0.2
 loker doctor               # check which backends are installed and reachable
 ```
 
@@ -136,14 +136,23 @@ loker init                 # writes a starter loker.toml
 ```
 
 > **Coexistence with lok.** loker uses its own namespace so it can run
-> alongside lok in the same repo. If `loker.toml` is absent loker falls
-> back to `lok.toml` (and `.loker/workflows/` falls back to
-> `.lok/workflows/`). Repos that already use lok can opt into loker by
-> creating `loker.toml` and `.loker/workflows/` without touching their
-> existing lok config.
+> alongside lok in the same repo. The canonical layout for any new
+> project is:
+>
+> ```
+> <repo>/
+> ├── loker.toml                     # canonical config
+> └── .loker/
+>     ├── workflows/<name>.toml
+>     └── prompts/<workflow>/*.tmpl
+> ```
+>
+> For backward compatibility loker also reads `lok.toml` and
+> `.lok/workflows/` if the `loker`-prefixed paths are absent. Repos
+> that already use lok can opt into loker by creating `loker.toml`
+> and `.loker/workflows/` without touching their existing lok config.
 
-The full canonical config (from this repo's own `lok.toml`, written
-under the legacy name for now):
+The full canonical config:
 
 ```toml
 [defaults]
@@ -300,7 +309,15 @@ expanded, the heredoc tag is irrelevant — loker expands first.
 
 ### 5.2. Phase-based: strategy/aggregator/verify pipeline
 
-`.lok/workflows/design-doc-tdd.toml` is the canonical reference:
+Phase-based workflows run end-to-end through `loker run` — the
+dispatcher detects `[[phases]]` in the workflow file, parses with the
+phase grammar, and walks each phase sequentially through the
+`PhaseRunner`. Artefacts are written to
+`runs/<id>/attempts/<phase>/<n>/<output>` and recorded in
+`manifest.json` with the matching `kind` (`design.md`, `review.md`,
+`plan.md`, etc.).
+
+`.loker/workflows/design-doc-tdd.toml` is the canonical reference:
 
 ```toml
 name = "design-doc-tdd"
@@ -344,7 +361,7 @@ Required phase keys:
 - `name` — unique within the workflow.
 - `strategy` — see §6.
 - `backends` — list of `<family>/<model>` identifiers. Empty `<model>`
-  (e.g. `"claude/"`) uses the backend's default model from `lok.toml`.
+  (e.g. `"claude/"`) uses the backend's default model from `loker.toml`.
 - `prompt_template` — path to a `.tmpl` file, relative to the
   workflow's directory.
 - `inputs` — list of upstream artefacts. `"spec"` reads from
@@ -373,9 +390,9 @@ Inside `prompt_template` files:
 | `{{ var.<name> }}` | `--var name=value` from the CLI |
 
 Templates are rendered by `src/workflow/template.rs`. A template file
-lives anywhere; the canonical location is `.lok/prompts/<workflow>/`.
+lives anywhere; the canonical location is `.loker/prompts/<workflow>/`.
 
-Example template (`.lok/prompts/design-doc-tdd/design.md.tmpl`):
+Example template (`.loker/prompts/design-doc-tdd/design.md.tmpl`):
 
 ```
 You are a senior systems architect.
@@ -487,9 +504,9 @@ Variants:
 
 ## 7. Backend catalogue
 
-Backends are configured in `lok.toml` under `[backends.<id>]`. A
+Backends are configured in `loker.toml` under `[backends.<id>]`. A
 phase's `backends = [...]` list references them by `<id>/<model>`. An
-empty model (`"claude/"`) uses the backend's `model` from `lok.toml`.
+empty model (`"claude/"`) uses the backend's `model` from `loker.toml`.
 
 ### 7.1. Subprocess CLI backends
 
@@ -557,14 +574,14 @@ loker -v …                  # verbose: show prompts, timing, debug
 
 | Command | Use |
 |---------|-----|
-| `loker run <name> [args…]` | Run a workflow. `name` is either the file under `.lok/workflows/` or a path to `*.toml`. Positional args become `{{ arg.1 }}`, `{{ arg.2 }}`. |
+| `loker run <name> [args…]` | Run a workflow. `name` is either the stem of a file under `.loker/workflows/` (falls back to `.lok/workflows/`) or a path to `*.toml`. Positional args become `{{ arg.1 }}`, `{{ arg.2 }}`. |
 | `loker run <name> --spec FILE` | Inject `FILE` contents as `{{ spec }}`. |
 | `loker run <name> --var k=v` | Set `{{ var.k }}`. Repeatable. |
 | `loker run <name> --rerun phase=design` | Force re-execution of a completed phase even if its marker exists. Repeatable. |
 | `loker run <name> --explain-validation` | Dump raw validator responses on parse failures. |
 | `loker resume <run_id>` | Continue an interrupted run from the last completed-phase marker. `run_id` is a directory name under `runs/` or a path. |
 | `loker resume <run_id> --ttl <secs>` | Override the heartbeat TTL (default: from the run's `heartbeat.json` or 300s). |
-| `loker workflow list` | List discovered workflows in `.lok/workflows/`. |
+| `loker workflow list` | List discovered workflows in `.loker/workflows/` (and `.lok/workflows/` fallback). |
 | `loker workflow validate <path>` | Parse + schema-check without executing. |
 | `loker explain <name>` | Print the DAG and phase summary for a workflow. |
 | `loker explain <dir> -f <topic>` | Codebase explanation focused on a topic — uses backends. |
@@ -579,7 +596,7 @@ loker -v …                  # verbose: show prompts, timing, debug
 | `loker smart <prompt> [--role <role>]` | Pick the best backend for the prompt via the team/role config. `--explain` shows resolution. |
 | `loker suggest <task>` | Recommend a backend for the task (no LLM call). |
 | `loker hunt [DIR] [--issues]` | Multi-prompt bug hunt. With `--issues` creates GitHub/GitLab issues. |
-| `loker audit [DIR]` | Security audit (uses `[tasks.audit]` from `lok.toml`). |
+| `loker audit [DIR]` | Security audit (uses `[tasks.audit]` from `loker.toml`). |
 | `loker diff <range>` | Multi-backend code review of a git range (`main..HEAD`). |
 | `loker pr <num>` | Multi-backend PR review. |
 | `loker spec <task>` | Generate ARF specs from a high-level description. |
@@ -596,7 +613,7 @@ loker -v …                  # verbose: show prompts, timing, debug
 |---------|-----|
 | `loker doctor` | Health-check backends, API keys, gateway. |
 | `loker backends` | List configured backends and their state. |
-| `loker init` | Write a starter `lok.toml`. |
+| `loker init` | Write a starter `loker.toml`. |
 | `loker report [--pr N]` | Generate an agent-history report from `.agent/` worktree. |
 | `loker ui --serve [--bind 127.0.0.1:8080]` | Start the localhost UI daemon. |
 
@@ -686,7 +703,7 @@ repo. Pick one and adapt.
 
 ### 12.1. "Review my PR with three families and post a synthesis"
 
-Drop this into `.lok/workflows/review-pr.toml` in the target repo,
+Drop this into `.loker/workflows/review-pr.toml` in the target repo,
 then `loker run review-pr <PR_NUM>`. Full reference at
 `examples/workflows/review-pr.toml` in this repo. Shape:
 
@@ -726,14 +743,68 @@ shell = "gh pr comment {{ arg.1 }} --body \"$(cat <<'EOF'\n{{ steps.synthesize.s
 `examples/workflows/full-heal.toml` is the autonomous loop:
 hunt → pick → issue → fix (with `apply_edits = true`) → branch →
 commit → push → PR → review → conditional merge. Copy that file into
-the target repo's `.lok/workflows/` and adjust prompts.
+the target repo's `.loker/workflows/` and adjust prompts.
 
 ### 12.3. "Design → review → implement → verify pipeline"
 
-Phase-based. Use `.lok/workflows/design-doc-tdd.toml` from this repo
+Phase-based. Use `.loker/workflows/design-doc-tdd.toml` from this repo
 (quoted in §5.2) as the template. The `verify` phase can swap in
 `run_command = { cmd = ["make", "check"] }` for repos with a
 `Makefile`, `["pytest"]` for Python, `["cargo", "test"]` for Rust.
+
+### 12.3a. "Design → review → plan" (no implement step)
+
+Lighter three-phase variant — useful as the front half of a ticket
+kickoff that only needs analysis artefacts, no code changes. Validated
+end-to-end against `mentis/docs/specs/MENTI-68.md` on
+`loker 20260511.0.2`. Drop into
+`.loker/workflows/task-kickoff.toml`:
+
+```toml
+name = "task-kickoff"
+description = "Three-phase ticket kickoff: design, cross-family review, plan."
+
+[[phases]]
+name = "design"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "../prompts/task-kickoff/design.md.tmpl"
+inputs = ["spec"]
+output = "design.md"
+
+[[phases]]
+name = "review"
+strategy = { parallel = { min_responses = 2 } }
+backends = ["claude/", "gemini/", "ollama/qwen3-coder-next:latest"]
+prompt_template = "../prompts/task-kickoff/review.md.tmpl"
+inputs = ["phase:design", "spec"]
+output = "review.md"
+
+[[phases]]
+name = "plan"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "../prompts/task-kickoff/plan.md.tmpl"
+inputs = ["phase:design", "phase:review", "spec"]
+output = "plan.md"
+```
+
+Then:
+
+```bash
+loker run task-kickoff --spec docs/specs/MY-TICKET.md
+```
+
+Expected output at `runs/task-kickoff-<ts>-<id>/`:
+
+```
+manifest.json              # 3 entries, kinds: design.md / review.md / plan.md
+design.md                  # phase 1 artefact
+review.md                  # phase 2 artefact (parallel fan-out, concat aggregator)
+plan.md                    # phase 3 artefact
+markers/                   # design.completed / review.completed / plan.completed
+attempts/                  # per-phase per-attempt prompts + raw stdout
+```
 
 ### 12.4. "Cross-family vote with judge"
 
@@ -786,11 +857,11 @@ This is the workflow an agent should follow when handed
 *"build a flow in this repo"*:
 
 1. **Confirm prerequisites in the target repo.**
-   - `loker --version` → expect `loker 20260509.0.0` (or newer).
+   - `loker --version` → expect `loker 20260511.0.2` (or newer).
    - `loker doctor` → at least one ready backend.
-   - If TensorZero is required: `cd deploy/tensorzero && docker compose up -d` in the loker checkout, then ensure the target repo's `lok.toml` has the `[tensorzero]` block above.
+   - If TensorZero is required: `cd deploy/tensorzero && docker compose up -d` in the loker checkout, then ensure the target repo's `loker.toml` has the `[tensorzero]` block above.
 
-2. **Create or update `lok.toml` in the target repo.**
+2. **Create or update `loker.toml` in the target repo.**
    - Copy the §4 template; trim to the backends you actually need.
    - For predefined `loker hunt` / `loker audit` prompts, copy the
      `[tasks.*]` blocks too.
@@ -799,13 +870,14 @@ This is the workflow an agent should follow when handed
    - Step-based for "shell + LLM" automation (PR review, issue
      triage, fix-and-merge).
    - Phase-based for "fan-out + verify" pipelines (design-doc TDD,
-     cross-family vote, escalating retry).
+     cross-family vote, escalating retry, three-phase ticket
+     kickoff).
 
 4. **Write the workflow file.**
-   - Place it under `.lok/workflows/<name>.toml`.
-   - Reference templates from `.lok/prompts/<name>/*.tmpl` if
+   - Place it under `.loker/workflows/<name>.toml`.
+   - Reference templates from `.loker/prompts/<name>/*.tmpl` if
      phase-based; inline `prompt = """…"""` if step-based.
-   - Validate: `loker workflow validate .lok/workflows/<name>.toml`.
+   - Validate: `loker workflow validate .loker/workflows/<name>.toml`.
 
 5. **Dry-run the DAG.**
    - `loker explain <name>` — prints the phases, backends, inputs,
@@ -833,7 +905,7 @@ This is the workflow an agent should follow when handed
 9. **Iterate.**
    - To force a phase to re-run: `loker run <name> --rerun phase=<name> [args…]`.
    - To pin a different backend without editing the workflow: edit
-     `lok.toml` (`[backends.<id>]`) — but prefer explicit
+     `loker.toml` (`[backends.<id>]`) — but prefer explicit
      `<family>/<model>` strings in the workflow for reproducibility.
 
 ---
@@ -863,7 +935,7 @@ Authoritative sources in this repo:
 - [`docs/migration-from-lok.md`](../migration-from-lok.md) — diff vs upstream lok.
 - [`docs/tutorial.md`](../tutorial.md) — full end-to-end run walkthrough.
 - [`docs/prd/2026-04-25-loker.md`](../prd/2026-04-25-loker.md) — milestone PRD; §6 is the v0 out-of-scope list.
-- [`.lok/workflows/`](../../.lok/workflows/) — the in-repo workflows used to build loker itself.
+- [`.lok/workflows/`](../../.lok/workflows/) — the in-repo workflows used to build loker itself (the loker source repo still uses the legacy `.lok/` namespace; new projects should use `.loker/workflows/`).
 - [`examples/workflows/`](../../examples/workflows/) — copy-pasteable starting points.
 - [`deploy/tensorzero/`](../../deploy/tensorzero/) — Docker Compose for the TensorZero gateway + ClickHouse + UI.
 
