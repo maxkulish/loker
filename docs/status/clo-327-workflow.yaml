@@ -20,10 +20,10 @@ linear:
   priority: '2'
   branch_actual: feat/clo-327-wire-phase-based-runner
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-10T18:06:01.841Z'
+  updated_at: '2026-05-10T18:48:51.876Z'
 phases:
   discovery:
     status: complete
@@ -60,14 +60,23 @@ phases:
     plan_file: docs/plans/clo-327-wire-phase-based-runner.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - 963cf08
       - fe48f2b
       - 50efd00
       - 9dda610
+    codex_report: docs/reviews/clo-327-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-327-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-327-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
   pr:
-    status: pending
+    status: in_progress
+    pr_number: 69
+    pr_url: https://github.com/maxkulish/loker/pull/69
   complete:
     status: pending
 history:
@@ -157,5 +166,23 @@ history:
     action: implementation_complete
     phase: implement
     details: 'All sub-tasks landed (ST1-ST4). make check green. 4 commits: 963cf08, fe48f2b, 50efd00, 9dda610.'
+  - timestamp: '2026-05-10T18:28:38.239Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (shell quoting bug). Gemini: REVIEW_FAILED (same). Synthesis: approve_with_changes (after
+      single fix iteration F1-F5). Claude fallback: OK, 7 findings all addressed.
+  - timestamp: '2026-05-10T18:30:36.864Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-10T18:32:21.268Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (0 failures, 1200+ tests)'
+  - timestamp: '2026-05-10T18:48:51.876Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #69 opened: https://github.com/maxkulish/loker/pull/69'
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
