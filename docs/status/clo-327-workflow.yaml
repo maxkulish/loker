@@ -20,10 +20,10 @@ linear:
   priority: '2'
   branch_actual: feat/clo-327-wire-phase-based-runner
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-10T13:25:34.417Z'
-  updated_at: '2026-05-11T07:23:49.297Z'
+  updated_at: '2026-05-11T08:12:39.711Z'
 phases:
   discovery:
     status: complete
@@ -74,12 +74,19 @@ phases:
     validation_synthesis_report: docs/reviews/clo-327-validation-synthesis.md
     validation_synthesis_verdict: approve_with_changes
   pr:
-    status: in_progress
+    status: complete
     pr_number: 69
     pr_url: https://github.com/maxkulish/loker/pull/69
     ci_passed: true
+    reviews_addressed: true
+    merge_commit: 099de0d
+    merged_at: '2026-05-11T08:05:56Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 099de0d
+    merged_at: '2026-05-11T08:05:56Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-10T13:25:34.417Z'
     action: workflow_started
@@ -189,5 +196,37 @@ history:
     action: ci_passed
     phase: pr
     details: 'All required checks passing: format ✅, clippy ✅, test ✅'
+  - timestamp: '2026-05-11T08:02:51.904Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      13 threads resolved (1 auto-resolved, 12 resolved after Gemini re-review approved all fixes). Replies posted
+      13/13. /gemini review trailer verified on every reply (Gemini and Copilot alike). All 1200 tests green.
+  - timestamp: '2026-05-11T08:04:08.475Z'
+    action: pr_complete
+    phase: pr
+    details: PR phase complete. PI green, 13/13 review threads resolved, all comments addressed.
+  - timestamp: '2026-05-11T08:04:42.477Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-11T08:08:59.107Z'
+    action: pr_merged
+    phase: complete
+    details: 'PR #69 merged. Merge commit 099de0d.'
+  - timestamp: '2026-05-11T08:09:20.249Z'
+    action: pr_merged
+    phase: pr
+    details: 'PR #69 merged. Merge commit 099de0d.'
+  - timestamp: '2026-05-11T08:11:22.106Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
+  - timestamp: '2026-05-11T08:12:39.711Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-327 fully completed. PR #69 merged in 099de0d. Unblocks: phase-based workflows now produce real output
+      instead of empty manifest.
 task_title: Wire phase-based runner into `loker run`
 task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
