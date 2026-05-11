@@ -34,8 +34,12 @@ fn backend_scheme(raw: &str) -> &str {
 /// Known markdown names resolve to dedicated enum variants; any other `.md`
 /// file falls back to `Kind::OtherMd` so workflow authors are not blocked
 /// waiting for a new enum variant.
-fn kind_from_filename(output: &str) -> Kind {
-    let name = output.to_ascii_lowercase();
+fn kind_from_filename(output: &std::path::Path) -> Kind {
+    let name = output
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     match name.as_str() {
         "design.md" => Kind::DesignMd,
         "review.md" => Kind::ReviewMd,
@@ -142,7 +146,7 @@ pub fn build_phase_config(
         Strategy::EscalatingRetry { .. } => Producer::Escalating,
     };
 
-    let artefact_kind = kind_from_filename(&phase.output);
+    let artefact_kind = kind_from_filename(std::path::Path::new(&phase.output));
 
     let pass_failure_context = match &phase.strategy {
         Strategy::EscalatingRetry {
@@ -490,37 +494,70 @@ output = "design.md"
 
     #[test]
     fn kind_from_filename_maps_known_names() {
-        assert_eq!(kind_from_filename("design.md"), Kind::DesignMd);
-        assert_eq!(kind_from_filename("review.md"), Kind::ReviewMd);
-        assert_eq!(kind_from_filename("plan.md"), Kind::PlanMd);
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("design.md")),
+            Kind::DesignMd
+        );
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("review.md")),
+            Kind::ReviewMd
+        );
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("plan.md")),
+            Kind::PlanMd
+        );
     }
 
     #[test]
     fn kind_from_filename_maps_mixed_case() {
-        assert_eq!(kind_from_filename("Plan.MD"), Kind::PlanMd);
-        assert_eq!(kind_from_filename("Design.Md"), Kind::DesignMd);
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("Plan.MD")),
+            Kind::PlanMd
+        );
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("Design.Md")),
+            Kind::DesignMd
+        );
     }
 
     #[test]
     fn kind_from_filename_maps_unknown_md_to_other() {
         assert_eq!(
-            kind_from_filename("analysis.md"),
+            kind_from_filename(std::path::Path::new("analysis.md")),
             Kind::OtherMd("analysis.md".into())
         );
         assert_eq!(
-            kind_from_filename("synthesis.md"),
+            kind_from_filename(std::path::Path::new("synthesis.md")),
             Kind::OtherMd("synthesis.md".into())
         );
     }
 
     #[test]
     fn kind_from_filename_maps_json_to_verify() {
-        assert_eq!(kind_from_filename("result.json"), Kind::VerifyJson);
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("result.json")),
+            Kind::VerifyJson
+        );
     }
 
     #[test]
     fn kind_from_filename_fallback_for_unknown_extension() {
-        assert_eq!(kind_from_filename("out.txt"), Kind::PhaseResultJson);
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("out.txt")),
+            Kind::PhaseResultJson
+        );
+    }
+
+    #[test]
+    fn kind_from_filename_nested_path() {
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("phaseX/plan.md")),
+            Kind::PlanMd
+        );
+        assert_eq!(
+            kind_from_filename(std::path::Path::new("phaseX/analysis.md")),
+            Kind::OtherMd("analysis.md".into())
+        );
     }
 
     #[test]

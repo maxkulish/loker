@@ -23,7 +23,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-11T09:15:52.727Z'
-  updated_at: '2026-05-11T09:24:32.701Z'
+  updated_at: '2026-05-11T09:31:50.865Z'
 phases:
   discovery:
     status: complete
@@ -60,7 +60,8 @@ phases:
     plan_file: docs/plans/clo-358-fix-manifest-kind.md
     approved: true
   implement:
-    status: pending
+    status: validating
+    phases.implement.commits: d91640b
   pr:
     status: pending
   complete:
@@ -132,5 +133,9 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-11T09:31:50.865Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed. make check green. 1 commit (d91640b).
 task_title: Phase bridge mislabels artefact kind in manifest (all .md → design.md)
 task_url: https://linear.app/cloud-ai/issue/CLO-358/phase-bridge-mislabels-artefact-kind-in-manifest-all-md-designmd
