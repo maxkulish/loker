@@ -53,8 +53,8 @@
             },
             {
               "type": "string",
-              "pattern": "^.*\\.md$",
-              "description": "Arbitrary markdown artefact kind produced by a workflow phase."
+              "pattern": "^.+\\.md$",
+              "description": "Arbitrary markdown artefact kind produced by a workflow phase. Filename stem must be non-empty (a bare '.md' is rejected)."
             }
           ]
         },
