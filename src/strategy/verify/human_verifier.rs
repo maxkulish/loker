@@ -641,7 +641,7 @@ impl VerifyHook for HumanVerifier {
 
 fn kind_str(kind: &Kind) -> &'static str {
     match kind {
-        Kind::DesignMd | Kind::ReviewMd => "text/markdown",
+        Kind::DesignMd | Kind::ReviewMd | Kind::PlanMd | Kind::OtherMd(_) => "text/markdown",
         Kind::VerifyJson
         | Kind::PhaseResultJson
         | Kind::PendingJson

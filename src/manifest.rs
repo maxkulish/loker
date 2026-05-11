@@ -27,26 +27,82 @@ pub enum ManifestError {
 }
 
 /// Artefact kind. Serialises to the bare strings defined in manifest.schema.json.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// `OtherMd(String)` captures arbitrary markdown filenames (e.g. `analysis.md`) so
+/// workflow authors are not blocked waiting for a new enum variant. It serialises
+/// as the bare string, not as a tagged enum object.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
-    #[serde(rename = "design.md")]
     DesignMd,
-    #[serde(rename = "review.md")]
     ReviewMd,
-    #[serde(rename = "verify.json")]
+    PlanMd,
+    OtherMd(String),
     VerifyJson,
-    #[serde(rename = "phase_result.json")]
     PhaseResultJson,
-    #[serde(rename = "pending.json")]
     PendingJson,
-    #[serde(rename = "response.json")]
     ResponseJson,
-    #[serde(rename = "summary.json")]
     SummaryJson,
-    #[serde(rename = "changes/")]
     ChangesDir,
-    #[serde(rename = "trace.jsonl")]
     TraceJsonl,
+}
+
+impl Kind {
+    /// True for all markdown variants (known or arbitrary).
+    pub fn is_markdown(&self) -> bool {
+        matches!(
+            self,
+            Kind::DesignMd | Kind::ReviewMd | Kind::PlanMd | Kind::OtherMd(_)
+        )
+    }
+
+    /// The filename string this kind serialises to.
+    pub fn as_filename(&self) -> &str {
+        match self {
+            Kind::DesignMd => "design.md",
+            Kind::ReviewMd => "review.md",
+            Kind::PlanMd => "plan.md",
+            Kind::OtherMd(s) => s.as_str(),
+            Kind::VerifyJson => "verify.json",
+            Kind::PhaseResultJson => "phase_result.json",
+            Kind::PendingJson => "pending.json",
+            Kind::ResponseJson => "response.json",
+            Kind::SummaryJson => "summary.json",
+            Kind::ChangesDir => "changes/",
+            Kind::TraceJsonl => "trace.jsonl",
+        }
+    }
+}
+
+impl Serialize for Kind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_filename())
+    }
+}
+
+impl<'de> Deserialize<'de> for Kind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "design.md" => Ok(Kind::DesignMd),
+            "review.md" => Ok(Kind::ReviewMd),
+            "plan.md" => Ok(Kind::PlanMd),
+            "verify.json" => Ok(Kind::VerifyJson),
+            "phase_result.json" => Ok(Kind::PhaseResultJson),
+            "pending.json" => Ok(Kind::PendingJson),
+            "response.json" => Ok(Kind::ResponseJson),
+            "summary.json" => Ok(Kind::SummaryJson),
+            "changes/" => Ok(Kind::ChangesDir),
+            "trace.jsonl" => Ok(Kind::TraceJsonl),
+            s if s.ends_with(".md") => Ok(Kind::OtherMd(s.to_string())),
+            _ => Err(serde::de::Error::custom(format!("unknown kind: {}", s))),
+        }
+    }
 }
 
 /// Producer backend that created the artefact.
@@ -373,6 +429,59 @@ mod tests {
         let got = sha256_hex(data);
         let expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn kind_plan_md_round_trips() {
+        let json = serde_json::to_string(&Kind::PlanMd).unwrap();
+        assert_eq!(json, "\"plan.md\"");
+        let back: Kind = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, Kind::PlanMd);
+    }
+
+    #[test]
+    fn kind_other_md_round_trips() {
+        let kind = Kind::OtherMd("analysis.md".into());
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"analysis.md\"");
+        let back: Kind = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, kind);
+    }
+
+    #[test]
+    fn kind_other_md_rejects_non_md_strings() {
+        let err: Result<Kind, _> = serde_json::from_str("\"random.txt\"");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn kind_known_variants_unchanged() {
+        for (kind, expected) in [
+            (Kind::DesignMd, "\"design.md\""),
+            (Kind::ReviewMd, "\"review.md\""),
+            (Kind::VerifyJson, "\"verify.json\""),
+            (Kind::PhaseResultJson, "\"phase_result.json\""),
+            (Kind::PendingJson, "\"pending.json\""),
+            (Kind::ResponseJson, "\"response.json\""),
+            (Kind::SummaryJson, "\"summary.json\""),
+            (Kind::ChangesDir, "\"changes/\""),
+            (Kind::TraceJsonl, "\"trace.jsonl\""),
+        ] {
+            let json = serde_json::to_string(&kind).unwrap();
+            assert_eq!(json, expected);
+            let back: Kind = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, kind);
+        }
+    }
+
+    #[test]
+    fn kind_is_markdown() {
+        assert!(Kind::DesignMd.is_markdown());
+        assert!(Kind::ReviewMd.is_markdown());
+        assert!(Kind::PlanMd.is_markdown());
+        assert!(Kind::OtherMd("anything.md".into()).is_markdown());
+        assert!(!Kind::VerifyJson.is_markdown());
+        assert!(!Kind::ChangesDir.is_markdown());
     }
 
     #[test]

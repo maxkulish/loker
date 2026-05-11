@@ -36,17 +36,26 @@
           "description": "Path of the artefact relative to the run directory (e.g., design/design.md, verify/01.json)."
         },
         "kind": {
-          "type": "string",
-          "enum": [
-            "design.md",
-            "review.md",
-            "verify.json",
-            "phase_result.json",
-            "pending.json",
-            "response.json",
-            "summary.json",
-            "changes/",
-            "trace.jsonl"
+          "anyOf": [
+            {
+              "enum": [
+                "design.md",
+                "review.md",
+                "plan.md",
+                "verify.json",
+                "phase_result.json",
+                "pending.json",
+                "response.json",
+                "summary.json",
+                "changes/",
+                "trace.jsonl"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^.*\\.md$",
+              "description": "Arbitrary markdown artefact kind produced by a workflow phase."
+            }
           ]
         },
         "schema_version": {

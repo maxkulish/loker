@@ -1,0 +1,16 @@
+{
+  "loker.run_id": "01f2a4e0-3b6f-7c8d-9e1a-2b3c4d5e6f70",
+  "schema_version": 1,
+  "entries": [
+    {
+      "name": "plan/plan.md",
+      "kind": "plan.md",
+      "schema_version": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "producer": "single",
+      "phase": "plan",
+      "attempt": 0,
+      "created_at": "2026-04-25T20:45:10Z"
+    }
+  ]
+}
