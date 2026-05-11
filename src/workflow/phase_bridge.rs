@@ -31,10 +31,16 @@ fn backend_scheme(raw: &str) -> &str {
 
 /// Map an output filename to the correct `Kind` variant.
 ///
-/// Known markdown names resolve to dedicated enum variants; any other `.md`
-/// file falls back to `Kind::OtherMd` so workflow authors are not blocked
-/// waiting for a new enum variant. Bare `.md` is treated as malformed and
-/// falls through to the JSON sentinel branch (matches schema pattern `^.+\.md$`).
+/// Resolution order:
+/// 1. Exact known markdown names (`design.md`, `review.md`, `plan.md`)
+///    map to their dedicated variants.
+/// 2. Any other filename matching `^.+\.md$` becomes `Kind::OtherMd` so
+///    workflow authors are not blocked waiting for a new enum variant.
+/// 3. `*.json` filenames become `Kind::VerifyJson`.
+/// 4. Anything else (including bare `.md`, which fails the `^.+\.md$`
+///    pattern) falls through to `Kind::PhaseResultJson` as the catch-all
+///    default. The grammar/schema layer is responsible for rejecting
+///    malformed `phase.output` values upstream.
 fn kind_from_filename(output: &std::path::Path) -> Kind {
     let name = output
         .file_name()
