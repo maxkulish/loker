@@ -55,11 +55,16 @@ impl Kind {
         )
     }
 
-    /// Construct an `OtherMd` variant, validating that the filename has a non-empty
-    /// stem and a `.md` extension (matches the manifest.schema.json pattern `^.+\.md$`).
+    /// True when `s` is a valid `OtherMd` filename: a non-empty stem followed
+    /// by `.md` (matches the manifest.schema.json pattern `^.+\.md$`).
+    pub fn is_valid_other_md(s: &str) -> bool {
+        s.ends_with(".md") && s.len() > 3
+    }
+
+    /// Construct an `OtherMd` variant, validating against [`Kind::is_valid_other_md`].
     pub fn other_md(s: impl Into<String>) -> Result<Self, KindError> {
         let s = s.into();
-        if !s.ends_with(".md") || s.len() <= 3 {
+        if !Self::is_valid_other_md(&s) {
             return Err(KindError::InvalidOtherMd(s));
         }
         Ok(Kind::OtherMd(s))
@@ -95,10 +100,9 @@ impl Serialize for Kind {
         S: serde::Serializer,
     {
         if let Kind::OtherMd(s) = self {
-            if !s.ends_with(".md") || s.len() <= 3 {
-                return Err(serde::ser::Error::custom(format!(
-                    "OtherMd filename must match `^.+\\.md$`, got '{}'",
-                    s
+            if !Self::is_valid_other_md(s) {
+                return Err(serde::ser::Error::custom(KindError::InvalidOtherMd(
+                    s.clone(),
                 )));
             }
         }
@@ -123,7 +127,7 @@ impl<'de> Deserialize<'de> for Kind {
             "summary.json" => Ok(Kind::SummaryJson),
             "changes/" => Ok(Kind::ChangesDir),
             "trace.jsonl" => Ok(Kind::TraceJsonl),
-            s if s.ends_with(".md") && s.len() > 3 => Ok(Kind::OtherMd(s.to_string())),
+            s if Kind::is_valid_other_md(s) => Ok(Kind::OtherMd(s.to_string())),
             _ => Err(serde::de::Error::custom(format!("unknown kind: {}", s))),
         }
     }

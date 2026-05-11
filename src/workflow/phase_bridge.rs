@@ -45,7 +45,7 @@ fn kind_from_filename(output: &std::path::Path) -> Kind {
         "design.md" => Kind::DesignMd,
         "review.md" => Kind::ReviewMd,
         "plan.md" => Kind::PlanMd,
-        s if s.ends_with(".md") && s.len() > 3 => Kind::other_md(s).expect("checked above"),
+        s if Kind::is_valid_other_md(s) => Kind::other_md(s).expect("checked above"),
         s if s.ends_with(".json") => Kind::VerifyJson,
         _ => Kind::PhaseResultJson,
     }
