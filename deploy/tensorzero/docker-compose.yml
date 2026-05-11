@@ -25,7 +25,7 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8123/ping"]
       start_period: 30s
       start_interval: 1s
       timeout: 1s
@@ -39,12 +39,13 @@ services:
       TENSORZERO_CLICKHOUSE_URL: http://chuser:chpassword@clickhouse:8123/tensorzero
       OPENAI_API_KEY: ${OPENAI_API_KEY:?Environment variable OPENAI_API_KEY must be set.}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-placeholder-not-set}
+      GOOGLE_AI_STUDIO_API_KEY: ${GEMINI_API_KEY:-placeholder-not-set}
     ports:
       - "3000:3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
       start_period: 10s
       start_interval: 1s
       timeout: 1s

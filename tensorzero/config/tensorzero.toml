@@ -24,7 +24,14 @@ routing = ["openai"]
 
 [models.loker_openai_mini.providers.openai]
 type = "openai"
-model_name = "gpt-4o-mini"
+model_name = "gpt-5.4-mini"
+
+[models.loker_google_flashlite]
+routing = ["google"]
+
+[models.loker_google_flashlite.providers.google]
+type = "google_ai_studio_gemini"
+model_name = "gemini-3.1-flash-lite"
 
 # Function-name family convention (D1 verdict, CLO-247):
 #   loker_<purpose>_<family>
@@ -48,3 +55,10 @@ type = "chat"
 [functions.loker_d1_openai.variants.mini_v1]
 type = "chat_completion"
 model = "loker_openai_mini"
+
+[functions.loker_d1_google]
+type = "chat"
+
+[functions.loker_d1_google.variants.flashlite_v1]
+type = "chat_completion"
+model = "loker_google_flashlite"
