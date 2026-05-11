@@ -20,10 +20,10 @@ linear:
   priority: Medium
   branch_actual: fix/clo-358-bridge
 workflow:
-  current_phase: implement
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-11T09:15:52.727Z'
-  updated_at: '2026-05-11T09:31:50.865Z'
+  updated_at: '2026-05-11T11:38:41.000Z'
 phases:
   discovery:
     status: complete
@@ -60,12 +60,22 @@ phases:
     plan_file: docs/plans/clo-358-fix-manifest-kind.md
     approved: true
   implement:
-    status: validating
+    status: complete
     phases.implement.commits: d91640b
   pr:
-    status: pending
+    status: complete
+    pr_number: 71
+    pr_url: https://github.com/maks-k/loker/pull/71
+    merged_at: '2026-05-11T10:00:53.000Z'
+    follow_up_pr: 72
+    follow_up_pr_url: https://github.com/maks-k/loker/pull/72
+    follow_up_merged_at: '2026-05-11T11:38:41.000Z'
+    follow_up_reason: Address bot review comments (Copilot + gemini-code-assist)
   complete:
-    status: pending
+    status: complete
+    aggregation_files_updated: false
+    aggregation_skip_reason: PROJECT.md/ROADMAP.md/DEPENDENCIES.md do not exist in this repo
+    merged_at: '2026-05-11T11:38:41.000Z'
 history:
   - timestamp: '2026-05-11T09:15:52.727Z'
     action: workflow_started
@@ -137,5 +147,22 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed. make check green. 1 commit (d91640b).
+  - timestamp: '2026-05-11T10:00:53.000Z'
+    action: pr_merged
+    phase: pr
+    details: PR #71 merged to main (squash). Initial CLO-358 fix shipped.
+  - timestamp: '2026-05-11T11:38:41.000Z'
+    action: pr_merged
+    phase: pr
+    details: >-
+      Follow-up PR #72 merged to main (squash). Addressed bot review feedback from PR #71
+      (Copilot + gemini-code-assist): centralized OtherMd validation via Kind::is_valid_other_md
+      and clarified kind_from_filename doc comment.
+  - timestamp: '2026-05-11T11:45:00.000Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-358 fully complete. PR #71 (initial fix) and PR #72 (bot-feedback follow-up) both
+      merged. Aggregation files skipped (do not exist in repo). Linear status already Done.
 task_title: Phase bridge mislabels artefact kind in manifest (all .md → design.md)
 task_url: https://linear.app/cloud-ai/issue/CLO-358/phase-bridge-mislabels-artefact-kind-in-manifest-all-md-designmd
