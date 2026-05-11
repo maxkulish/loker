@@ -253,6 +253,8 @@ impl RunState {
                 }
                 Kind::DesignMd
                 | Kind::ReviewMd
+                | Kind::PlanMd
+                | Kind::OtherMd(_)
                 | Kind::VerifyJson
                 | Kind::PhaseResultJson
                 | Kind::PendingJson
@@ -384,16 +386,6 @@ fn status_rank(status: PhaseStatus) -> u8 {
     }
 }
 
-fn kind_name(kind: &Kind) -> &'static str {
-    match kind {
-        Kind::DesignMd => "design.md",
-        Kind::ReviewMd => "review.md",
-        Kind::VerifyJson => "verify.json",
-        Kind::PhaseResultJson => "phase_result.json",
-        Kind::PendingJson => "pending.json",
-        Kind::ResponseJson => "response.json",
-        Kind::SummaryJson => "summary.json",
-        Kind::ChangesDir => "changes/",
-        Kind::TraceJsonl => "trace.jsonl",
-    }
+fn kind_name(kind: &Kind) -> &str {
+    kind.as_filename()
 }

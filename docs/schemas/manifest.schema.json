@@ -40,6 +40,7 @@
           "enum": [
             "design.md",
             "review.md",
+            "plan.md",
             "verify.json",
             "phase_result.json",
             "pending.json",

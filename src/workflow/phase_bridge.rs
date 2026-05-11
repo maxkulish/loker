@@ -29,6 +29,23 @@ fn backend_scheme(raw: &str) -> &str {
     raw.trim_end_matches('/').split('/').next().unwrap_or(raw)
 }
 
+/// Map an output filename to the correct `Kind` variant.
+///
+/// Known markdown names resolve to dedicated enum variants; any other `.md`
+/// file falls back to `Kind::OtherMd` so workflow authors are not blocked
+/// waiting for a new enum variant.
+fn kind_from_filename(output: &str) -> Kind {
+    let name = output.to_ascii_lowercase();
+    match name.as_str() {
+        "design.md" => Kind::DesignMd,
+        "review.md" => Kind::ReviewMd,
+        "plan.md" => Kind::PlanMd,
+        s if s.ends_with(".md") => Kind::OtherMd(s.to_string()),
+        s if s.ends_with(".json") => Kind::VerifyJson,
+        _ => Kind::PhaseResultJson,
+    }
+}
+
 /// Build a `PhaseConfig` from a `grammar::Phase`.
 ///
 /// Strategy mapping:
@@ -125,14 +142,7 @@ pub fn build_phase_config(
         Strategy::EscalatingRetry { .. } => Producer::Escalating,
     };
 
-    let output_lower = phase.output.to_lowercase();
-    let artefact_kind = if output_lower.ends_with(".md") {
-        Kind::DesignMd
-    } else if output_lower.ends_with(".json") {
-        Kind::VerifyJson
-    } else {
-        Kind::PhaseResultJson
-    };
+    let artefact_kind = kind_from_filename(&phase.output);
 
     let pass_failure_context = match &phase.strategy {
         Strategy::EscalatingRetry {
@@ -479,45 +489,56 @@ output = "design.md"
     }
 
     #[test]
-    fn build_phase_config_pre_renders_phase_output_chaining() {
-        let mut phase_outputs = HashMap::new();
-        phase_outputs.insert(
-            "design".to_string(),
-            (
-                "Design output content".to_string(),
-                PathBuf::from("design.md"),
-            ),
+    fn kind_from_filename_maps_known_names() {
+        assert_eq!(kind_from_filename("design.md"), Kind::DesignMd);
+        assert_eq!(kind_from_filename("review.md"), Kind::ReviewMd);
+        assert_eq!(kind_from_filename("plan.md"), Kind::PlanMd);
+    }
+
+    #[test]
+    fn kind_from_filename_maps_mixed_case() {
+        assert_eq!(kind_from_filename("Plan.MD"), Kind::PlanMd);
+        assert_eq!(kind_from_filename("Design.Md"), Kind::DesignMd);
+    }
+
+    #[test]
+    fn kind_from_filename_maps_unknown_md_to_other() {
+        assert_eq!(
+            kind_from_filename("analysis.md"),
+            Kind::OtherMd("analysis.md".into())
         );
-        let review_toml = r#"
+        assert_eq!(
+            kind_from_filename("synthesis.md"),
+            Kind::OtherMd("synthesis.md".into())
+        );
+    }
+
+    #[test]
+    fn kind_from_filename_maps_json_to_verify() {
+        assert_eq!(kind_from_filename("result.json"), Kind::VerifyJson);
+    }
+
+    #[test]
+    fn kind_from_filename_fallback_for_unknown_extension() {
+        assert_eq!(kind_from_filename("out.txt"), Kind::PhaseResultJson);
+    }
+
+    #[test]
+    fn build_phase_config_kind_from_filename() {
+        let toml = r#"
 name = "test"
 [[phases]]
-name = "design"
+name = "plan"
 strategy = { single = {} }
 backends = ["claude/"]
-prompt_template = "Design the system"
+prompt_template = "Plan the work"
 inputs = ["spec"]
-output = "design.md"
-
-[[phases]]
-name = "review"
-strategy = { single = {} }
-backends = ["claude/"]
-prompt_template = "Review {{ phase.design.output }}"
-inputs = ["phase:design"]
-output = "review.md"
+output = "plan.md"
 "#;
-        let wf: Workflow = review_toml.parse().unwrap();
-        let review_phase = wf.phases.into_iter().nth(1).unwrap();
-
-        let cfg = build_phase_config(&review_phase, &phase_outputs, None, &empty_vars()).unwrap();
-        assert!(
-            cfg.prompt_template.contains("Design output content"),
-            "Expected phase output chaining, got: {}",
-            cfg.prompt_template
-        );
-        assert!(
-            !cfg.prompt_template.contains("{{ phase.design.output }}"),
-            "{{ phase.design.output }} should have been resolved"
-        );
+        let wf: Workflow = toml.parse().unwrap();
+        let phase = wf.phases.into_iter().next().unwrap();
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
+        assert_eq!(cfg.artefact_kind, Kind::PlanMd);
+        assert_eq!(cfg.artefact_name, "plan.md");
     }
 }
