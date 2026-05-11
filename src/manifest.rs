@@ -55,6 +55,16 @@ impl Kind {
         )
     }
 
+    /// Construct an `OtherMd` variant, validating that the filename has a non-empty
+    /// stem and a `.md` extension (matches the manifest.schema.json pattern `^.+\.md$`).
+    pub fn other_md(s: impl Into<String>) -> Result<Self, KindError> {
+        let s = s.into();
+        if !s.ends_with(".md") || s.len() <= 3 {
+            return Err(KindError::InvalidOtherMd(s));
+        }
+        Ok(Kind::OtherMd(s))
+    }
+
     /// The filename string this kind serialises to.
     pub fn as_filename(&self) -> &str {
         match self {
@@ -73,11 +83,25 @@ impl Kind {
     }
 }
 
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum KindError {
+    #[error("OtherMd filename must match `^.+\\.md$`, got '{0}'")]
+    InvalidOtherMd(String),
+}
+
 impl Serialize for Kind {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
+        if let Kind::OtherMd(s) = self {
+            if !s.ends_with(".md") || s.len() <= 3 {
+                return Err(serde::ser::Error::custom(format!(
+                    "OtherMd filename must match `^.+\\.md$`, got '{}'",
+                    s
+                )));
+            }
+        }
         serializer.serialize_str(self.as_filename())
     }
 }
@@ -99,7 +123,7 @@ impl<'de> Deserialize<'de> for Kind {
             "summary.json" => Ok(Kind::SummaryJson),
             "changes/" => Ok(Kind::ChangesDir),
             "trace.jsonl" => Ok(Kind::TraceJsonl),
-            s if s.ends_with(".md") => Ok(Kind::OtherMd(s.to_string())),
+            s if s.ends_with(".md") && s.len() > 3 => Ok(Kind::OtherMd(s.to_string())),
             _ => Err(serde::de::Error::custom(format!("unknown kind: {}", s))),
         }
     }
@@ -452,6 +476,37 @@ mod tests {
     fn kind_other_md_rejects_non_md_strings() {
         let err: Result<Kind, _> = serde_json::from_str("\"random.txt\"");
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn kind_other_md_rejects_bare_md_on_deserialize() {
+        let err: Result<Kind, _> = serde_json::from_str("\"\"");
+        assert!(err.is_err());
+        let err: Result<Kind, _> = serde_json::from_str("\".md\"");
+        assert!(err.is_err(), "bare '.md' should be rejected");
+    }
+
+    #[test]
+    fn kind_other_md_constructor_validates() {
+        assert!(Kind::other_md("notes.md").is_ok());
+        assert_eq!(
+            Kind::other_md(".md"),
+            Err(KindError::InvalidOtherMd(".md".into()))
+        );
+        assert_eq!(
+            Kind::other_md("notes.txt"),
+            Err(KindError::InvalidOtherMd("notes.txt".into()))
+        );
+    }
+
+    #[test]
+    fn kind_other_md_serialize_rejects_invalid_inner() {
+        let bad = Kind::OtherMd(".md".to_string());
+        let err = serde_json::to_string(&bad);
+        assert!(
+            err.is_err(),
+            "serializing an invalid OtherMd payload should error"
+        );
     }
 
     #[test]

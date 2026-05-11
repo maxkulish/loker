@@ -33,7 +33,8 @@ fn backend_scheme(raw: &str) -> &str {
 ///
 /// Known markdown names resolve to dedicated enum variants; any other `.md`
 /// file falls back to `Kind::OtherMd` so workflow authors are not blocked
-/// waiting for a new enum variant.
+/// waiting for a new enum variant. Bare `.md` is treated as malformed and
+/// falls through to the JSON sentinel branch (matches schema pattern `^.+\.md$`).
 fn kind_from_filename(output: &std::path::Path) -> Kind {
     let name = output
         .file_name()
@@ -44,7 +45,7 @@ fn kind_from_filename(output: &std::path::Path) -> Kind {
         "design.md" => Kind::DesignMd,
         "review.md" => Kind::ReviewMd,
         "plan.md" => Kind::PlanMd,
-        s if s.ends_with(".md") => Kind::OtherMd(s.to_string()),
+        s if s.ends_with(".md") && s.len() > 3 => Kind::other_md(s).expect("checked above"),
         s if s.ends_with(".json") => Kind::VerifyJson,
         _ => Kind::PhaseResultJson,
     }
@@ -557,6 +558,46 @@ output = "design.md"
         assert_eq!(
             kind_from_filename(std::path::Path::new("phaseX/analysis.md")),
             Kind::OtherMd("analysis.md".into())
+        );
+    }
+
+    #[test]
+    fn build_phase_config_pre_renders_phase_output_chain() {
+        // The downstream phase references the upstream phase's output via
+        // `{{ phase.NAME.output }}`. The bridge pre-renders the template
+        // before handing it to the strategy.
+        let downstream_toml = r#"
+name = "chained"
+[[phases]]
+name = "review"
+strategy = { single = {} }
+backends = ["claude/"]
+prompt_template = "Review this design:\n{{ phase.design.output }}"
+inputs = ["spec"]
+output = "review.md"
+"#;
+        let wf: Workflow = downstream_toml.parse().unwrap();
+        let phase = wf.phases.into_iter().next().unwrap();
+
+        let mut phase_outputs: HashMap<String, (String, PathBuf)> = HashMap::new();
+        phase_outputs.insert(
+            "design".to_string(),
+            (
+                "## Design\nUse a queue.".to_string(),
+                PathBuf::from("design/design.md"),
+            ),
+        );
+
+        let cfg = build_phase_config(&phase, &phase_outputs, None, &empty_vars()).unwrap();
+        assert!(
+            cfg.prompt_template.contains("Use a queue."),
+            "expected upstream phase output baked into prompt, got: {}",
+            cfg.prompt_template
+        );
+        assert!(
+            !cfg.prompt_template.contains("{{ phase.design.output }}"),
+            "phase placeholder should be resolved, got: {}",
+            cfg.prompt_template
         );
     }
 

@@ -2,18 +2,49 @@
 //!
 //! Covers the bug fixed in CLO-358 where every markdown artefact was
 //! hardcoded to `kind: "design.md"` regardless of actual filename.
+//!
+//! These tests drive `PhaseConfig` through the public `build_phase_config`
+//! pipeline (parsing a real grammar TOML), so a regression that hardcodes
+//! `artefact_kind` would resurface here. Earlier versions of this file
+//! constructed `PhaseConfig` via `PhaseConfig::single` and overwrote
+//! `artefact_kind` after the fact, which masked exactly the bug being
+//! guarded against.
 
-use loker::manifest::{Kind, Manifest, Producer};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+use loker::manifest::{Kind, Manifest};
 use loker::phase_runner::persist::commit_success;
-use loker::phase_runner::{PhaseConfig, VerifyHookName};
+use loker::workflow::grammar::Workflow;
+use loker::workflow::phase_bridge::build_phase_config;
 use uuid::Uuid;
+
+fn build_cfg_for(phase_name: &str, output: &str) -> loker::phase_runner::PhaseConfig {
+    let toml = format!(
+        r#"
+name = "kind-per-phase"
+[[phases]]
+name = "{phase_name}"
+strategy = {{ single = {{}} }}
+backends = ["claude/"]
+prompt_template = "irrelevant"
+inputs = ["spec"]
+output = "{output}"
+"#
+    );
+    let wf: Workflow = toml.parse().expect("workflow parses");
+    let phase = wf.phases.into_iter().next().expect("one phase");
+    let phase_outputs: HashMap<String, (String, PathBuf)> = HashMap::new();
+    let vars: HashMap<String, String> = HashMap::new();
+    build_phase_config(&phase, &phase_outputs, None, &vars)
+        .expect("build_phase_config succeeds for valid grammar")
+}
 
 #[test]
 fn manifest_kind_matches_filename_for_each_phase() {
     let tmp = tempfile::tempdir().unwrap();
     let run_id = Uuid::nil();
 
-    // Simulate a phase-based workflow producing four different markdown files
     let phases = vec![
         ("design", "design.md", Kind::DesignMd),
         ("review", "review.md", Kind::ReviewMd),
@@ -26,10 +57,12 @@ fn manifest_kind_matches_filename_for_each_phase() {
     ];
 
     for (phase, output, expected_kind) in &phases {
-        let mut cfg = PhaseConfig::single(*phase, "mock", "test", *output);
-        cfg.artefact_kind = expected_kind.clone();
-        cfg.producer = Producer::Single;
-        cfg.verify = VerifyHookName::None;
+        let cfg = build_cfg_for(phase, output);
+        // Sanity: build_phase_config itself must compute the right kind.
+        assert_eq!(
+            cfg.artefact_kind, *expected_kind,
+            "build_phase_config produced wrong kind for {output}"
+        );
 
         let (path, entry) = commit_success(tmp.path(), &cfg, b"hello", 0, run_id).unwrap();
         assert_eq!(entry.name, *output);
@@ -37,7 +70,6 @@ fn manifest_kind_matches_filename_for_each_phase() {
         assert!(path.exists());
     }
 
-    // Load the manifest and assert every entry's kind matches its filename
     let manifest = Manifest::load(&tmp.path().join("manifest.json")).unwrap();
     assert_eq!(manifest.entries.len(), phases.len());
 
@@ -56,12 +88,21 @@ fn manifest_kind_matches_filename_for_each_phase() {
 }
 
 #[test]
-fn phase_bridge_kind_from_filename_integration() {
-    // Verify that the helper maps known filenames correctly when building
-    // PhaseConfig through the public API.
-    let cfg = PhaseConfig::single("design", "mock", "test", "design.md");
-    assert_eq!(cfg.artefact_name, "design.md");
-
-    let cfg = PhaseConfig::single("plan", "mock", "test", "plan.md");
-    assert_eq!(cfg.artefact_name, "plan.md");
+fn build_phase_config_kind_from_grammar_filename() {
+    // Drives the full bridge: grammar TOML -> Phase -> PhaseConfig. A regression
+    // that ignored `phase.output` and re-hardcoded `artefact_kind` would fail here.
+    for (phase_name, output, expected_kind) in [
+        ("design", "design.md", Kind::DesignMd),
+        ("plan", "plan.md", Kind::PlanMd),
+        ("review", "review.md", Kind::ReviewMd),
+        (
+            "analysis",
+            "analysis.md",
+            Kind::OtherMd("analysis.md".into()),
+        ),
+    ] {
+        let cfg = build_cfg_for(phase_name, output);
+        assert_eq!(cfg.artefact_name, output);
+        assert_eq!(cfg.artefact_kind, expected_kind);
+    }
 }

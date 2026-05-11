@@ -665,6 +665,25 @@ mod tests {
             self.0
         }
     }
+
+    #[test]
+    fn kind_str_markdown_variants() {
+        assert_eq!(kind_str(&Kind::DesignMd), "text/markdown");
+        assert_eq!(kind_str(&Kind::ReviewMd), "text/markdown");
+        assert_eq!(kind_str(&Kind::PlanMd), "text/markdown");
+        assert_eq!(
+            kind_str(&Kind::OtherMd("analysis.md".into())),
+            "text/markdown"
+        );
+    }
+
+    #[test]
+    fn kind_str_json_and_directory_variants() {
+        assert_eq!(kind_str(&Kind::VerifyJson), "application/json");
+        assert_eq!(kind_str(&Kind::PhaseResultJson), "application/json");
+        assert_eq!(kind_str(&Kind::ChangesDir), "application/directory");
+    }
+
     fn hook(tmp: &tempfile::TempDir, severity: HumanSeverity) -> HumanVerifier {
         HumanVerifier::new(HumanVerifierConfig {
             run_dir: tmp.path().to_path_buf(),
