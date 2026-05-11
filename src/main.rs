@@ -44,6 +44,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use loker::run_state::RunDir;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
 // Custom CLI value parsers
@@ -1422,6 +1423,82 @@ async fn run_workflow(
     config: &config::Config,
 ) -> Result<()> {
     let source = workflow::find_workflow(name).await?;
+
+    // --- Phase-based dispatch (ST1 detection gate) ---
+    // Attempt to parse as grammar::Workflow (phase-based). If the text contains
+    // [[phases]] the grammar parser will succeed; otherwise it returns an error
+    // and we fall through to the step-based path.
+    let source_text = workflow::read_workflow_source_text(&source).await?;
+    if let Ok(grammar_wf) = source_text.parse::<workflow::grammar::Workflow>() {
+        println!(
+            "{} Phase-based workflow '{}' detected ({} phases)",
+            "◆".cyan(),
+            grammar_wf.name,
+            grammar_wf.phases.len()
+        );
+        println!("{} Phase execution via new runner (ST4)", "▶".cyan());
+
+        let cwd = crate::utils::canonicalize_async(dir).await;
+        let template_vars: std::collections::HashMap<String, String> = vars
+            .iter()
+            .map(|kv| (kv.key.clone(), kv.value.clone()))
+            .collect();
+
+        let spec_content: Option<String> = match spec {
+            Some(path) => {
+                let abs_path = if path.is_absolute() {
+                    path.to_path_buf()
+                } else {
+                    cwd.join(path)
+                };
+                let content = tokio::fs::read_to_string(&abs_path)
+                    .await
+                    .with_context(|| format!("Failed to read spec file: {}", abs_path.display()))?;
+                println!(
+                    "{} Spec file: {} ({} bytes)",
+                    "✓".green(),
+                    abs_path.display(),
+                    content.len()
+                );
+                Some(content)
+            }
+            None => None,
+        };
+
+        let run_dir = RunDir::create(&cwd, name)
+            .with_context(|| format!("failed to create run directory for '{}'", name))?;
+        let run_id = uuid::Uuid::new_v4();
+
+        match workflow::phase_bridge::run_phase_workflow(
+            Arc::new(config.clone()),
+            &cwd,
+            &grammar_wf,
+            spec_content,
+            template_vars,
+            rerun_phases,
+            run_dir.path(),
+            run_id,
+        )
+        .await
+        {
+            Ok(artifacts) => {
+                println!(
+                    "{} Phase workflow completed — {} artifacts\n",
+                    "✓".green(),
+                    artifacts.len()
+                );
+            }
+            Err(e) => {
+                anyhow::bail!(
+                    "{err} Phase workflow failed: {e}\n  hint: check the phase outputs and re-run",
+                    err = "✗".red()
+                );
+            }
+        }
+
+        return Ok(());
+    }
+
     let wf = workflow::load_workflow_from_source(source).await?;
     wf.validate_with_capabilities(crate::backend::capabilities_for_name)?;
 

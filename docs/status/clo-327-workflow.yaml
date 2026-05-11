@@ -1,0 +1,193 @@
+task_id: clo-327
+task_type: development
+classification_reason: >-
+  Title starts with "Wire" (not in spec/ops keywords), no [spec]/[ops] labels or **Type:** markers, features mechanical
+  ACs requiring both design and implementation work
+task_profile:
+  has_backend: false
+  has_frontend: false
+  has_data_model: false
+  has_external_deps: false
+  skip_probe: false
+pending_human_action: null
+linear:
+  team: Cloud-ai
+  project: Loker
+  status_at_start: Backlog
+  blocks: []
+  blocked_by: []
+  branch_suggested: kmamemo/clo-327-wire-phase-based-runner-into-loker-run
+  priority: '2'
+  branch_actual: feat/clo-327-wire-phase-based-runner
+workflow:
+  current_phase: pr
+  status: active
+  created_at: '2026-05-10T13:25:34.417Z'
+  updated_at: '2026-05-11T07:23:49.297Z'
+phases:
+  discovery:
+    status: complete
+    approach_chosen: detect-and-dispatch (Approach A)
+    approaches_identified: 3
+    approved: true
+    baseline_score: 4
+    discovery_debt: []
+    discovery_report: docs/discovery/clo-327.md
+    prd_created: true
+    prd_exists: true
+    prd_file: docs/prds/clo-327-wire-phase-based-runner.md
+    problem_framed: true
+  design:
+    status: complete
+    design_doc: docs/designs/clo-327-wire-phase-based-runner.md
+    discovery_context_used: true
+    draft_ready: true
+    draft_source: manual
+    applied_suggestions:
+      - Reuse existing TemplateEngine (remove new TemplateEngine proposal)
+      - Fix API signature consistency (Arc<Config> vs &Config)
+      - Fix backend resolution timing description
+      - Clarify --rerun behavior
+    flagged_suggestions: []
+    review_completed: true
+    review_gemini: docs/reviews/clo-327-design-gemini.md
+    review_synthesis: docs/reviews/clo-327-design-synthesis.md
+    review_verdict: approve_with_changes
+    human_review_completed: true
+    finalized: true
+  plan:
+    status: complete
+    plan_file: docs/plans/clo-327-wire-phase-based-runner.md
+    approved: true
+  implement:
+    status: complete
+    commits:
+      - 963cf08
+      - fe48f2b
+      - 50efd00
+      - 9dda610
+    codex_report: docs/reviews/clo-327-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-327-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-327-validation-synthesis.md
+    validation_synthesis_verdict: approve_with_changes
+  pr:
+    status: in_progress
+    pr_number: 69
+    pr_url: https://github.com/maxkulish/loker/pull/69
+    ci_passed: true
+  complete:
+    status: pending
+history:
+  - timestamp: '2026-05-10T13:25:34.417Z'
+    action: workflow_started
+    phase: init
+    details: Workflow initialized for clo-327 as development
+  - timestamp: '2026-05-10T13:25:58.181Z'
+    action: init_classified
+    phase: init
+    details: >-
+      Classified as development: title starts with "Wire" (not in spec/ops keywords), no [spec]/[ops] labels or
+      **Type:** markers, features mechanical ACs requiring both design and implementation work
+  - timestamp: '2026-05-10T13:26:17.770Z'
+    action: project_sync_skipped
+    phase: init
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo. Skipping project sync.
+  - timestamp: '2026-05-10T13:26:19.876Z'
+    action: phase_transition
+    phase: init
+    details: Transitioned from init to discovery
+  - timestamp: '2026-05-10T13:27:10.117Z'
+    action: branch_created
+    phase: discovery
+    details: Branch feat/clo-327-wire-phase-based-runner created from main (4f0c8b3)
+  - timestamp: '2026-05-10T13:33:47.510Z'
+    action: discovery_approved
+    phase: discovery
+    details: 'Approach: detect-and-dispatch (Approach A). Baseline 4/10. 3 approaches considered.'
+  - timestamp: '2026-05-10T13:33:57.143Z'
+    action: phase_transition
+    phase: discovery
+    details: Transitioned from discovery to design
+  - timestamp: '2026-05-10T13:38:20.398Z'
+    action: design_draft_ready
+    phase: design
+    details: Draft generated manually at docs/designs/clo-327-wire-phase-based-runner.md (7 sections, 13444 bytes)
+  - timestamp: '2026-05-10T13:52:12.353Z'
+    action: design_review_complete
+    phase: design
+    details: >-
+      Review verdict: approve_with_changes. 5 suggestions received (all addressed), 0 flagged. Gemini review produced,
+      Claude timed out.
+  - timestamp: '2026-05-10T13:57:45.496Z'
+    action: design_human_review_complete
+    phase: design
+    details: >-
+      Plannotator annotate session timed out with no annotations (headless environment). Human review gate passed
+      without feedback.
+  - timestamp: '2026-05-10T13:58:41.020Z'
+    action: design_finalized
+    phase: design
+    details: Design ready for plan phase. 5 review suggestions applied, verdict approve_with_changes.
+  - timestamp: '2026-05-10T13:58:43.314Z'
+    action: phase_transition
+    phase: design
+    details: Transitioned from design to plan
+  - timestamp: '2026-05-10T14:11:11.755Z'
+    action: plan_created
+    phase: plan
+    details: Plan with 5 sub-tasks (ST1-ST5) at docs/plans/clo-327-wire-phase-based-runner.md
+  - timestamp: '2026-05-10T14:11:25.059Z'
+    action: plan_approved
+    phase: plan
+    details: 'Plan approved. 5 sub-tasks queued: ST1 detection, ST2 builder, ST3 runner, ST4 dispatch, ST5 integration.'
+  - timestamp: '2026-05-10T14:12:33.749Z'
+    action: phase_transition
+    phase: plan
+    details: Transitioned from plan to implement
+  - timestamp: '2026-05-10T14:26:03.140Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST1 landed: Phase detection — make source text available for dual-parsing. Commit 963cf08'
+  - timestamp: '2026-05-10T17:19:20.484Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST2 landed: PhaseConfig builder. Commit fe48f2b. 5 tests green.'
+  - timestamp: '2026-05-10T17:47:13.249Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST3 landed: Phase workflow runner with template pre-rendering. Commit 50efd00. 6 tests green.'
+  - timestamp: '2026-05-10T18:05:45.743Z'
+    action: subtask_complete
+    phase: implement
+    details: 'ST4 landed: Wire phase-based dispatch into run_workflow(). Commit 9dda610. 1196 all tests green.'
+  - timestamp: '2026-05-10T18:06:01.841Z'
+    action: implementation_complete
+    phase: implement
+    details: 'All sub-tasks landed (ST1-ST4). make check green. 4 commits: 963cf08, fe48f2b, 50efd00, 9dda610.'
+  - timestamp: '2026-05-10T18:28:38.239Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (shell quoting bug). Gemini: REVIEW_FAILED (same). Synthesis: approve_with_changes (after
+      single fix iteration F1-F5). Claude fallback: OK, 7 findings all addressed.
+  - timestamp: '2026-05-10T18:30:36.864Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-10T18:32:21.268Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass (0 failures, 1200+ tests)'
+  - timestamp: '2026-05-10T18:48:51.876Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #69 opened: https://github.com/maxkulish/loker/pull/69'
+  - timestamp: '2026-05-11T07:23:49.297Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format ✅, clippy ✅, test ✅'
+task_title: Wire phase-based runner into `loker run`
+task_url: https://linear.app/cloud-ai/issue/CLO-327/wire-phase-based-runner-into-loker-run
