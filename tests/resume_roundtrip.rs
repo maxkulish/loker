@@ -132,13 +132,15 @@ enum InitialState {
     AllComplete,
     /// Phase 1 completed, phase 2 has only a started marker (simulating SIGTERM).
     InterruptedPhase,
+    /// Phase 1 completed, phase 2 failed via real backend error on attempt 0.
+    FailedPhase,
 }
 
 /// Create a RunDir with marker state matching `initial_state`.
 ///
 /// Returns (RunDir, Vec<PhaseConfig>).  The TempDir must stay alive for the
 /// duration of the test.
-fn build_roundtrip_run_dir(
+async fn build_roundtrip_run_dir(
     base: &tempfile::TempDir,
     initial_state: InitialState,
 ) -> (RunDir, Vec<PhaseConfig>) {
@@ -154,14 +156,15 @@ fn build_roundtrip_run_dir(
 
     write_stale_heartbeat(run_dir.path());
 
+    // Phase 1 is always completed.
+    let content1 = b"sentinel phase1";
+    let sha1 = sha256_hex(content1);
+    write_artefact(run_dir.path(), "phase1.md", content1);
+    write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
+    write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
+
     match initial_state {
         InitialState::AllComplete => {
-            let content1 = b"sentinel phase1";
-            let sha1 = sha256_hex(content1);
-            write_artefact(run_dir.path(), "phase1.md", content1);
-            write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
-            write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
-
             let content2 = b"sentinel phase2";
             let sha2 = sha256_hex(content2);
             write_artefact(run_dir.path(), "phase2.md", content2);
@@ -170,12 +173,6 @@ fn build_roundtrip_run_dir(
         }
 
         InitialState::InterruptedPhase => {
-            let content1 = b"sentinel phase1";
-            let sha1 = sha256_hex(content1);
-            write_artefact(run_dir.path(), "phase1.md", content1);
-            write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
-            write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
-
             let started = StartedMarker {
                 phase: "phase2".to_string(),
                 attempt: 0,
@@ -190,42 +187,33 @@ fn build_roundtrip_run_dir(
             )
             .unwrap();
         }
+
+        InitialState::FailedPhase => {
+            // Drive a real backend failure via PhaseRunner so the .failed
+            // marker is produced naturally (not a synthetic write).
+            let runner = PhaseRunner::new();
+            let phase_cfg = &phases[1];
+            let backend: Arc<dyn Backend> = Arc::new(FailThenSucceedBackend::new("mock"));
+            let backends: Vec<Arc<dyn Backend>> = vec![backend];
+            let ctx = PhaseContext::new(&phase_cfg.phase, run_dir.run_id());
+            let prompt = Prompt::new();
+            let inputs = PhaseInputs {
+                backends: &backends,
+                prompt,
+                ctx,
+                verify: None,
+                run_dir: run_dir.path().to_path_buf(),
+                trace: None,
+            };
+            let result = runner.run(phase_cfg, inputs, 0).await;
+            assert!(
+                result.is_err(),
+                "expected PhaseRunner to fail for phase 2 attempt 0"
+            );
+        }
     }
 
     (run_dir, phases)
-}
-
-/// Run PhaseRunner for phase 2 with a backend that fails on the first call.
-/// This exercises the real terminal-failure path, producing a `.failed`
-/// marker (not a synthetic one).
-async fn create_failed_phase_state(
-    run_dir: &RunDir,
-    _base: &tempfile::TempDir,
-    phases: &[PhaseConfig],
-) {
-    let runner = PhaseRunner::new();
-    let phase_cfg = &phases[1]; // phase2
-
-    let backend: Arc<dyn Backend> = Arc::new(FailThenSucceedBackend::new("mock"));
-    let backends: Vec<Arc<dyn Backend>> = vec![backend];
-
-    let ctx = PhaseContext::new(&phase_cfg.phase, run_dir.run_id());
-    let prompt = Prompt::new();
-    let inputs = PhaseInputs {
-        backends: &backends,
-        prompt,
-        ctx,
-        verify: None,
-        run_dir: run_dir.path().to_path_buf(),
-        trace: None,
-    };
-
-    // PhaseRunner will fail on attempt 0, writing a .failed marker.
-    let result = runner.run(phase_cfg, inputs, 0).await;
-    assert!(
-        result.is_err(),
-        "expected PhaseRunner to fail for phase 2 attempt 0"
-    );
 }
 
 fn write_stale_heartbeat(run_dir: &Path) {
@@ -293,7 +281,9 @@ fn write_manifest_entry(run_dir: &RunDir, name: &str, sha: &str, attempt: u32) {
 /// Capture the mtime of a phase's sentinel artefact file.
 fn capture_sentinel_mtime(run_dir: &RunDir, phase_name: &str) -> Option<SystemTime> {
     let path = run_dir.path().join(format!("{phase_name}.md"));
-    std::fs::metadata(&path).ok().map(|m| m.modified().unwrap())
+    std::fs::metadata(&path)
+        .ok()
+        .and_then(|m| m.modified().ok())
 }
 
 /// Assert that a sentinel artefact's mtime has not changed.
@@ -352,7 +342,7 @@ fn assert_manifest_entry_attempt(run_dir: &RunDir, phase: &str, expected_attempt
 #[tokio::test]
 async fn test_resume_roundtrip_all_complete() {
     let base = tempfile::tempdir().unwrap();
-    let (run_dir, phases) = build_roundtrip_run_dir(&base, InitialState::AllComplete);
+    let (run_dir, phases) = build_roundtrip_run_dir(&base, InitialState::AllComplete).await;
 
     // Capture sentinel mtimes before resume.
     let mtime_p1_before = capture_sentinel_mtime(&run_dir, "phase1");
@@ -415,7 +405,7 @@ async fn test_resume_roundtrip_all_complete() {
 #[tokio::test]
 async fn test_resume_roundtrip_kill_phase2() {
     let base = tempfile::tempdir().unwrap();
-    let (run_dir, phases) = build_roundtrip_run_dir(&base, InitialState::InterruptedPhase);
+    let (run_dir, phases) = build_roundtrip_run_dir(&base, InitialState::InterruptedPhase).await;
 
     // Capture sentinel mtime for phase 1 before resume.
     let mtime_p1_before = capture_sentinel_mtime(&run_dir, "phase1");
@@ -472,32 +462,7 @@ async fn test_resume_roundtrip_kill_phase2() {
 #[tokio::test]
 async fn test_resume_roundtrip_phase2_failed_then_retry() {
     let base = tempfile::tempdir().unwrap();
-
-    let (run_dir, phases) = {
-        let run_dir = RunDir::create(base.path(), "test-roundtrip").unwrap();
-        let markers_dir = run_dir.path().join("markers");
-        std::fs::create_dir_all(&markers_dir).unwrap();
-
-        let phases = vec![
-            PhaseConfig::single("phase1", "mock", "do phase one", "phase1.md"),
-            PhaseConfig::single("phase2", "mock", "do phase two", "phase2.md"),
-        ];
-
-        write_stale_heartbeat(run_dir.path());
-
-        // Phase 1: completed.
-        let content1 = b"sentinel phase1";
-        let sha1 = sha256_hex(content1);
-        write_artefact(run_dir.path(), "phase1.md", content1);
-        write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
-        write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
-
-        // Phase 2: drive real failure via PhaseRunner with FailThenSucceedBackend
-        // (F1: use real backend error, not synthetic marker).
-        create_failed_phase_state(&run_dir, &base, &phases).await;
-
-        (run_dir, phases)
-    };
+    let (run_dir, phases) = build_roundtrip_run_dir(&base, InitialState::FailedPhase).await;
 
     // Capture sentinel mtime for phase 1 before resume.
     let mtime_p1_before = capture_sentinel_mtime(&run_dir, "phase1");
