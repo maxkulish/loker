@@ -28,3 +28,28 @@ approve_with_changes
 
 ## Recommendation
 PROCEED_WITH_FIXES. The branch is bounded (tests-only, no production code touched, all three tests pass deterministically) and the gaps are addressable in one iteration: (1) replace the synthetic `phase2.failed` marker in the FailedPhase scenario with a real `MockBackend` failure on attempt 0; (2) add explicit `markers/phase2.completed` existence assertions and manifest `attempt == Some(1)` checks in both kill and failed-retry tests; (3) `git rm` the empty `.draft` companion file. After these, the round-trip suite matches the design's intent rather than working around it. The Codex/Gemini script breakage should be fixed upstream in `.pi/scripts` (heredoc quoting), but is independent of this PR's merge decision.
+
+## Re-validation
+
+**Commit**: `acef8cb`
+
+### Fixes applied (1 iteration)
+
+| Finding | Applied | Details |
+|---------|---------|---------|
+| **F1** [medium] | ✅ | Added `FailThenSucceedBackend` with `AtomicBool` that errors on first query and succeeds thereafter. `create_failed_phase_state()` drives PhaseRunner for phase 2 attempt 0, producing a real `.failed` marker via the terminal-failure path. |
+| **F2** [low] | ✅ | `git rm docs/designs/clo-325-resume-roundtrip.draft` — file deleted. |
+| **F3/F4/F6** [low] | ✅ | Added `assert_completed_marker_exists()` and `assert_manifest_entry_attempt()` helpers. Both kill-phase2 and failed-retry tests now assert the `.completed` marker exists on disk and the manifest has a phase-2 entry with `attempt == Some(1)` after resume. |
+
+### Additional production fix
+
+While addressing F1, a latent bug was discovered and fixed in `src/phase_runner.rs`: `PhaseRunner::run` used the 0-based strategy-output index (`selected_attempt`) instead of the absolute attempt number (`initial_attempt + selected_attempt`) when writing manifest entries and completed markers. This only manifested during resume where `initial_attempt` can be > 0. The fix is a one-line change at `src/phase_runner.rs:411`.
+
+### Re-validation result
+
+- `make check` (fmt + clippy + 957+ tests): **green**
+- Round-trip tests: 3/3 pass
+- Existing test suite: all pass, no regressions
+
+## Final Verdict
+approve

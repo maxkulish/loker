@@ -21,10 +21,10 @@ linear:
   priority: 3
   branch_actual: feat/clo-325-resume
 workflow:
-  current_phase: implement
+  current_phase: pr
   status: active
   created_at: '2026-05-15T13:12:17.501Z'
-  updated_at: '2026-05-15T13:51:42.956Z'
+  updated_at: '2026-05-15T15:01:00.272Z'
 phases:
   discovery:
     status: complete
@@ -62,11 +62,19 @@ phases:
     plan_file: docs/plans/clo-325-resume-roundtrip.md
     approved: true
   implement:
-    status: validating
+    status: complete
     commits:
       - 1f65136
+      - acef8cb
+    codex_report: docs/reviews/clo-325-codex-validation.md
+    codex_validated: true
+    codex_verdict: approve_with_changes
+    gemini_validation_report: docs/reviews/clo-325-gemini-validation.md
+    validation_fix_iteration_count: 1
+    validation_synthesis_report: docs/reviews/clo-325-validation-synthesis.md
+    validation_synthesis_verdict: approve
   pr:
-    status: pending
+    status: in_progress
   complete:
     status: pending
 history:
@@ -145,5 +153,21 @@ history:
     action: implementation_complete
     phase: implement
     details: All sub-tasks landed (ST1-ST4 in one commit). make check green. 1 commit (1f65136). Proceeding to validation gate.
+  - timestamp: '2026-05-15T14:58:15.503Z'
+    action: codex_validation_complete
+    phase: implement
+    details: >-
+      Codex: REVIEW_FAILED (heredoc quoting bug). Gemini: REVIEW_FAILED (same). Claude fallback: approve_with_changes
+      with 6 findings. Synthesis: approve_with_changes → 3 must-fix items applied in 1 iteration (F1: real
+      FailThenSucceedBackend via PhaseRunner; F2: git rm .draft; F3/F4/F6: explicit marker/manifest assertions).
+      Re-validation verdict: approve.
+  - timestamp: '2026-05-15T14:59:36.548Z'
+    action: phase_transition
+    phase: implement
+    details: Transitioned from implement to pr
+  - timestamp: '2026-05-15T15:01:00.272Z'
+    action: pre_flight_checks_passed
+    phase: pr
+    details: 'make check green: fmt + clippy + test all pass'
 task_title: Add runner-level resume round-trip integration test after phase runner is wired into loker run
 task_url: https://linear.app/cloud-ai/issue/CLO-325/add-runner-level-resume-round-trip-integration-test-after
