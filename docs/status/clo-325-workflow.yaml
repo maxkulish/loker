@@ -21,10 +21,10 @@ linear:
   priority: 3
   branch_actual: feat/clo-325-resume
 workflow:
-  current_phase: pr
-  status: active
+  current_phase: complete
+  status: complete
   created_at: '2026-05-15T13:12:17.501Z'
-  updated_at: '2026-05-15T15:01:00.272Z'
+  updated_at: '2026-05-15T15:17:43.934Z'
 phases:
   discovery:
     status: complete
@@ -74,9 +74,19 @@ phases:
     validation_synthesis_report: docs/reviews/clo-325-validation-synthesis.md
     validation_synthesis_verdict: approve
   pr:
-    status: in_progress
+    status: complete
+    pr_number: 75
+    pr_url: https://github.com/maxkulish/loker/pull/75
+    ci_passed: true
+    reviews_addressed: true
+    merge_commit: 865b860dffcbc685083b2c85dbe2642bdbae9b32
+    merged_at: '2026-05-15T15:20:00Z'
   complete:
-    status: pending
+    status: complete
+    merge_commit: 865b860dffcbc685083b2c85dbe2642bdbae9b32
+    merged_at: '2026-05-15T15:20:00Z'
+    aggregation_files_skip_reason: No aggregation files in repo
+    aggregation_files_updated: false
 history:
   - timestamp: '2026-05-15T13:12:17.501Z'
     action: workflow_started
@@ -169,5 +179,48 @@ history:
     action: pre_flight_checks_passed
     phase: pr
     details: 'make check green: fmt + clippy + test all pass'
+  - timestamp: '2026-05-15T15:02:15.569Z'
+    action: pr_created
+    phase: pr
+    details: 'PR #75 opened: https://github.com/maxkulish/loker/pull/75'
+  - timestamp: '2026-05-15T15:06:29.444Z'
+    action: ci_passed
+    phase: pr
+    details: 'All required checks passing: format, clippy, test'
+  - timestamp: '2026-05-15T15:15:32.551Z'
+    action: review_addressed
+    phase: pr
+    details: >-
+      4 threads resolved (Gemini re-review approved all fixes via /gemini review). 3 Gemini re-reviews posted, 3
+      confirmed. 4/4 threads resolved. Copilot 3 inline comments addressed (2 via same fix as Gemini thread). Trailer
+      verification GATE OK — every reply ends with /gemini review.
+  - timestamp: '2026-05-15T15:16:15.059Z'
+    action: pr_ready_for_merge
+    phase: pr
+    details: >-
+      PR #75: CI green, all 4 comment threads resolved, Gemini re-review confirmed all fixes, no branch protection.
+      Auto-merge conditions met.
+  - timestamp: '2026-05-15T15:16:24.662Z'
+    action: phase_transition
+    phase: pr
+    details: Transitioned from pr to complete
+  - timestamp: '2026-05-15T15:16:59.111Z'
+    action: pr_merged
+    phase: complete
+    details: 'PR #75 merged. Merge commit 865b860.'
+  - timestamp: '2026-05-15T15:17:02.694Z'
+    action: pr_merged
+    phase: pr
+    details: Merge commit 865b860
+  - timestamp: '2026-05-15T15:17:24.127Z'
+    action: project_sync_skipped
+    phase: complete
+    details: No PROJECT.md/ROADMAP.md/DEPENDENCIES.md exist in this repo
+  - timestamp: '2026-05-15T15:17:43.934Z'
+    action: workflow_complete
+    phase: complete
+    details: >-
+      Task CLO-325 fully completed. PR #75 merged (865b860). Added tests/resume_roundtrip.rs with 3 resume round-trip
+      integration tests. Fixed PhaseRunner attempt indexing bug.
 task_title: Add runner-level resume round-trip integration test after phase runner is wired into loker run
 task_url: https://linear.app/cloud-ai/issue/CLO-325/add-runner-level-resume-round-trip-integration-test-after
