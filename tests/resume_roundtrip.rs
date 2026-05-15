@@ -11,21 +11,25 @@
 //!   - All phases complete → resume is a no-op.
 //!   - Phase 2 interrupted mid-execution (started marker only) → resume
 //!     skips phase 1 and resumes phase 2.
-//!   - Phase 2 failed → resume archives the failed attempt and retries.
+//!   - Phase 2 failed via real backend error → resume archives the failed
+//!     attempt and retries.
 
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use loker::backend::{Backend, BackendCapabilities, BackendError, QueryOutput};
-use loker::manifest::{Kind, Manifest, ManifestEntry, Producer, sha256_hex};
-use loker::phase_runner::PhaseConfig;
-use loker::resume::{PhaseAction, ResumePlanner, ResumeRunner};
+use loker::manifest::{sha256_hex, Kind, Manifest, ManifestEntry, Producer};
+use loker::phase_runner::{PhaseConfig, PhaseInputs, PhaseRunner};
 use loker::resume::sweep::sweep_stale_tmp;
+use loker::resume::{PhaseAction, ResumePlanner, ResumeRunner};
 use loker::run_state::{
     CompletedMarker, HeartbeatBody, PhaseStatus, RunDir, RunState, StartedMarker,
 };
+use loker::strategy::{PhaseContext, Prompt};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,7 +50,7 @@ impl Backend for MockBackend {
     async fn query(
         &self,
         _prompt: &str,
-        _cwd: &std::path::Path,
+        _cwd: &Path,
         _model: Option<&str>,
     ) -> Result<QueryOutput, BackendError> {
         Ok(QueryOutput::from_text(
@@ -65,6 +69,62 @@ impl Backend for MockBackend {
     }
 }
 
+/// A backend that fails on the first query call, then succeeds on all
+/// subsequent calls.  Used by the failed-phase scenario to exercise the
+/// real PhaseRunner terminal-failure path.
+#[derive(Debug)]
+struct FailThenSucceedBackend {
+    name: &'static str,
+    has_failed: AtomicBool,
+}
+
+impl FailThenSucceedBackend {
+    fn new(name: &'static str) -> Self {
+        Self {
+            name,
+            has_failed: AtomicBool::new(false),
+        }
+    }
+}
+
+#[async_trait]
+impl Backend for FailThenSucceedBackend {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    async fn query(
+        &self,
+        _prompt: &str,
+        _cwd: &Path,
+        _model: Option<&str>,
+    ) -> Result<QueryOutput, BackendError> {
+        if self.has_failed.load(Ordering::SeqCst) {
+            // Subsequent calls succeed.
+            Ok(QueryOutput::from_text(
+                format!("output from {}", self.name),
+                self.name,
+                std::time::Duration::from_millis(1),
+            ))
+        } else {
+            // First call: fail.
+            self.has_failed.store(true, Ordering::SeqCst);
+            Err(BackendError::ExecutionFailed {
+                message: "simulated failure for round-trip test".to_string(),
+                exit_code: None,
+            })
+        }
+    }
+
+    fn is_available(&self) -> bool {
+        true
+    }
+
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities::none()
+    }
+}
+
 /// Initial marker state to create for the round-trip fixture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InitialState {
@@ -72,43 +132,36 @@ enum InitialState {
     AllComplete,
     /// Phase 1 completed, phase 2 has only a started marker (simulating SIGTERM).
     InterruptedPhase,
-    /// Phase 1 completed, phase 2 has a failed marker.
-    FailedPhase,
 }
 
 /// Create a RunDir with marker state matching `initial_state`.
 ///
 /// Returns (RunDir, Vec<PhaseConfig>).  The TempDir must stay alive for the
-/// duration of the test (it is dropped at end of scope).
+/// duration of the test.
 fn build_roundtrip_run_dir(
     base: &tempfile::TempDir,
     initial_state: InitialState,
 ) -> (RunDir, Vec<PhaseConfig>) {
     let run_dir = RunDir::create(base.path(), "test-roundtrip").unwrap();
 
-    // Create markers directory (RunDir::create does not create this).
     let markers_dir = run_dir.path().join("markers");
     std::fs::create_dir_all(&markers_dir).unwrap();
 
-    // Phase configs (two phases, single strategy, same backend name "mock").
     let phases = vec![
         PhaseConfig::single("phase1", "mock", "do phase one", "phase1.md"),
         PhaseConfig::single("phase2", "mock", "do phase two", "phase2.md"),
     ];
 
-    // Write a stale heartbeat so RunState::load does not see a live writer.
     write_stale_heartbeat(run_dir.path());
 
     match initial_state {
         InitialState::AllComplete => {
-            // Phase 1: artefact + manifest entry + completed marker.
             let content1 = b"sentinel phase1";
             let sha1 = sha256_hex(content1);
             write_artefact(run_dir.path(), "phase1.md", content1);
             write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
             write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
 
-            // Phase 2: same.
             let content2 = b"sentinel phase2";
             let sha2 = sha256_hex(content2);
             write_artefact(run_dir.path(), "phase2.md", content2);
@@ -117,14 +170,12 @@ fn build_roundtrip_run_dir(
         }
 
         InitialState::InterruptedPhase => {
-            // Phase 1: completed.
             let content1 = b"sentinel phase1";
             let sha1 = sha256_hex(content1);
             write_artefact(run_dir.path(), "phase1.md", content1);
             write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
             write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
 
-            // Phase 2: started-only (no completed/failed — simulates SIGTERM).
             let started = StartedMarker {
                 phase: "phase2".to_string(),
                 attempt: 0,
@@ -136,43 +187,6 @@ fn build_roundtrip_run_dir(
             std::fs::write(
                 markers_dir.join("phase2.started.0"),
                 serde_json::to_string_pretty(&started).unwrap(),
-            )
-            .unwrap();
-        }
-
-        InitialState::FailedPhase => {
-            // Phase 1: completed.
-            let content1 = b"sentinel phase1";
-            let sha1 = sha256_hex(content1);
-            write_artefact(run_dir.path(), "phase1.md", content1);
-            write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
-            write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
-
-            // Phase 2: started + failed markers.
-            let started = StartedMarker {
-                phase: "phase2".to_string(),
-                attempt: 0,
-                started_at: Utc::now(),
-                writer_pid: std::process::id(),
-                writer_host: "localhost".to_string(),
-                heartbeat_ttl_seconds: 300,
-            };
-            std::fs::write(
-                markers_dir.join("phase2.started.0"),
-                serde_json::to_string_pretty(&started).unwrap(),
-            )
-            .unwrap();
-
-            let failed = serde_json::json!({
-                "phase": "phase2",
-                "attempts_made": 1,
-                "failed_at": Utc::now().to_rfc3339(),
-                "error_class": "test_failure",
-                "last_attempt_path": "attempts/phase2/0",
-            });
-            std::fs::write(
-                markers_dir.join("phase2.failed"),
-                serde_json::to_string_pretty(&failed).unwrap(),
             )
             .unwrap();
         }
@@ -181,7 +195,40 @@ fn build_roundtrip_run_dir(
     (run_dir, phases)
 }
 
-fn write_stale_heartbeat(run_dir: &std::path::Path) {
+/// Run PhaseRunner for phase 2 with a backend that fails on the first call.
+/// This exercises the real terminal-failure path, producing a `.failed`
+/// marker (not a synthetic one).
+async fn create_failed_phase_state(
+    run_dir: &RunDir,
+    _base: &tempfile::TempDir,
+    phases: &[PhaseConfig],
+) {
+    let runner = PhaseRunner::new();
+    let phase_cfg = &phases[1]; // phase2
+
+    let backend: Arc<dyn Backend> = Arc::new(FailThenSucceedBackend::new("mock"));
+    let backends: Vec<Arc<dyn Backend>> = vec![backend];
+
+    let ctx = PhaseContext::new(&phase_cfg.phase, run_dir.run_id());
+    let prompt = Prompt::new();
+    let inputs = PhaseInputs {
+        backends: &backends,
+        prompt,
+        ctx,
+        verify: None,
+        run_dir: run_dir.path().to_path_buf(),
+        trace: None,
+    };
+
+    // PhaseRunner will fail on attempt 0, writing a .failed marker.
+    let result = runner.run(phase_cfg, inputs, 0).await;
+    assert!(
+        result.is_err(),
+        "expected PhaseRunner to fail for phase 2 attempt 0"
+    );
+}
+
+fn write_stale_heartbeat(run_dir: &Path) {
     let old_tick = Utc::now() - Duration::seconds(600);
     let body = HeartbeatBody {
         writer_pid: 99999,
@@ -196,12 +243,12 @@ fn write_stale_heartbeat(run_dir: &std::path::Path) {
     .unwrap();
 }
 
-fn write_artefact(run_dir: &std::path::Path, artefact_name: &str, content: &[u8]) {
+fn write_artefact(run_dir: &Path, artefact_name: &str, content: &[u8]) {
     std::fs::write(run_dir.join(artefact_name), content).unwrap();
 }
 
 fn write_completed_marker(
-    run_dir: &std::path::Path,
+    run_dir: &Path,
     phase: &str,
     attempt: u32,
     sha: &str,
@@ -216,9 +263,7 @@ fn write_completed_marker(
         hitl: None,
     };
     std::fs::write(
-        run_dir
-            .join("markers")
-            .join(format!("{phase}.completed")),
+        run_dir.join("markers").join(format!("{phase}.completed")),
         serde_json::to_string_pretty(&marker).unwrap(),
     )
     .unwrap();
@@ -229,7 +274,6 @@ fn write_manifest_entry(run_dir: &RunDir, name: &str, sha: &str, attempt: u32) {
     let text = std::fs::read_to_string(&manifest_path).unwrap();
     let mut manifest: Manifest = Manifest::from_json(&text).unwrap();
 
-    // Extract phase name from artefact name (e.g. "phase1.md" → "phase1").
     let phase_name = name.strip_suffix(".md").unwrap_or(name).to_string();
 
     manifest.entries.push(ManifestEntry {
@@ -262,6 +306,42 @@ fn assert_sentinel_unchanged(
     assert_eq!(
         before, after,
         "sentinel mtime for phase '{phase_name}' changed — phase was re-run"
+    );
+}
+
+/// Assert that a completed marker exists for the given phase after resume.
+fn assert_completed_marker_exists(run_dir: &RunDir, phase: &str) {
+    let marker_path = run_dir
+        .path()
+        .join("markers")
+        .join(format!("{phase}.completed"));
+    assert!(
+        marker_path.exists(),
+        "expected completed marker at {path} after resume",
+        path = marker_path.display()
+    );
+}
+
+/// Assert that the manifest contains an entry for the given phase with
+/// the expected attempt number.
+fn assert_manifest_entry_attempt(run_dir: &RunDir, phase: &str, expected_attempt: u32) {
+    let manifest_text = std::fs::read_to_string(run_dir.manifest_path()).unwrap();
+    let manifest = Manifest::from_json(&manifest_text).unwrap();
+    let matching: Vec<&ManifestEntry> = manifest
+        .entries
+        .iter()
+        .filter(|e| e.phase.as_deref() == Some(phase))
+        .collect();
+    assert!(
+        !matching.is_empty(),
+        "no manifest entry for phase '{phase}' after resume"
+    );
+    let last = matching.last().unwrap();
+    assert_eq!(
+        last.attempt,
+        Some(expected_attempt),
+        "phase '{phase}' manifest entry has wrong attempt: expected {expected_attempt}, got {:?}",
+        last.attempt
     );
 }
 
@@ -312,10 +392,20 @@ async fn test_resume_roundtrip_all_complete() {
     assert_sentinel_unchanged(&run_dir, "phase1", mtime_p1_before, mtime_p1_after);
     assert_sentinel_unchanged(&run_dir, "phase2", mtime_p2_before, mtime_p2_after);
 
+    // Completed markers still present.
+    assert_completed_marker_exists(&run_dir, "phase1");
+    assert_completed_marker_exists(&run_dir, "phase2");
+
     // Manifest still has both entries.
-    let manifest_text = std::fs::read_to_string(run_dir.manifest_path()).unwrap();
-    let manifest = Manifest::from_json(&manifest_text).unwrap();
-    assert_eq!(manifest.entries.len(), 2);
+    assert_manifest_entry_attempt(&run_dir, "phase1", 0);
+    assert_manifest_entry_attempt(&run_dir, "phase2", 0);
+    assert_eq!(
+        Manifest::from_json(&std::fs::read_to_string(run_dir.manifest_path()).unwrap())
+            .unwrap()
+            .entries
+            .len(),
+        2
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -349,10 +439,7 @@ async fn test_resume_roundtrip_kill_phase2() {
     let plan = ResumePlanner::plan(run_dir.path(), &run_state, &phases, swept).unwrap();
     assert_eq!(plan.actions.len(), 2);
     assert_eq!(plan.actions[0].1, PhaseAction::Skip);
-    assert_eq!(
-        plan.actions[1].1,
-        PhaseAction::Resume { next_attempt: 1 }
-    );
+    assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 1 });
 
     // Execute.
     let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(MockBackend { name: "mock" })];
@@ -370,6 +457,12 @@ async fn test_resume_roundtrip_kill_phase2() {
         run_state_after.phase_status.get("phase2"),
         Some(&PhaseStatus::Completed)
     );
+
+    // Explicit marker existence assertion (F3 / F6).
+    assert_completed_marker_exists(&run_dir, "phase2");
+
+    // Manifest should have a phase2 entry with attempt 1.
+    assert_manifest_entry_attempt(&run_dir, "phase2", 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +472,32 @@ async fn test_resume_roundtrip_kill_phase2() {
 #[tokio::test]
 async fn test_resume_roundtrip_phase2_failed_then_retry() {
     let base = tempfile::tempdir().unwrap();
-    let (run_dir, phases) = build_roundtrip_run_dir(&base, InitialState::FailedPhase);
+
+    let (run_dir, phases) = {
+        let run_dir = RunDir::create(base.path(), "test-roundtrip").unwrap();
+        let markers_dir = run_dir.path().join("markers");
+        std::fs::create_dir_all(&markers_dir).unwrap();
+
+        let phases = vec![
+            PhaseConfig::single("phase1", "mock", "do phase one", "phase1.md"),
+            PhaseConfig::single("phase2", "mock", "do phase two", "phase2.md"),
+        ];
+
+        write_stale_heartbeat(run_dir.path());
+
+        // Phase 1: completed.
+        let content1 = b"sentinel phase1";
+        let sha1 = sha256_hex(content1);
+        write_artefact(run_dir.path(), "phase1.md", content1);
+        write_manifest_entry(&run_dir, "phase1.md", &sha1, 0);
+        write_completed_marker(run_dir.path(), "phase1", 0, &sha1, &["phase1.md"]);
+
+        // Phase 2: drive real failure via PhaseRunner with FailThenSucceedBackend
+        // (F1: use real backend error, not synthetic marker).
+        create_failed_phase_state(&run_dir, &base, &phases).await;
+
+        (run_dir, phases)
+    };
 
     // Capture sentinel mtime for phase 1 before resume.
     let mtime_p1_before = capture_sentinel_mtime(&run_dir, "phase1");
@@ -403,10 +521,7 @@ async fn test_resume_roundtrip_phase2_failed_then_retry() {
     let plan = ResumePlanner::plan(run_dir.path(), &run_state, &phases, swept).unwrap();
     assert_eq!(plan.actions.len(), 2);
     assert_eq!(plan.actions[0].1, PhaseAction::Skip);
-    assert_eq!(
-        plan.actions[1].1,
-        PhaseAction::Resume { next_attempt: 1 }
-    );
+    assert_eq!(plan.actions[1].1, PhaseAction::Resume { next_attempt: 1 });
 
     // Execute with a working mock backend so the retry succeeds.
     let backends: Vec<Arc<dyn Backend>> = vec![Arc::new(MockBackend { name: "mock" })];
@@ -424,4 +539,10 @@ async fn test_resume_roundtrip_phase2_failed_then_retry() {
         run_state_after.phase_status.get("phase2"),
         Some(&PhaseStatus::Completed)
     );
+
+    // Explicit marker existence assertion (F4 / F6).
+    assert_completed_marker_exists(&run_dir, "phase2");
+
+    // Manifest should have a phase2 entry with attempt 1 (retry succeeded).
+    assert_manifest_entry_attempt(&run_dir, "phase2", 1);
 }

@@ -24,7 +24,7 @@ workflow:
   current_phase: implement
   status: active
   created_at: '2026-05-15T13:12:17.501Z'
-  updated_at: '2026-05-15T13:26:45.216Z'
+  updated_at: '2026-05-15T13:51:42.956Z'
 phases:
   discovery:
     status: complete
@@ -62,7 +62,9 @@ phases:
     plan_file: docs/plans/clo-325-resume-roundtrip.md
     approved: true
   implement:
-    status: pending
+    status: validating
+    commits:
+      - 1f65136
   pr:
     status: pending
   complete:
@@ -133,5 +135,15 @@ history:
     action: phase_transition
     phase: plan
     details: Transitioned from plan to implement
+  - timestamp: '2026-05-15T13:48:58.672Z'
+    action: subtask_complete
+    phase: implement
+    details: >-
+      ST1 landed: shared test helper fixtures (MockBackend, build_roundtrip_run_dir, sentinel helpers). ST2-ST4 landed:
+      three round-trip integration tests. Commit 1f65136
+  - timestamp: '2026-05-15T13:51:42.956Z'
+    action: implementation_complete
+    phase: implement
+    details: All sub-tasks landed (ST1-ST4 in one commit). make check green. 1 commit (1f65136). Proceeding to validation gate.
 task_title: Add runner-level resume round-trip integration test after phase runner is wired into loker run
 task_url: https://linear.app/cloud-ai/issue/CLO-325/add-runner-level-resume-round-trip-integration-test-after

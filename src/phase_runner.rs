@@ -408,7 +408,7 @@ impl PhaseRunner {
             (Some(result), hitl_report)
         };
 
-        let attempt = selected_attempt;
+        let attempt = initial_attempt + selected_attempt;
         let (artefact_path, manifest_entry) =
             persist::commit_success(&inputs.run_dir, cfg, &bytes, attempt, run_id)?;
         markers.write_completed_with_hitl(
