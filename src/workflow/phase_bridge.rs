@@ -29,6 +29,18 @@ fn backend_scheme(raw: &str) -> &str {
     raw.trim_end_matches('/').split('/').next().unwrap_or(raw)
 }
 
+/// Extract the model (or TensorZero function) part from a grammar
+/// backend string.
+///
+/// `"ollama/glm-5.1:cloud"` → `Some("glm-5.1:cloud")`,
+/// `"tensorzero/loker_d1_google"` → `Some("loker_d1_google")`,
+/// `"claude/"` and `"claude"` → `None`.
+fn backend_model(raw: &str) -> Option<&str> {
+    raw.split_once('/')
+        .map(|(_, rest)| rest)
+        .filter(|rest| !rest.is_empty())
+}
+
 /// Map an output filename to the correct `Kind` variant.
 ///
 /// Resolution order:
@@ -113,11 +125,17 @@ pub fn build_phase_config(
             let targets: Vec<crate::strategy::TargetSpec> = phase
                 .backends
                 .iter()
-                .map(|b| crate::strategy::TargetSpec::new(backend_scheme(b)))
+                .map(|b| {
+                    let spec = crate::strategy::TargetSpec::new(backend_scheme(b));
+                    match backend_model(b) {
+                        Some(model) => spec.with_model(model),
+                        None => spec,
+                    }
+                })
                 .collect();
             (
                 StrategyName::Parallel,
-                AggregatorName::First,
+                AggregatorName::Concat,
                 rungs,
                 targets,
             )
