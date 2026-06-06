@@ -110,6 +110,16 @@ First `docker compose up -d` on a cold stack: gateway exits 1
 a second `up -d` fixes it. The healthcheck/depends_on ordering from
 87021f8 doesn't cover the cold-pull first boot.
 
+### 11. Backend retry policy does not fire for single-strategy phase legs
+
+With `[defaults] max_retries = 2`, parallel legs visibly retry
+("↻ Retrying tensorzero (attempt 1/2)…"), but a single-strategy design
+phase that died on a transport error produced exactly one claude session
+and one attempt dir - no retry. 35-minute design generations on claude
+die often enough (2 of 3 runs here, `API Error: socket closed` /
+`529 Overloaded`) that single phases need the same RetryExecutor wrap
+as fan-out targets.
+
 ## Operational notes from the integration (no loker change needed)
 
 - Headless `claude -p` inherits the user's skills and may answer with a
