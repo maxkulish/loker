@@ -41,7 +41,7 @@ Phase order:
 Phases:
   design
     strategy: single
-    backends: ollama/qwen3-coder-next
+    backends: ollama/glm-5.3:cloud
     inputs: spec
     prompt_template: ../prompts/design-doc-tdd/design.md.tmpl
     output: design.md
@@ -49,7 +49,7 @@ Phases:
 
   review
     strategy: parallel (min_responses: 2)
-    backends: claude/, gemini/, codex/, ollama/qwen3-coder-next
+    backends: claude/, gemini/, codex/, ollama/glm-5.3:cloud
     inputs: phase:design
     depends_on: design
     prompt_template: ../prompts/design-doc-tdd/review.md.tmpl
@@ -58,7 +58,7 @@ Phases:
 
   implement
     strategy: escalating (pass_failure_context: true)
-    backends: ollama/qwen3-coder-next, claude/, codex/
+    backends: ollama/glm-5.3:cloud, claude/, codex/
     inputs: phase:design, phase:review
     depends_on: design, review
     prompt_template: ../prompts/design-doc-tdd/implement.md.tmpl

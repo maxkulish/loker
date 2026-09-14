@@ -101,7 +101,7 @@ when = "steps.health_check.success"
 shell = '''
 PROMPT=$(cat .pi/agents/ollama-rust-reviewer.md .lok/prompts/design-review-prompt.md | sed -e 's|__DOC_PATH__|{{ arg.1 }}|g' -e 's|__TASK_ID__|{{ arg.2 }}|g')
 
-OUTPUT=$(timeout 570 opencode run --model "${OLLAMA_MODEL:-ollama/glm-5.1:cloud}" --dangerously-skip-permissions "$PROMPT" 2>/tmp/lok-ollama-stderr.log)
+OUTPUT=$(timeout 570 opencode run --model "${OLLAMA_MODEL:-ollama-cloud/glm-5.3}" --dangerously-skip-permissions "$PROMPT" 2>/tmp/lok-ollama-stderr.log)
 
 if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
   STDERR=$(head -5 /tmp/lok-ollama-stderr.log 2>/dev/null || echo "no stderr")
@@ -355,7 +355,7 @@ write_review \
 write_review \
   "$TMP_DIR/ollama-review-${REVIEW_SUFFIX}.md" \
   "docs/reviews/{{ arg.2 }}-review-ollama.md" \
-  "Codex via Ollama (glm-5.1:cloud)"
+  "Codex via Ollama (glm-5.3)"
 
 {% if steps.claude_fallback is defined %}
 cat <<'LOKER_WF_REVIEW_FALLBACK_OUTPUT_EOF' > "$TMP_DIR/fallback-review-${REVIEW_SUFFIX}.md"
