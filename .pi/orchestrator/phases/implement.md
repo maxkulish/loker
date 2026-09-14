@@ -131,7 +131,7 @@ Optional environment overrides:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `CODEX_MODEL` | `gpt-5.5` | Codex model used for the codex reviewer |
+| `CODEX_MODEL` | `gpt-5.6-sol` | Codex model used for the codex reviewer |
 | `GEMINI_MODEL` | `gemini-3.1-pro-preview` | Primary Gemini model |
 | `GEMINI_FALLBACK_MODEL` | `gemini-2.5-pro` | Used if the primary returns empty |
 

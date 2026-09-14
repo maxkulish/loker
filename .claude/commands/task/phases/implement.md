@@ -84,8 +84,8 @@ approve | approve_with_changes | rework
 
 ```bash
 # Codex validation (background) - 10 minute timeout
-timeout 600 codex exec -m gpt-5.4 \
-  -c reasoning.effort='"high"' \
+timeout 600 codex exec -m gpt-5.6-sol \
+  -c model_reasoning_effort='"high"' \
   -s read-only \
   -o docs/reviews/clo-XX-codex-validation.md \
   "[VALIDATION_PROMPT]" &
