@@ -173,4 +173,22 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn parse_output_returns_last_agent_message() {
+        let backend = CodexBackend {
+            command: "codex".to_string(),
+            args: vec![],
+            default_model: None,
+        };
+        let output = concat!(
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"I'll look at the files first."}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"command_execution","command":"ls"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"Final answer"}}"#,
+            "\n",
+        );
+        assert_eq!(backend.parse_output(output), "Final answer");
+    }
 }

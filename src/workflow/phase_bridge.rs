@@ -467,6 +467,37 @@ output = "code.md"
     }
 
     #[test]
+    fn build_phase_config_parallel_threads_model_and_concats() {
+        let toml = r#"
+name = "parallel-models"
+[[phases]]
+name = "review"
+strategy = { parallel = { min_responses = 2 } }
+backends = ["ollama/glm-5.3:cloud", "tensorzero/loker_d1_google", "claude/"]
+prompt_template = "Review"
+inputs = ["spec"]
+output = "review.md"
+"#;
+        let wf: Workflow = toml.parse().unwrap();
+        let phase = wf.phases.into_iter().next().unwrap();
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
+        assert_eq!(cfg.aggregator, AggregatorName::Concat);
+        let targets: Vec<(&str, Option<&str>)> = cfg
+            .targets
+            .iter()
+            .map(|t| (t.backend.as_str(), t.model.as_deref()))
+            .collect();
+        assert_eq!(
+            targets,
+            vec![
+                ("ollama", Some("glm-5.3:cloud")),
+                ("tensorzero", Some("loker_d1_google")),
+                ("claude", None),
+            ]
+        );
+    }
+
+    #[test]
     fn build_phase_config_escalating_strategy() {
         let phase = sample_escalating_phase();
         let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
