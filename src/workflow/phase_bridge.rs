@@ -29,6 +29,18 @@ fn backend_scheme(raw: &str) -> &str {
     raw.trim_end_matches('/').split('/').next().unwrap_or(raw)
 }
 
+/// Extract the model (or TensorZero function) part from a grammar
+/// backend string.
+///
+/// `"ollama/glm-5.1:cloud"` → `Some("glm-5.1:cloud")`,
+/// `"tensorzero/loker_d1_google"` → `Some("loker_d1_google")`,
+/// `"claude/"` and `"claude"` → `None`.
+fn backend_model(raw: &str) -> Option<&str> {
+    raw.split_once('/')
+        .map(|(_, rest)| rest)
+        .filter(|rest| !rest.is_empty())
+}
+
 /// Map an output filename to the correct `Kind` variant.
 ///
 /// Resolution order:
@@ -113,11 +125,17 @@ pub fn build_phase_config(
             let targets: Vec<crate::strategy::TargetSpec> = phase
                 .backends
                 .iter()
-                .map(|b| crate::strategy::TargetSpec::new(backend_scheme(b)))
+                .map(|b| {
+                    let spec = crate::strategy::TargetSpec::new(backend_scheme(b));
+                    match backend_model(b) {
+                        Some(model) => spec.with_model(model),
+                        None => spec,
+                    }
+                })
                 .collect();
             (
                 StrategyName::Parallel,
-                AggregatorName::First,
+                AggregatorName::Concat,
                 rungs,
                 targets,
             )
@@ -446,6 +464,37 @@ output = "code.md"
         assert_eq!(cfg.targets.len(), 2);
         assert_eq!(cfg.targets[0].backend, "claude");
         assert_eq!(cfg.targets[1].backend, "gemini");
+    }
+
+    #[test]
+    fn build_phase_config_parallel_threads_model_and_concats() {
+        let toml = r#"
+name = "parallel-models"
+[[phases]]
+name = "review"
+strategy = { parallel = { min_responses = 2 } }
+backends = ["ollama/glm-5.3:cloud", "tensorzero/loker_d1_google", "claude/"]
+prompt_template = "Review"
+inputs = ["spec"]
+output = "review.md"
+"#;
+        let wf: Workflow = toml.parse().unwrap();
+        let phase = wf.phases.into_iter().next().unwrap();
+        let cfg = build_phase_config(&phase, &empty_phase_outputs(), None, &empty_vars()).unwrap();
+        assert_eq!(cfg.aggregator, AggregatorName::Concat);
+        let targets: Vec<(&str, Option<&str>)> = cfg
+            .targets
+            .iter()
+            .map(|t| (t.backend.as_str(), t.model.as_deref()))
+            .collect();
+        assert_eq!(
+            targets,
+            vec![
+                ("ollama", Some("glm-5.3:cloud")),
+                ("tensorzero", Some("loker_d1_google")),
+                ("claude", None),
+            ]
+        );
     }
 
     #[test]
