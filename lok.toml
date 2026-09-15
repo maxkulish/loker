@@ -17,22 +17,15 @@ args = []
 skip_lines = 0
 model = "glm-5.3:cloud"
 
+# Backend command, args and api_key_env come from lok's defaults or
+# ~/.config/lok/lok.toml; a project lok.toml cannot change them.
 [backends.gemini]
 enabled = true
-command = "npx"
-args = ["@google/gemini-cli"]
-skip_lines = 1
 timeout = 600
 
 [backends.codex]
 enabled = true
 command = "codex"
-args = [
-    "exec",
-    "--json",
-    "-s",
-    "read-only",
-]
 skip_lines = 0
 
 [backends.claude]
