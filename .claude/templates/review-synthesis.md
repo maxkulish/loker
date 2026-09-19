@@ -18,7 +18,7 @@ Always include this table first. Shows which reviewers ran, succeeded, or failed
 | Reviewer | Status | Detail |
 |----------|--------|--------|
 | Gemini 3.1 Pro | [OK / REVIEW_FAILED / SKIPPED] | [If failed: reason from REVIEW_FAILED line. If skipped: "Pre-flight check failed"] |
-| Codex/Ollama (glm-5:cloud) | [OK / REVIEW_FAILED / SKIPPED] | [Same] |
+| Codex/Ollama (glm-5.3:cloud) | [OK / REVIEW_FAILED / SKIPPED] | [Same] |
 | Claude (fallback) | [OK / SKIPPED] | [If OK: "Both external models failed, fallback activated". If skipped: "External reviewers succeeded"] |
 
 ---

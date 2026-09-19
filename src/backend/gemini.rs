@@ -67,7 +67,7 @@ impl super::Backend for GeminiBackend {
             .unwrap_or_default();
         let shell_cmd = format!(
             "echo '' | {} {}{} '{}'",
-            &self.command,
+            self.command,
             self.args.join(" "),
             model_flag,
             escaped_prompt

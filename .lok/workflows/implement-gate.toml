@@ -85,7 +85,7 @@ when = "steps.health_check.success"
 shell = '''
 TASK="{{ arg.1 }}"
 BRANCH="{{ arg.2 }}"
-PRIMARY_MODEL="${CODEX_MODEL:-gpt-5.5}"
+PRIMARY_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
 
 PERSONA=$(cat .pi/agents/codex-pre-pr.md)
 PROMPT=$(cat <<EOF
@@ -111,7 +111,7 @@ approve | approve_with_changes | rework
 EOF
 )
 
-OUTPUT=$(timeout 900 codex exec -m "$PRIMARY_MODEL" -s read-only "$PROMPT" 2>/tmp/lok-codex-stderr.log)
+OUTPUT=$(timeout 900 codex exec -m "$PRIMARY_MODEL" -c model_reasoning_effort='"high"' -s read-only "$PROMPT" 2>/tmp/lok-codex-stderr.log)
 
 if [ -z "$OUTPUT" ] || [ $(printf '%s' "$OUTPUT" | wc -c) -lt 100 ]; then
   STDERR=$(head -10 /tmp/lok-codex-stderr.log 2>/dev/null || echo "no stderr")
@@ -412,7 +412,7 @@ write_review() {
 write_review \
   "$TMP_DIR/codex.md" \
   "docs/reviews/${TASK}-codex-validation.md" \
-  "Codex (${CODEX_MODEL:-gpt-5.5})"
+  "Codex (${CODEX_MODEL:-gpt-5.6-sol})"
 
 write_review \
   "$TMP_DIR/gemini.md" \

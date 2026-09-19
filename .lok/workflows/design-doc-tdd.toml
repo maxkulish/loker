@@ -25,7 +25,7 @@ description = "Four-phase design → review → implement → verify pipeline."
 [[phases]]
 name = "design"
 strategy = { single = {} }
-backends = ["ollama/qwen3-coder-next"]
+backends = ["ollama/glm-5.3:cloud"]
 prompt_template = "../prompts/design-doc-tdd/design.md.tmpl"
 inputs = ["spec"]
 output = "design.md"
@@ -33,7 +33,7 @@ output = "design.md"
 [[phases]]
 name = "review"
 strategy = { parallel = { min_responses = 2 } }
-backends = ["claude/", "gemini/", "codex/", "ollama/qwen3-coder-next"]
+backends = ["claude/", "gemini/", "codex/", "ollama/glm-5.3:cloud"]
 prompt_template = "../prompts/design-doc-tdd/review.md.tmpl"
 inputs = ["phase:design"]
 output = "review.md"
@@ -44,7 +44,7 @@ output = "review.md"
 [[phases]]
 name = "implement"
 strategy = { escalating = { pass_failure_context = true } }
-backends = ["ollama/qwen3-coder-next", "claude/", "codex/"]
+backends = ["ollama/glm-5.3:cloud", "claude/", "codex/"]
 prompt_template = "../prompts/design-doc-tdd/implement.md.tmpl"
 inputs = ["phase:design", "phase:review"]
 output = "changes"

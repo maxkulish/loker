@@ -39,7 +39,10 @@ impl CodexBackend {
 
     fn parse_output(&self, output: &str) -> String {
         // Parse JSON output from codex
-        // Look for agent_message in item.completed events
+        // Look for agent_message in item.completed events. Codex emits one
+        // per assistant message - preambles first, the actual answer last -
+        // so keep the final match.
+        let mut last_message: Option<String> = None;
         for line in output.lines() {
             if line.contains("\"type\":\"item.completed\"") && line.contains("agent_message") {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
@@ -48,10 +51,13 @@ impl CodexBackend {
                         .and_then(|i| i.get("text"))
                         .and_then(|t| t.as_str())
                     {
-                        return text.to_string();
+                        last_message = Some(text.to_string());
                     }
                 }
             }
+        }
+        if let Some(text) = last_message {
+            return text;
         }
 
         // Fallback: return raw output
@@ -166,5 +172,23 @@ mod tests {
                 file_edit: true,
             }
         );
+    }
+
+    #[test]
+    fn parse_output_returns_last_agent_message() {
+        let backend = CodexBackend {
+            command: "codex".to_string(),
+            args: vec![],
+            default_model: None,
+        };
+        let output = concat!(
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"I'll look at the files first."}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"command_execution","command":"ls"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"Final answer"}}"#,
+            "\n",
+        );
+        assert_eq!(backend.parse_output(output), "Final answer");
     }
 }

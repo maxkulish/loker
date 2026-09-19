@@ -246,7 +246,7 @@ This produces:
 # Design Review: CLO-XX - [Title]
 
 **Reviewed**: [Current Date YYYY-MM-DD]
-**Reviewer**: [Gemini 3.1 Pro | Codex via Ollama (glm-5:cloud)]
+**Reviewer**: [Gemini 3.1 Pro | Codex via Ollama (glm-5.3:cloud)]
 **Design Document**: docs/design-docs/clo-XX-[description].md
 **Review Duration**: [X seconds]
 
@@ -400,13 +400,13 @@ For deeper diagnostics:
 | Provider | Model | Integration | Notes |
 |----------|-------|-------------|-------|
 | Gemini | `gemini-3.1-pro-preview` | Gemini CLI | Explicitly set via `--model` flag to prevent auto-routing to Flash |
-| Ollama | `glm-5:cloud` | Codex | `ollama launch codex --model MODEL --oss --local-provider ollama` |
+| Ollama | `glm-5.3:cloud` | Codex | `ollama launch codex --model MODEL --oss --local-provider ollama` |
 
 ### Environment Variables
 
 - `GEMINI_MODEL` - Override default Gemini model (default: `gemini-3.1-pro-preview`)
 - `GEMINI_FALLBACK_MODEL` - Gemini model to try when primary returns empty output (default: `gemini-2.5-pro`)
-- `OLLAMA_MODEL` - Override default Ollama model (default: `glm-5:cloud`)
+- `OLLAMA_MODEL` - Override default Ollama model (default: `glm-5.3:cloud`)
 - `GEMINI_TIMEOUT` - Override Gemini timeout in seconds (default: 300)
 - `OLLAMA_TIMEOUT` - Override Ollama timeout in seconds (default: 300)
 
@@ -455,7 +455,7 @@ PROJECT CONTEXT: Rust CLI tool for multi-LLM orchestration. Linear workspace: cl
 # Run Ollama/Codex (background)
 (
   start=$(date +%s)
-  env -u CLAUDECODE timeout 300 ollama launch codex --model glm-5:cloud -- \
+  env -u CLAUDECODE timeout 300 ollama launch codex --model glm-5.3:cloud -- \
     exec "$REVIEW_PROMPT" \
     --sandbox read-only \
     --oss --local-provider ollama \

@@ -112,11 +112,11 @@ loker explain design-doc-tdd
 
 Design-doc-tdd workflow (4 phases):
 
-  design (ollama/qwen3-coder-next)
+  design (ollama/glm-5.3:cloud)
     ↓ design.md
-  review (claude/ + gemini/ + codex/ + ollama/qwen3-coder-next)
+  review (claude/ + gemini/ + codex/ + ollama/glm-5.3:cloud)
     ↓ review.md
-  implement (ollama/qwen3-coder-next → claude/ → codex/)
+  implement (ollama/glm-5.3:cloud → claude/ → codex/)
     ↓ changes/
   verify (codex/ + gemini/)
     ↓ verify.json
