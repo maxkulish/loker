@@ -37,7 +37,7 @@ Install both this orchestrator AND the sibling Linear bridge - the
 phase scripts call `mcp__linear__*` tools, which only resolve when the
 linear bridge is active. `make pi-init` does both.
 
-pi provides `@mariozechner/pi-*` and `typebox` at runtime, so they are
+pi provides `@earendil-works/pi-*` and `typebox` at runtime, so they are
 optional peer dependencies. `--omit=dev` skips them; run plain `npm ci`
 when you edit the extension and want editor types.
 
