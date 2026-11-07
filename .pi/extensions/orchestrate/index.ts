@@ -1,15 +1,15 @@
-import type { ExtensionAPI, ExtensionContext, MessageRenderer } from "@mariozechner/pi-coding-agent";
-import type { AutocompleteItem } from "@mariozechner/pi-tui";
-import { StringEnum } from "@mariozechner/pi-ai";
-import { Text } from "@mariozechner/pi-tui";
-import { Type, type Static } from "typebox";
+import type { ExtensionAPI, ExtensionContext, MessageRenderer } from "@earendil-works/pi-coding-agent";
+import type { AutocompleteItem } from "@earendil-works/pi-tui";
+import { StringEnum } from "@earendil-works/pi-ai";
+import { Text } from "@earendil-works/pi-tui";
+import { Type, type Static, type TUnsafe } from "typebox";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   formatSize,
   truncateHead,
   withFileMutationQueue,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -188,9 +188,11 @@ interface WorkflowState {
   history?: WorkflowHistoryEvent[];
 }
 
+const WorkflowPhaseSchema = StringEnum(WORKFLOW_PHASES) as unknown as TUnsafe<WorkflowPhase>;
+
 const UpdateWorkflowStateParams = Type.Object({
   task_id: Type.String({ description: "Task ID (e.g. CLO-XX)" }),
-  phase: StringEnum(WORKFLOW_PHASES),
+  phase: WorkflowPhaseSchema,
   action: Type.String({ description: "History action type (e.g. pre_flight_checks_passed, pr_created)" }),
   details: Type.String({ description: "Details about the action" }),
   field_updates: Type.Optional(Type.Record(Type.String(), Type.Any())),
@@ -202,8 +204,8 @@ const UpdateWorkflowStateParams = Type.Object({
 
 const TransitionPhaseParamsSchema = Type.Object({
   task_id: Type.String({ description: "Task ID (e.g. CLO-XX)" }),
-  from_phase: StringEnum(WORKFLOW_PHASES),
-  to_phase: StringEnum(WORKFLOW_PHASES),
+  from_phase: WorkflowPhaseSchema,
+  to_phase: WorkflowPhaseSchema,
   validation_override: Type.Optional(Type.Boolean({ description: "Skip validation (use with caution)" })),
 });
 
